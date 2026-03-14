@@ -112,4 +112,48 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(output.attributes.single { it.name.localName == "styleClass" }.value).isEqualTo("#{wrapperClass}")
         assertThat(output.attributes.single { it.name.localName == "value" }.value).isEqualTo("#{resolvedLabel}")
     }
+
+    @Test
+    fun `missing include fixture preserves precise provenance without expanded content`() {
+        val scenario = FixtureScenarios.scenario("support/missing-include")
+
+        val loadedSources = SourceLoader.scaffold().load(
+            AnalysisRequest(
+                oldRoot = FixtureScenarios.repositoryRoot.relativize(scenario.oldRoot),
+                newRoot = FixtureScenarios.repositoryRoot.relativize(scenario.newRoot),
+                baseOld = FixtureScenarios.repositoryRoot,
+                baseNew = FixtureScenarios.repositoryRoot,
+            ),
+        )
+
+        val includeEdge = loadedSources.oldRoot.sourceGraphFile.includeEdges.single()
+
+        assertThat(includeEdge.sourcePath).isEqualTo("/fragments/missing.xhtml")
+        assertThat(includeEdge.includeSite.render())
+            .startsWith("fixtures/support/missing-include/old/root.xhtml:2:")
+        assertThat(includeEdge.includeSite.attributeName).isEqualTo("src")
+        assertThat(includeEdge.includedDocument).isNotNull()
+        assertThat(includeEdge.includedDocument!!.displayPath)
+            .isEqualTo("fixtures/support/missing-include/old/fragments/missing.xhtml")
+        assertThat(includeEdge.includedFile).isNull()
+        assertThat(includeEdge.includeFailure).isNotNull()
+        assertThat(includeEdge.includeFailure!!.missingDocument).isEqualTo(includeEdge.includedDocument)
+        assertThat(includeEdge.parameters.map { it.name }).containsExactly("label")
+        assertThat(includeEdge.parameters.single().provenance.logicalLocation.render())
+            .startsWith("fixtures/support/missing-include/old/root.xhtml:3:")
+        assertThat(includeEdge.parameters.single().provenance.logicalLocation.attributeName).isEqualTo("value")
+
+        val parsedTrees = XhtmlSyntaxParser.scaffold().parse(loadedSources)
+        val includeNode = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+
+        assertThat(includeNode.sourcePath).isEqualTo("/fragments/missing.xhtml")
+        assertThat(includeNode.children).isEmpty()
+        assertThat(includeNode.provenance.logicalLocation.render())
+            .startsWith("fixtures/support/missing-include/old/root.xhtml:2:")
+        assertThat(includeNode.provenance.logicalLocation.attributeName).isEqualTo("src")
+        assertThat(includeNode.includeFailure).isNotNull()
+        assertThat(includeNode.includeFailure!!.missingDocument!!.displayPath)
+            .isEqualTo("fixtures/support/missing-include/old/fragments/missing.xhtml")
+        assertThat(includeNode.parameters.map { it.name }).containsExactly("label")
+    }
 }

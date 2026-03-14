@@ -1,6 +1,7 @@
 package dev.xhtmlinlinecheck.analyzer
 
 import dev.xhtmlinlinecheck.domain.AnalysisResult
+import dev.xhtmlinlinecheck.testing.FixtureScenarios
 import dev.xhtmlinlinecheck.testing.TemporaryProjectTree
 import dev.xhtmlinlinecheck.testing.assertThatReport
 import org.assertj.core.api.Assertions.assertThat
@@ -175,5 +176,40 @@ class FaceletsAnalyzerScaffoldTest {
         assertThat(report.problems.first().locations.old?.snippet).isEqualTo("/fragments/missing.xhtml")
         assertThat(report.problems.first().explanation)
             .contains("Static include /fragments/missing.xhtml resolved to fragments/missing.xhtml")
+    }
+
+    @Test
+    fun `missing include fixture keeps dedicated diagnostic provenance stable`() {
+        val scenario = FixtureScenarios.scenario("support/missing-include")
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = FixtureScenarios.repositoryRoot.relativize(scenario.oldRoot),
+                newRoot = FixtureScenarios.repositoryRoot.relativize(scenario.newRoot),
+                baseOld = FixtureScenarios.repositoryRoot,
+                baseNew = FixtureScenarios.repositoryRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasProblemCount(2)
+            .hasWarningCount(2)
+            .hasProblemIds(
+                "W-UNSUPPORTED-MISSING_INCLUDE",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().locations.old?.logicalLocation?.render())
+            .startsWith("fixtures/support/missing-include/old/root.xhtml:2:")
+        assertThat(report.problems.first().locations.old?.physicalLocation?.render())
+            .startsWith("fixtures/support/missing-include/old/root.xhtml:2:")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.attributeName).isEqualTo("src")
+        assertThat(report.problems.first().locations.old?.physicalLocation?.attributeName).isEqualTo("src")
+        assertThat(report.problems.first().locations.old?.snippet).isEqualTo("/fragments/missing.xhtml")
+        assertThat(report.problems.first().explanation)
+            .contains(
+                "Static include /fragments/missing.xhtml resolved to " +
+                    "fixtures/support/missing-include/old/fragments/missing.xhtml",
+            )
     }
 }
