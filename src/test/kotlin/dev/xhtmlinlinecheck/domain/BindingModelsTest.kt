@@ -16,4 +16,15 @@ class BindingModelsTest {
                 BindingKind.IMPLICIT_GLOBAL,
             )
     }
+
+    @Test
+    fun `binding ids scope ids and origin descriptors provide stable scope metadata`() {
+        val bindingId = BindingId(12)
+        val scopeId = ScopeId(7)
+        val origin = BindingOrigin(descriptor = "ui:repeat var=row")
+
+        assertThat(bindingId.value).isEqualTo(12)
+        assertThat(scopeId.value).isEqualTo(7)
+        assertThat(origin.descriptor).isEqualTo("ui:repeat var=row")
+    }
 }

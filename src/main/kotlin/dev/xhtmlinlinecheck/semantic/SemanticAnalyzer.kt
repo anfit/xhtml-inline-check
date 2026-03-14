@@ -20,12 +20,14 @@ fun interface SemanticAnalyzer {
                         provenance = parsedTrees.oldRoot.provenance,
                         syntaxTree = parsedTrees.oldRoot.syntaxTree,
                         tagRules = tagRules,
+                        scopeModel = ScopeStackModel.fromSyntaxTree(parsedTrees.oldRoot.syntaxTree),
                     ),
                     newRoot = SemanticModel(
                         document = parsedTrees.newRoot.document,
                         provenance = parsedTrees.newRoot.provenance,
                         syntaxTree = parsedTrees.newRoot.syntaxTree,
                         tagRules = tagRules,
+                        scopeModel = ScopeStackModel.fromSyntaxTree(parsedTrees.newRoot.syntaxTree),
                     ),
                 )
             }

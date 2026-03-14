@@ -10,6 +10,7 @@ data class SemanticModel(
     val provenance: Provenance,
     val syntaxTree: XhtmlSyntaxTree,
     val tagRules: TagRuleRegistry,
+    val scopeModel: ScopeStackModel,
 ) {
     init {
         require(provenance.physicalLocation.document == document) {

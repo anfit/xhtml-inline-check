@@ -51,6 +51,7 @@ class ScaffoldPipelineMetadataTest {
         assertThat(parsedTrees.oldRoot.syntaxTree.root).isNotNull()
         assertThat(semanticModels.newRoot.syntaxTree).isEqualTo(parsedTrees.newRoot.syntaxTree)
         assertThat(semanticModels.oldRoot.tagRules).isSameAs(TagRuleRegistry.builtIns())
+        assertThat(semanticModels.oldRoot.scopeModel.bindings).isEmpty()
         assertThat(loadedSources.oldRoot.contents).contains("<ui:composition")
         assertThat(loadedSources.newRoot.contents).contains("<ui:composition")
         assertThat(loadedSources.oldRoot.sourceGraphFile.stack.steps).isEmpty()
@@ -84,10 +85,12 @@ class ScaffoldPipelineMetadataTest {
 
         val loadedSources = SourceLoader.scaffold().load(request)
 
-        assertThat(loadedSources.oldRoot.document.absolutePath)
-            .isEqualTo(oldBase.toAbsolutePath().normalize().resolve("views/root.xhtml"))
-        assertThat(loadedSources.newRoot.document.absolutePath)
-            .isEqualTo(newBase.toAbsolutePath().normalize().resolve("pages/root.xhtml"))
+        assertThat(loadedSources.oldRoot.document.absolutePath).isEqualTo(
+                oldBase.toAbsolutePath().normalize().resolve("views/root.xhtml")
+            )
+        assertThat(loadedSources.newRoot.document.absolutePath).isEqualTo(
+                newBase.toAbsolutePath().normalize().resolve("pages/root.xhtml")
+            )
         assertThat(loadedSources.oldRoot.document.displayPath).isEqualTo("views/root.xhtml")
         assertThat(loadedSources.newRoot.document.displayPath).isEqualTo("pages/root.xhtml")
         assertThat(loadedSources.oldRoot.contents).contains("legacy")
@@ -119,15 +122,16 @@ class ScaffoldPipelineMetadataTest {
                     baseNew = newBase,
                 ),
             )
-        }
-            .isInstanceOf(SourceLoadException::class.java)
-            .hasMessageContaining("Missing source file for old: views/missing.xhtml")
-            .hasMessageContaining(oldBase.toAbsolutePath().normalize().resolve("views/missing.xhtml").toString().replace("\\", "/"))
-            .satisfies { exception ->
-                val sourceLoadException = exception as SourceLoadException
+        }.isInstanceOfSatisfying(SourceLoadException::class.java) { sourceLoadException ->
+                assertThat(sourceLoadException.message).contains("Missing source file for old: views/missing.xhtml")
+                assertThat(sourceLoadException.message).contains(
+                        oldBase.toAbsolutePath().normalize().resolve("views/missing.xhtml").toString()
+                            .replace("\\", "/")
+                    )
                 assertThat(sourceLoadException.document.displayPath).isEqualTo("views/missing.xhtml")
-                assertThat(sourceLoadException.document.absolutePath)
-                    .isEqualTo(oldBase.toAbsolutePath().normalize().resolve("views/missing.xhtml"))
+                assertThat(sourceLoadException.document.absolutePath).isEqualTo(
+                        oldBase.toAbsolutePath().normalize().resolve("views/missing.xhtml")
+                    )
             }
     }
 }

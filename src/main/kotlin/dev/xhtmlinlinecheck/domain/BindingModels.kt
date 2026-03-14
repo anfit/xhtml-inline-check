@@ -8,3 +8,17 @@ enum class BindingKind {
     C_FOR_EACH,
     IMPLICIT_GLOBAL,
 }
+
+@JvmInline
+value class BindingId(
+    val value: Int,
+)
+
+@JvmInline
+value class ScopeId(
+    val value: Int,
+)
+
+data class BindingOrigin(
+    val descriptor: String,
+)

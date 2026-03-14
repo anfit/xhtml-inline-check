@@ -29,6 +29,16 @@ sealed interface LogicalNode {
     val provenance: Provenance
 }
 
+data class LogicalNodePath(
+    val segments: List<Int> = emptyList(),
+) {
+    fun child(index: Int): LogicalNodePath = LogicalNodePath(segments + index)
+
+    companion object {
+        fun root(): LogicalNodePath = LogicalNodePath()
+    }
+}
+
 data class XhtmlSyntaxTree(
     val root: LogicalElementNode?,
 )
@@ -92,6 +102,23 @@ fun XhtmlSyntaxTree.walkDepthFirst(visitor: (LogicalNode) -> Unit) {
     }
 
     root?.let(::visit)
+}
+
+fun XhtmlSyntaxTree.walkDepthFirstWithPath(visitor: (LogicalNodePath, LogicalNode) -> Unit) {
+    fun visit(node: LogicalNode, path: LogicalNodePath) {
+        visitor(path, node)
+        val children =
+            when (node) {
+                is LogicalElementNode -> node.children
+                is LogicalIncludeNode -> node.children
+                is LogicalTextNode -> emptyList()
+            }
+        children.forEachIndexed { index, child ->
+            visit(child, path.child(index))
+        }
+    }
+
+    root?.let { visit(it, LogicalNodePath.root()) }
 }
 
 fun XhtmlSyntaxTree.walkNormalizedStructureDepthFirst(visitor: (LogicalNode) -> Unit) {
