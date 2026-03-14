@@ -4,7 +4,9 @@ import dev.xhtmlinlinecheck.domain.BindingKind
 import dev.xhtmlinlinecheck.rules.SyntaxRole
 import dev.xhtmlinlinecheck.semantic.CanonicalBindingId
 import dev.xhtmlinlinecheck.semantic.ComponentTargetAttribute
+import dev.xhtmlinlinecheck.semantic.ComponentTargetResolutionKind
 import dev.xhtmlinlinecheck.semantic.NormalizedElTemplate
+import dev.xhtmlinlinecheck.semantic.ResolvedComponentTargetReference
 import dev.xhtmlinlinecheck.semantic.SemanticElBindingReference
 import dev.xhtmlinlinecheck.semantic.SemanticNode
 import dev.xhtmlinlinecheck.semantic.SemanticNodeAncestor
@@ -21,6 +23,7 @@ data class SemanticNodeMatch(
 
 enum class SemanticNodeMatchReason {
     EXPLICIT_ID,
+    EXPLICIT_TARGET_RELATIONSHIP,
     STRUCTURAL_SIGNATURE,
 }
 
@@ -54,6 +57,18 @@ internal data class SemanticMatchSignature(
             append(namingContainerAncestry.joinToString(">") { it.render() })
             append("|iteration=")
             append(iterationContext.joinToString(">") { it.render() })
+        }
+}
+
+internal data class SemanticTargetRelationshipSignature(
+    val tagIdentity: SemanticTagIdentity,
+    val relationships: List<String>,
+) {
+    fun render(): String =
+        buildString {
+            append(tagIdentity.render())
+            append("|relationships=")
+            append(relationships.joinToString(","))
         }
 }
 
@@ -103,49 +118,9 @@ object SemanticNodeMatcher {
         val unmatchedOld = oldCandidates.toMutableList()
         val unmatchedNew = newCandidates.toMutableList()
 
-        val oldByExplicitId = unmatchedOld.groupByExplicitId()
-        val newByExplicitId = unmatchedNew.groupByExplicitId()
-        oldByExplicitId.keys
-            .intersect(newByExplicitId.keys)
-            .sorted()
-            .forEach { explicitId ->
-                val oldMatches = oldByExplicitId.getValue(explicitId)
-                val newMatches = newByExplicitId.getValue(explicitId)
-                if (oldMatches.size == 1 && newMatches.size == 1) {
-                    val oldNode = oldMatches.single()
-                    val newNode = newMatches.single()
-                    matches +=
-                        SemanticNodeMatch(
-                            oldNodeId = oldNode.nodeId,
-                            newNodeId = newNode.nodeId,
-                            reason = SemanticNodeMatchReason.EXPLICIT_ID,
-                        )
-                    unmatchedOld.remove(oldNode)
-                    unmatchedNew.remove(newNode)
-                }
-            }
-
-        val oldBySignature = unmatchedOld.groupBy(::semanticSignatureFor)
-        val newBySignature = unmatchedNew.groupBy(::semanticSignatureFor)
-        oldBySignature.keys
-            .intersect(newBySignature.keys)
-            .sortedBy(SemanticMatchSignature::render)
-            .forEach { signature ->
-                val oldMatches = oldBySignature.getValue(signature)
-                val newMatches = newBySignature.getValue(signature)
-                if (oldMatches.size == newMatches.size) {
-                    oldMatches.zip(newMatches).forEach { (oldNode, newNode) ->
-                        matches +=
-                            SemanticNodeMatch(
-                                oldNodeId = oldNode.nodeId,
-                                newNodeId = newNode.nodeId,
-                                reason = SemanticNodeMatchReason.STRUCTURAL_SIGNATURE,
-                            )
-                        unmatchedOld.remove(oldNode)
-                        unmatchedNew.remove(newNode)
-                    }
-                }
-            }
+        matchByExplicitIds(unmatchedOld, unmatchedNew, matches)
+        matchByExplicitTargetRelationships(unmatchedOld, unmatchedNew, matches)
+        matchBySemanticSignatureWithAncestryConstraints(unmatchedOld, unmatchedNew, matches)
 
         return SemanticNodeMatchResult(
             matches = matches,
@@ -155,8 +130,194 @@ object SemanticNodeMatcher {
     }
 }
 
+private fun matchByExplicitIds(
+    unmatchedOld: MutableList<SemanticNode>,
+    unmatchedNew: MutableList<SemanticNode>,
+    matches: MutableList<SemanticNodeMatch>,
+) {
+    val oldByExplicitId = unmatchedOld.groupByExplicitId()
+    val newByExplicitId = unmatchedNew.groupByExplicitId()
+    oldByExplicitId.keys
+        .intersect(newByExplicitId.keys)
+        .sorted()
+        .forEach { explicitId ->
+            val oldMatches = oldByExplicitId.getValue(explicitId)
+            val newMatches = newByExplicitId.getValue(explicitId)
+            if (oldMatches.size == 1 && newMatches.size == 1) {
+                recordMatch(
+                    oldNode = oldMatches.single(),
+                    newNode = newMatches.single(),
+                    reason = SemanticNodeMatchReason.EXPLICIT_ID,
+                    unmatchedOld = unmatchedOld,
+                    unmatchedNew = unmatchedNew,
+                    matches = matches,
+                )
+            }
+        }
+}
+
+private fun matchByExplicitTargetRelationships(
+    unmatchedOld: MutableList<SemanticNode>,
+    unmatchedNew: MutableList<SemanticNode>,
+    matches: MutableList<SemanticNodeMatch>,
+) {
+    while (true) {
+        val oldRelationshipSignatures =
+            unmatchedOld.associateWith { node ->
+                targetRelationshipSignatureFor(node).takeIf { it.relationships.isNotEmpty() }
+            }
+        val newRelationshipSignatures =
+            unmatchedNew.associateWith { node ->
+                targetRelationshipSignatureFor(node).takeIf { it.relationships.isNotEmpty() }
+            }
+        val proposedMatches =
+            mutuallyUniqueMatches(
+                oldNodes = unmatchedOld,
+                newNodes = unmatchedNew,
+                oldSignatureFor = { oldRelationshipSignatures.getValue(it) },
+                newSignatureFor = { newRelationshipSignatures.getValue(it) },
+                matches = matches,
+            )
+        if (proposedMatches.isEmpty()) {
+            break
+        }
+        proposedMatches.forEach { (oldNode, newNode) ->
+            recordMatch(
+                oldNode = oldNode,
+                newNode = newNode,
+                reason = SemanticNodeMatchReason.EXPLICIT_TARGET_RELATIONSHIP,
+                unmatchedOld = unmatchedOld,
+                unmatchedNew = unmatchedNew,
+                matches = matches,
+            )
+        }
+    }
+}
+
+private fun matchBySemanticSignatureWithAncestryConstraints(
+    unmatchedOld: MutableList<SemanticNode>,
+    unmatchedNew: MutableList<SemanticNode>,
+    matches: MutableList<SemanticNodeMatch>,
+) {
+    while (true) {
+        val proposedMatches =
+            mutuallyUniqueMatches(
+                oldNodes = unmatchedOld,
+                newNodes = unmatchedNew,
+                oldSignatureFor = ::semanticSignatureFor,
+                newSignatureFor = ::semanticSignatureFor,
+                matches = matches,
+            )
+        if (proposedMatches.isEmpty()) {
+            break
+        }
+        proposedMatches.forEach { (oldNode, newNode) ->
+            recordMatch(
+                oldNode = oldNode,
+                newNode = newNode,
+                reason = SemanticNodeMatchReason.STRUCTURAL_SIGNATURE,
+                unmatchedOld = unmatchedOld,
+                unmatchedNew = unmatchedNew,
+                matches = matches,
+            )
+        }
+    }
+}
+
+private fun <T : Any> mutuallyUniqueMatches(
+    oldNodes: List<SemanticNode>,
+    newNodes: List<SemanticNode>,
+    oldSignatureFor: (SemanticNode) -> T?,
+    newSignatureFor: (SemanticNode) -> T?,
+    matches: List<SemanticNodeMatch>,
+): List<Pair<SemanticNode, SemanticNode>> {
+    val oldCandidates =
+        oldNodes.associateWith { oldNode ->
+            val oldSignature = oldSignatureFor(oldNode) ?: return@associateWith emptyList()
+            newNodes.filter { newNode ->
+                newSignatureFor(newNode) == oldSignature && satisfiesAncestryConstraint(oldNode, newNode, matches)
+            }
+        }
+    val newCandidates =
+        newNodes.associateWith { newNode ->
+            val newSignature = newSignatureFor(newNode) ?: return@associateWith emptyList()
+            oldNodes.filter { oldNode ->
+                oldSignatureFor(oldNode) == newSignature && satisfiesAncestryConstraint(oldNode, newNode, matches)
+            }
+        }
+
+    return oldNodes.mapNotNull { oldNode ->
+        val newCandidatesForOld = oldCandidates.getValue(oldNode)
+        if (newCandidatesForOld.size != 1) {
+            return@mapNotNull null
+        }
+        val newNode = newCandidatesForOld.single()
+        if (newCandidates.getValue(newNode).singleOrNull() != oldNode) {
+            return@mapNotNull null
+        }
+        oldNode to newNode
+    }
+}
+
+private fun satisfiesAncestryConstraint(
+    oldNode: SemanticNode,
+    newNode: SemanticNode,
+    matches: List<SemanticNodeMatch>,
+): Boolean {
+    val oldMatchedAncestorId = nearestMatchedStructuralAncestorId(oldNode, matches.map(SemanticNodeMatch::oldNodeId).toSet())
+    val newMatchedAncestorId = nearestMatchedStructuralAncestorId(newNode, matches.map(SemanticNodeMatch::newNodeId).toSet())
+    if (oldMatchedAncestorId == null || newMatchedAncestorId == null) {
+        return oldMatchedAncestorId == null && newMatchedAncestorId == null
+    }
+    return matches.any { match ->
+        match.oldNodeId == oldMatchedAncestorId && match.newNodeId == newMatchedAncestorId
+    }
+}
+
+private fun nearestMatchedStructuralAncestorId(
+    node: SemanticNode,
+    matchedNodeIds: Set<SemanticNodeId>,
+): SemanticNodeId? =
+    node.nodePath.ancestorPaths()
+        .asSequence()
+        .map(::semanticNodeIdFor)
+        .firstOrNull { it in matchedNodeIds }
+
+private fun targetRelationshipSignatureFor(
+    node: SemanticNode,
+): SemanticTargetRelationshipSignature {
+    val relationships =
+        node.componentTargetAttributes.flatMap { attribute ->
+            attribute.resolvedReferences.mapNotNull { reference ->
+                reference.explicitTargetRelationship(attribute.kind.attributeName)
+            }
+        }
+    return SemanticTargetRelationshipSignature(
+        tagIdentity = node.semanticTagIdentity(),
+        relationships = relationships,
+    )
+}
+
 private fun List<SemanticNode>.groupByExplicitId(): Map<String, List<SemanticNode>> =
-    filter { it.explicitIdAttribute != null }.groupBy { it.explicitIdAttribute!!.rawValue }
+    filter { it.explicitIdAttribute?.isStaticLiteral == true }.groupBy { it.explicitIdAttribute!!.rawValue }
+
+private fun recordMatch(
+    oldNode: SemanticNode,
+    newNode: SemanticNode,
+    reason: SemanticNodeMatchReason,
+    unmatchedOld: MutableList<SemanticNode>,
+    unmatchedNew: MutableList<SemanticNode>,
+    matches: MutableList<SemanticNodeMatch>,
+) {
+    matches +=
+        SemanticNodeMatch(
+            oldNodeId = oldNode.nodeId,
+            newNodeId = newNode.nodeId,
+            reason = reason,
+        )
+    unmatchedOld.remove(oldNode)
+    unmatchedNew.remove(newNode)
+}
 
 internal fun semanticSignatureFor(node: SemanticNode): SemanticMatchSignature =
     SemanticMatchSignature(
@@ -230,3 +391,35 @@ private fun NormalizedElTemplate.renderForMatching(bindingReferences: List<Seman
         }
     return rendered
 }
+
+private fun ResolvedComponentTargetReference.explicitTargetRelationship(
+    attributeName: String,
+): String? {
+    val resolvedTarget = target ?: return null
+    val explicitTarget = resolvedTarget.explicitId ?: return null
+    val stableTargetAnchor =
+        when (kind) {
+            ComponentTargetResolutionKind.COMPONENT ->
+                "component:${resolvedTarget.nodeName}#$explicitTarget@form:${resolvedTarget.formAnchor ?: "<none>"}"
+
+            ComponentTargetResolutionKind.FORM ->
+                "form:${resolvedTarget.nodeName}#$explicitTarget"
+
+            else -> null
+        } ?: return null
+
+    return "$attributeName->$stableTargetAnchor"
+}
+
+private fun dev.xhtmlinlinecheck.syntax.LogicalNodePath.ancestorPaths(): List<dev.xhtmlinlinecheck.syntax.LogicalNodePath> =
+    segments.indices.reversed().map { depth ->
+        dev.xhtmlinlinecheck.syntax.LogicalNodePath(segments.take(depth))
+    }
+
+private fun semanticNodeIdFor(path: dev.xhtmlinlinecheck.syntax.LogicalNodePath): SemanticNodeId =
+    SemanticNodeId(
+        buildString {
+            append("node:/")
+            append(path.segments.joinToString("/"))
+        },
+    )

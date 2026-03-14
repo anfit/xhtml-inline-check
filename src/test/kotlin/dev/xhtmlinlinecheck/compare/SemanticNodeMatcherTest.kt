@@ -325,6 +325,72 @@ class SemanticNodeMatcherTest {
     }
 
     @Test
+    fun `anonymous nodes can align by explicit target relationships after explicit ids anchor the targets`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:form id="mainForm">
+                <h:inputText id="leftInput" />
+                <h:outputLabel for="leftInput" />
+                <h:inputText id="rightInput" />
+                <h:outputLabel for="rightInput" />
+              </h:form>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:form id="mainForm">
+                <h:inputText id="rightInput" />
+                <h:outputLabel for="rightInput" />
+                <h:inputText id="leftInput" />
+                <h:outputLabel for="leftInput" />
+              </h:form>
+            </ui:composition>
+            """,
+        )
+
+        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val oldLabels = semanticModels.oldRoot.semanticNodes.filter { it.nodeName == "h:outputLabel" }
+        val newLabels = semanticModels.newRoot.semanticNodes.filter { it.nodeName == "h:outputLabel" }
+        val oldLeftLabel = oldLabels.single { it.componentTargetAttributes.single().attribute.rawValue == "leftInput" }
+        val oldRightLabel = oldLabels.single { it.componentTargetAttributes.single().attribute.rawValue == "rightInput" }
+        val newLeftLabel = newLabels.single { it.componentTargetAttributes.single().attribute.rawValue == "leftInput" }
+        val newRightLabel = newLabels.single { it.componentTargetAttributes.single().attribute.rawValue == "rightInput" }
+
+        val result = SemanticNodeMatcher.matchStructuralCandidates(
+            oldNodes = semanticModels.oldRoot.semanticNodes,
+            newNodes = semanticModels.newRoot.semanticNodes,
+        )
+
+        assertThat(result.matches)
+            .extracting("reason", "oldNodeId.value", "newNodeId.value")
+            .containsExactlyInAnyOrder(
+                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/0", "node:/0"),
+                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/0/0", "node:/0/2"),
+                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/0/2", "node:/0/0"),
+                Tuple.tuple(
+                    SemanticNodeMatchReason.EXPLICIT_TARGET_RELATIONSHIP,
+                    oldLeftLabel.nodeId.value,
+                    newLeftLabel.nodeId.value,
+                ),
+                Tuple.tuple(
+                    SemanticNodeMatchReason.EXPLICIT_TARGET_RELATIONSHIP,
+                    oldRightLabel.nodeId.value,
+                    newRightLabel.nodeId.value,
+                ),
+            )
+        assertThat(result.unmatchedOldNodeIds).isEmpty()
+        assertThat(result.unmatchedNewNodeIds).isEmpty()
+    }
+
+    @Test
     fun `semantic signatures disambiguate reordered alpha-renamed siblings by local semantic facts`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(
@@ -446,6 +512,76 @@ class SemanticNodeMatcherTest {
                 Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/1", "node:/0"),
                 Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, oldLeft.nodeId.value, newLeft.nodeId.value),
                 Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, oldRight.nodeId.value, newRight.nodeId.value),
+            )
+        assertThat(result.unmatchedOldNodeIds).isEmpty()
+        assertThat(result.unmatchedNewNodeIds).isEmpty()
+    }
+
+    @Test
+    fun `fallback semantic matching keeps anonymous descendants under their already matched ancestors`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup rendered="#{bean.left}">
+                <h:outputText value="same" />
+              </h:panelGroup>
+              <h:panelGroup rendered="#{bean.right}">
+                <h:outputText value="same" />
+              </h:panelGroup>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup rendered="#{bean.right}">
+                <h:outputText value="same" />
+              </h:panelGroup>
+              <h:panelGroup rendered="#{bean.left}">
+                <h:outputText value="same" />
+              </h:panelGroup>
+            </ui:composition>
+            """,
+        )
+
+        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val oldPanels = semanticModels.oldRoot.semanticNodes.filter { it.nodeName == "h:panelGroup" }
+        val newPanels = semanticModels.newRoot.semanticNodes.filter { it.nodeName == "h:panelGroup" }
+        val oldLeftPanel = oldPanels.single { it.renderedAttribute!!.rawValue == "#{bean.left}" }
+        val oldRightPanel = oldPanels.single { it.renderedAttribute!!.rawValue == "#{bean.right}" }
+        val newLeftPanel = newPanels.single { it.renderedAttribute!!.rawValue == "#{bean.left}" }
+        val newRightPanel = newPanels.single { it.renderedAttribute!!.rawValue == "#{bean.right}" }
+        val oldOutputsByParent =
+            semanticModels.oldRoot.semanticNodes
+                .filter { it.nodeName == "h:outputText" }
+                .associateBy { output -> output.nodePath.segments.dropLast(1) }
+        val newOutputsByParent =
+            semanticModels.newRoot.semanticNodes
+                .filter { it.nodeName == "h:outputText" }
+                .associateBy { output -> output.nodePath.segments.dropLast(1) }
+
+        val oldLeftOutput = oldOutputsByParent.getValue(oldLeftPanel.nodePath.segments)
+        val oldRightOutput = oldOutputsByParent.getValue(oldRightPanel.nodePath.segments)
+        val newLeftOutput = newOutputsByParent.getValue(newLeftPanel.nodePath.segments)
+        val newRightOutput = newOutputsByParent.getValue(newRightPanel.nodePath.segments)
+
+        val result = SemanticNodeMatcher.matchStructuralCandidates(
+            oldNodes = semanticModels.oldRoot.semanticNodes,
+            newNodes = semanticModels.newRoot.semanticNodes,
+        )
+
+        assertThat(result.matches)
+            .extracting("reason", "oldNodeId.value", "newNodeId.value")
+            .containsExactlyInAnyOrder(
+                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, oldLeftPanel.nodeId.value, newLeftPanel.nodeId.value),
+                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, oldRightPanel.nodeId.value, newRightPanel.nodeId.value),
+                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, oldLeftOutput.nodeId.value, newLeftOutput.nodeId.value),
+                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, oldRightOutput.nodeId.value, newRightOutput.nodeId.value),
             )
         assertThat(result.unmatchedOldNodeIds).isEmpty()
         assertThat(result.unmatchedNewNodeIds).isEmpty()
