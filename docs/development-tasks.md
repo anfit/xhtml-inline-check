@@ -1,4 +1,3 @@
-Define the top-level result model for `EQUIVALENT`, `NOT_EQUIVALENT`, and `INCONCLUSIVE`, because the comparison, reporting, and CLI exit-code tasks all depend on a stable outcome vocabulary.
 Define shared location and provenance models that can be reused by the loader, syntax-tree, semantic-node, diagnostic, and reporter tasks.
 Define the structured problem model with severity, category, summary, locations, snippets, explanation, and hint, reusing the location/provenance task so comparison and reporting can speak the same language.
 Define summary and statistics models for counts, coverage, and warning totals so the comparison engine, text reporter, and JSON reporter tasks can emit consistent aggregates.

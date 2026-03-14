@@ -15,7 +15,10 @@ fun interface EquivalenceComparator {
         fun scaffold(): EquivalenceComparator =
             EquivalenceComparator {
                 AnalysisReport(
-                    result = AnalysisResult.INCONCLUSIVE,
+                    result = AnalysisResult.derive(
+                        hasMismatch = false,
+                        blocksEquivalenceClaim = true,
+                    ),
                     summary = "Scaffolded analyzer pipeline only; semantic comparison is not implemented yet.",
                     problems = listOf(
                         Problem(
