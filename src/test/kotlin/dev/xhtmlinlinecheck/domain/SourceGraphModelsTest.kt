@@ -1,0 +1,72 @@
+package dev.xhtmlinlinecheck.domain
+
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
+import java.nio.file.Path
+
+class SourceGraphModelsTest {
+    @Test
+    fun `root source graph file reuses root provenance`() {
+        val document = SourceDocument.fromPath(
+            side = AnalysisSide.OLD,
+            path = Path.of("legacy", "root.xhtml"),
+        )
+
+        val file = SourceGraphFile.root(document)
+
+        assertThat(file.document).isEqualTo(document)
+        assertThat(file.provenance).isEqualTo(Provenance.forRoot(document))
+        assertThat(file.stack.steps).isEmpty()
+        assertThat(file.includeEdges).isEmpty()
+    }
+
+    @Test
+    fun `include edges preserve parameters and grow source graph stacks`() {
+        val rootDocument = SourceDocument.fromPath(
+            side = AnalysisSide.OLD,
+            path = Path.of("legacy", "root.xhtml"),
+        )
+        val includedDocument = SourceDocument.fromPath(
+            side = AnalysisSide.OLD,
+            path = Path.of("legacy", "fragments", "table.xhtml"),
+        )
+        val parameterProvenance = Provenance.forRoot(rootDocument).copy(
+            physicalLocation = SourceLocation(
+                document = rootDocument,
+                span = SourceSpan(SourcePosition(line = 7, column = 9)),
+                attributeName = "value",
+            ),
+            logicalLocation = SourceLocation(
+                document = rootDocument,
+                span = SourceSpan(SourcePosition(line = 7, column = 9)),
+                attributeName = "value",
+            ),
+        )
+        val edge = SourceGraphEdge(
+            includeSite = SourceLocation(
+                document = rootDocument,
+                span = SourceSpan(SourcePosition(line = 5, column = 5)),
+                attributeName = "src",
+            ),
+            includedDocument = includedDocument,
+            parameters = listOf(
+                SourceGraphParameter(
+                    name = "row",
+                    valueExpression = "#{bean.row}",
+                    provenance = parameterProvenance,
+                ),
+            ),
+        )
+
+        val includedFile = SourceGraphFile.included(includedDocument, edge)
+
+        assertThat(edge.asIncludeStep().parameterNames).containsExactly("row")
+        assertThat(edge.parameters.single().valueExpression).isEqualTo("#{bean.row}")
+        assertThat(edge.parameters.single().provenance.physicalLocation.render())
+            .isEqualTo("legacy/root.xhtml:7:9 @value")
+        assertThat(edge.stackAfter.steps).containsExactly(edge.asIncludeStep())
+        assertThat(includedFile.stack.steps).containsExactly(edge.asIncludeStep())
+        assertThat(includedFile.provenance.includeStack).containsExactly(edge.asIncludeStep())
+        assertThat(includedFile.provenance.logicalLocation.render()).isEqualTo("legacy/fragments/table.xhtml")
+    }
+}

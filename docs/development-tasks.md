@@ -1,4 +1,3 @@
-Define source-graph objects for files, include edges, include parameters, and include stacks, reusing the shared provenance model so loader and parser tasks can preserve origin details.
 Implement static detection of `ui:include` in source files, using the source-graph task as the discovery mechanism for later include-resolution and expansion tasks.
 Implement include `src` resolution relative to the current file and optional base directory, building on the root-path, file-reading, and `ui:include`-detection tasks.
 Implement `ui:param` extraction on include sites so the later binding and scope tasks can inherit the parameter flow established during include expansion.

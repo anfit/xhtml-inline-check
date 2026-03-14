@@ -46,8 +46,11 @@ class ScaffoldPipelineMetadataTest {
         assertThat(loadedSources.newRoot.document.side).isEqualTo(AnalysisSide.NEW)
         assertThat(parsedTrees.oldRoot.document).isEqualTo(loadedSources.oldRoot.document)
         assertThat(parsedTrees.newRoot.provenance).isEqualTo(loadedSources.newRoot.provenance)
+        assertThat(parsedTrees.oldRoot.sourceGraphFile).isEqualTo(loadedSources.oldRoot.sourceGraphFile)
+        assertThat(semanticModels.newRoot.sourceGraphFile).isEqualTo(parsedTrees.newRoot.sourceGraphFile)
         assertThat(loadedSources.oldRoot.contents).contains("<ui:composition")
         assertThat(loadedSources.newRoot.contents).contains("<ui:composition")
+        assertThat(loadedSources.oldRoot.sourceGraphFile.stack.steps).isEmpty()
         assertThat(semanticModels.oldRoot.document.displayPath).isEqualTo("legacy/root.xhtml")
         assertThat(semanticModels.newRoot.provenance.logicalLocation.render()).isEqualTo("refactored/root.xhtml")
     }
@@ -88,6 +91,8 @@ class ScaffoldPipelineMetadataTest {
         assertThat(loadedSources.newRoot.contents).contains("refactored")
         assertThat(loadedSources.oldRoot.provenance.logicalLocation.render()).isEqualTo("views/root.xhtml")
         assertThat(loadedSources.newRoot.provenance.physicalLocation.render()).isEqualTo("pages/root.xhtml")
+        assertThat(loadedSources.oldRoot.sourceGraphFile.provenance).isEqualTo(loadedSources.oldRoot.provenance)
+        assertThat(loadedSources.newRoot.sourceGraphFile.document.displayPath).isEqualTo("pages/root.xhtml")
     }
 
     @Test

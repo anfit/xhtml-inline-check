@@ -17,10 +17,12 @@ fun interface XhtmlSyntaxParser {
                     oldRoot = ParsedSourceTree(
                         document = loadedSources.oldRoot.document,
                         provenance = loadedSources.oldRoot.provenance,
+                        sourceGraphFile = loadedSources.oldRoot.sourceGraphFile,
                     ),
                     newRoot = ParsedSourceTree(
                         document = loadedSources.newRoot.document,
                         provenance = loadedSources.newRoot.provenance,
+                        sourceGraphFile = loadedSources.newRoot.sourceGraphFile,
                     ),
                 )
             }
