@@ -52,6 +52,7 @@ Represents parsed XHTML with namespace-aware elements and source metadata.
 Should capture:
 
 - element name and namespace
+- resolved tag-rule semantics from the shared registry
 - attributes
 - child order
 - source location
@@ -161,6 +162,7 @@ This reduces diagnostic cascades and keeps output easier to understand.
 ## Implementation Notes
 
 - Loader and parser should preserve enough metadata for file-linked diagnostics from day one.
+- The loader, syntax walker, and semantic handoff should share one `TagRuleRegistry`; resolve tag semantics once onto syntax nodes so later scope and structural work read the same rule decisions.
 - The EL layer should stay symbolic; it is not a runtime evaluator.
 - The semantic layer should treat transparent wrappers carefully so include inlining does not create false mismatches.
 - The comparator should suppress duplicate downstream noise when a single upstream mismatch already explains the failure.

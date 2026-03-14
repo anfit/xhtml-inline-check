@@ -5,6 +5,8 @@ import dev.xhtmlinlinecheck.domain.SourceGraphEdge
 import dev.xhtmlinlinecheck.domain.SourceGraphFile
 import dev.xhtmlinlinecheck.domain.SourceLocation
 import dev.xhtmlinlinecheck.loader.LoadedSources
+import dev.xhtmlinlinecheck.rules.TagRuleRegistry
+import dev.xhtmlinlinecheck.rules.isIncludeTag
 import dev.xhtmlinlinecheck.xml.NamespaceAwareXml
 import dev.xhtmlinlinecheck.xml.toSourceLocation
 import dev.xhtmlinlinecheck.xml.useAndClose
@@ -20,40 +22,48 @@ fun interface XhtmlSyntaxParser {
     fun parse(loadedSources: LoadedSources): ParsedTrees
 
     companion object {
-        fun scaffold(): XhtmlSyntaxParser =
+        fun scaffold(tagRules: TagRuleRegistry = TagRuleRegistry.builtIns()): XhtmlSyntaxParser =
             XhtmlSyntaxParser { loadedSources ->
                 ParsedTrees(
-                    oldRoot = loadedSources.oldRoot.toParsedSourceTree(),
-                    newRoot = loadedSources.newRoot.toParsedSourceTree(),
+                    oldRoot = loadedSources.oldRoot.toParsedSourceTree(tagRules),
+                    newRoot = loadedSources.newRoot.toParsedSourceTree(tagRules),
                 )
             }
 
-        private fun dev.xhtmlinlinecheck.loader.LoadedSource.toParsedSourceTree(): ParsedSourceTree =
+        private fun dev.xhtmlinlinecheck.loader.LoadedSource.toParsedSourceTree(
+            tagRules: TagRuleRegistry,
+        ): ParsedSourceTree =
             ParsedSourceTree(
                 document = document,
                 provenance = provenance,
                 sourceGraphFile = sourceGraphFile,
-                syntaxTree = XhtmlSyntaxTree(root = LogicalTreeBuilder.parse(sourceGraphFile)),
+                syntaxTree = XhtmlSyntaxTree(root = LogicalTreeBuilder.parse(sourceGraphFile, tagRules)),
             )
     }
 }
 
 private object LogicalTreeBuilder {
-    private const val FACELETS_NAMESPACE = "http://xmlns.jcp.org/jsf/facelets"
-    private const val INCLUDE_LOCAL_NAME = "include"
+    fun parse(
+        sourceGraphFile: SourceGraphFile,
+        tagRules: TagRuleRegistry,
+    ): LogicalElementNode? {
+        val xmlReader = NamespaceAwareXml.newReader(
+            sourceGraphFile.document.displayPath,
+            sourceGraphFile.contents,
+        )
 
-    fun parse(sourceGraphFile: SourceGraphFile): LogicalElementNode? {
-        val reader = NamespaceAwareXml.newReader(sourceGraphFile.document.displayPath, sourceGraphFile.contents)
-        reader.useAndClose {
+        try {
             val includeEdges = ArrayDeque(sourceGraphFile.includeEdges)
-            while (reader.hasNext()) {
-                if (reader.next() != XMLStreamConstants.START_ELEMENT) {
+            while (xmlReader.hasNext()) {
+                if (xmlReader.next() != XMLStreamConstants.START_ELEMENT) {
                     continue
                 }
 
-                return readNode(reader, sourceGraphFile, includeEdges) as? LogicalElementNode
+                return readNode(xmlReader, sourceGraphFile, includeEdges, tagRules) as? LogicalElementNode
             }
             return null
+        } finally {
+            xmlReader.close()
         }
     }
 
@@ -61,27 +71,36 @@ private object LogicalTreeBuilder {
         reader: XMLStreamReader,
         sourceGraphFile: SourceGraphFile,
         includeEdges: ArrayDeque<SourceGraphEdge>,
+        tagRules: TagRuleRegistry,
     ): LogicalNode =
-        if (reader.namespaceURI == FACELETS_NAMESPACE && reader.localName == INCLUDE_LOCAL_NAME) {
-            readIncludeNode(reader, sourceGraphFile, includeEdges.removeFirst())
+        if (tagRules.resolve(reader.toLogicalName()).isIncludeTag) {
+            readIncludeNode(reader, sourceGraphFile, includeEdges.removeFirst(), tagRules)
         } else {
-            readElementNode(reader, sourceGraphFile, includeEdges)
+            readElementNode(reader, sourceGraphFile, includeEdges, tagRules)
         }
 
     private fun readElementNode(
         reader: XMLStreamReader,
         sourceGraphFile: SourceGraphFile,
         includeEdges: ArrayDeque<SourceGraphEdge>,
+        tagRules: TagRuleRegistry,
     ): LogicalElementNode {
         val location = reader.toSourceLocation(sourceGraphFile)
         val children = mutableListOf<LogicalNode>()
         val name = reader.toLogicalName()
+        val tagRule = tagRules.resolve(name)
         val attributes = buildAttributes(reader, sourceGraphFile)
         val namespaceBindings = buildNamespaceBindings(reader)
 
         while (reader.hasNext()) {
             when (reader.next()) {
-                XMLStreamConstants.START_ELEMENT -> children += readNode(reader, sourceGraphFile, includeEdges)
+                XMLStreamConstants.START_ELEMENT -> children += readNode(
+                    reader,
+                    sourceGraphFile,
+                    includeEdges,
+                    tagRules
+                )
+
                 XMLStreamConstants.CHARACTERS, XMLStreamConstants.CDATA -> {
                     reader.text.takeUnless(String::isBlank)?.let { text ->
                         children +=
@@ -95,6 +114,7 @@ private object LogicalTreeBuilder {
 
                 XMLStreamConstants.END_ELEMENT -> return LogicalElementNode(
                     name = name,
+                    tagRule = tagRule,
                     attributes = attributes,
                     namespaceBindings = namespaceBindings,
                     children = children,
@@ -106,6 +126,7 @@ private object LogicalTreeBuilder {
 
         return LogicalElementNode(
             name = name,
+            tagRule = tagRule,
             attributes = attributes,
             namespaceBindings = namespaceBindings,
             children = children,
@@ -118,6 +139,7 @@ private object LogicalTreeBuilder {
         reader: XMLStreamReader,
         sourceGraphFile: SourceGraphFile,
         edge: SourceGraphEdge,
+        tagRules: TagRuleRegistry,
     ): LogicalIncludeNode {
         skipCurrentElement(reader)
         return LogicalIncludeNode(
@@ -128,11 +150,11 @@ private object LogicalTreeBuilder {
             includeFailure = edge.includeFailure,
             children =
                 edge.includedFile
-                    ?.let(::parse)
+                    ?.let { parse(it, tagRules) }
                     ?.let(::listOf)
                     ?: emptyList(),
             location = edge.includeSite,
-            provenance = sourceGraphFile.provenanceAt(edge.includeSite),
+            provenance = sourceGraphFile.includeBoundaryProvenanceAt(edge.includeSite),
         )
     }
 
@@ -154,8 +176,8 @@ private object LogicalTreeBuilder {
                         name =
                             LogicalName(
                                 localName = reader.getAttributeLocalName(index),
-                                namespaceUri = reader.getAttributeNamespace(index),
-                                prefix = reader.getAttributePrefix(index),
+                                namespaceUri = reader.getAttributeNamespace(index).nullIfBlank(),
+                                prefix = reader.getAttributePrefix(index).nullIfBlank(),
                             ),
                         value = reader.getAttributeValue(index),
                         location = reader.toSourceLocation(sourceGraphFile, reader.getAttributeLocalName(index)),
@@ -180,9 +202,11 @@ private object LogicalTreeBuilder {
     private fun XMLStreamReader.toLogicalName(): LogicalName =
         LogicalName(
             localName = localName,
-            namespaceUri = namespaceURI,
+            namespaceUri = namespaceURI.nullIfBlank(),
             prefix = prefix,
         )
+
+    private fun String?.nullIfBlank(): String? = this?.takeUnless(String::isBlank)
 
     private fun XMLStreamReader.toSourceLocation(
         sourceGraphFile: SourceGraphFile,
@@ -198,6 +222,13 @@ private object LogicalTreeBuilder {
                 } else {
                     provenance.logicalLocation
                 },
+            includeStack = stack.steps,
+        )
+
+    private fun SourceGraphFile.includeBoundaryProvenanceAt(location: SourceLocation): Provenance =
+        Provenance(
+            physicalLocation = location,
+            logicalLocation = location,
             includeStack = stack.steps,
         )
 }

@@ -1,4 +1,3 @@
-Implement a central registry for known tag rules so the syntax-walker, scope builder, structural analyzer, and later extension tasks can resolve semantics deterministically.
 Add registry rules for `ui:include`, `ui:param`, `ui:composition`, and `ui:fragment`, building on the parser and transparent-wrapper tasks so include-related behavior is explicit.
 Add a registry rule for `ui:repeat`, because the binding, iteration-ancestry, EL-normalization, and variable-capture comparison tasks depend on its semantics.
 Add registry rules for `c:set`, `c:forEach`, and `c:if`, extending the same registry introduced for Facelets tags so JSTL-controlled scope and guards can be modeled consistently.

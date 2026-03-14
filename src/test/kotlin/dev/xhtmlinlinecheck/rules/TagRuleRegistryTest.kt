@@ -20,6 +20,7 @@ class TagRuleRegistryTest {
 
         assertThat(compositionRule).isNotNull()
         assertThat(compositionRule!!.isTransparentStructureWrapper).isTrue()
+        assertThat(compositionRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
         assertThat(compositionRule.bindingRules).isEmpty()
     }
 
@@ -28,7 +29,10 @@ class TagRuleRegistryTest {
         val repeatRule = registry.ruleFor(LogicalName(localName = "repeat", namespaceUri = FACELETS_NAMESPACE))
 
         assertThat(repeatRule).isNotNull()
-        assertThat(repeatRule!!.bindingRules).containsExactly(
+        val resolvedRepeatRule = repeatRule!!
+
+        assertThat(resolvedRepeatRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(resolvedRepeatRule.bindingRules).containsExactly(
             BindingCreationRule(
                 kind = BindingKind.ITERATION_VAR,
                 nameAttribute = "var",
@@ -38,8 +42,8 @@ class TagRuleRegistryTest {
                 nameAttribute = "varStatus",
             ),
         )
-        assertThat(repeatRule.elAttributeNames).containsExactly("value", "offset", "size", "step", "rendered")
-        assertThat(repeatRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
+        assertThat(resolvedRepeatRule.elAttributeNames).containsExactly("value", "offset", "size", "step", "rendered")
+        assertThat(resolvedRepeatRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
     }
 
     @Test
@@ -69,5 +73,30 @@ class TagRuleRegistryTest {
         assertThat(genericRule.isNamingContainer).isFalse()
         assertThat(genericRule.elAttributeNames).containsExactly("rendered")
         assertThat(genericRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
+    }
+
+    @Test
+    fun `include and param tags expose explicit syntax roles for loader and syntax stages`() {
+        val includeRule = registry.resolve(LogicalName(localName = "include", namespaceUri = FACELETS_NAMESPACE))
+        val paramRule = registry.resolve(LogicalName(localName = "param", namespaceUri = FACELETS_NAMESPACE))
+
+        assertThat(includeRule.syntaxRole).isEqualTo(SyntaxRole.INCLUDE)
+        assertThat(includeRule.isIncludeTag).isTrue()
+        assertThat(paramRule.syntaxRole).isEqualTo(SyntaxRole.INCLUDE_PARAMETER)
+        assertThat(paramRule.isIncludeParameterTag).isTrue()
+    }
+
+    @Test
+    fun `resolve returns deterministic empty semantics for unknown tags`() {
+        val unknownRule =
+            registry.resolve(
+                LogicalName(
+                    localName = "unknown",
+                    namespaceUri = "urn:test",
+                ),
+            )
+
+        assertThat(unknownRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(unknownRule.bindingRules).isEmpty()
     }
 }

@@ -3,6 +3,7 @@ package dev.xhtmlinlinecheck.syntax
 import dev.xhtmlinlinecheck.analyzer.AnalysisRequest
 import dev.xhtmlinlinecheck.domain.AttributeLocationPrecision
 import dev.xhtmlinlinecheck.loader.SourceLoader
+import dev.xhtmlinlinecheck.rules.SyntaxRole
 import dev.xhtmlinlinecheck.testing.TemporaryProjectTree
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -60,6 +61,8 @@ class XhtmlSyntaxParserNamespaceAwareTest {
         assertThat(panel.name.localName).isEqualTo("panelGroup")
         assertThat(panel.name.prefix).isEqualTo("h")
         assertThat(panel.name.namespaceUri).isEqualTo("http://xmlns.jcp.org/jsf/html")
+        assertThat(panel.tagRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(panel.tagRule.elAttributeNames).contains("rendered")
         assertThat(panel.attributes.map { it.name })
             .containsExactlyInAnyOrder(
                 LogicalName(localName = "id"),

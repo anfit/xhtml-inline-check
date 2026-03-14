@@ -3,6 +3,7 @@ package dev.xhtmlinlinecheck.analyzer
 import dev.xhtmlinlinecheck.compare.EquivalenceComparator
 import dev.xhtmlinlinecheck.domain.AnalysisReport
 import dev.xhtmlinlinecheck.loader.SourceLoader
+import dev.xhtmlinlinecheck.rules.TagRuleRegistry
 import dev.xhtmlinlinecheck.semantic.SemanticAnalyzer
 import dev.xhtmlinlinecheck.syntax.XhtmlSyntaxParser
 
@@ -20,11 +21,11 @@ class FaceletsAnalyzer(
     }
 
     companion object {
-        fun scaffold(): FaceletsAnalyzer =
+        fun scaffold(tagRules: TagRuleRegistry = TagRuleRegistry.builtIns()): FaceletsAnalyzer =
             FaceletsAnalyzer(
-                sourceLoader = SourceLoader.scaffold(),
-                syntaxParser = XhtmlSyntaxParser.scaffold(),
-                semanticAnalyzer = SemanticAnalyzer.scaffold(),
+                sourceLoader = SourceLoader.scaffold(tagRules),
+                syntaxParser = XhtmlSyntaxParser.scaffold(tagRules),
+                semanticAnalyzer = SemanticAnalyzer.scaffold(tagRules),
                 comparator = EquivalenceComparator.scaffold(),
             )
     }

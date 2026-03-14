@@ -3,6 +3,7 @@ package dev.xhtmlinlinecheck.analyzer
 import dev.xhtmlinlinecheck.domain.AnalysisSide
 import dev.xhtmlinlinecheck.loader.SourceLoadException
 import dev.xhtmlinlinecheck.loader.SourceLoader
+import dev.xhtmlinlinecheck.rules.TagRuleRegistry
 import dev.xhtmlinlinecheck.semantic.SemanticAnalyzer
 import dev.xhtmlinlinecheck.syntax.XhtmlSyntaxParser
 import dev.xhtmlinlinecheck.testing.TemporaryProjectTree
@@ -49,6 +50,7 @@ class ScaffoldPipelineMetadataTest {
         assertThat(parsedTrees.oldRoot.sourceGraphFile).isEqualTo(loadedSources.oldRoot.sourceGraphFile)
         assertThat(parsedTrees.oldRoot.syntaxTree.root).isNotNull()
         assertThat(semanticModels.newRoot.syntaxTree).isEqualTo(parsedTrees.newRoot.syntaxTree)
+        assertThat(semanticModels.oldRoot.tagRules).isSameAs(TagRuleRegistry.builtIns())
         assertThat(loadedSources.oldRoot.contents).contains("<ui:composition")
         assertThat(loadedSources.newRoot.contents).contains("<ui:composition")
         assertThat(loadedSources.oldRoot.sourceGraphFile.stack.steps).isEmpty()

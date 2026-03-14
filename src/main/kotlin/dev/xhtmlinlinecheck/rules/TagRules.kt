@@ -6,6 +6,12 @@ const val FACELETS_NAMESPACE: String = "http://xmlns.jcp.org/jsf/facelets"
 const val JSTL_CORE_NAMESPACE: String = "http://java.sun.com/jsp/jstl/core"
 const val JSF_HTML_NAMESPACE: String = "http://xmlns.jcp.org/jsf/html"
 
+enum class SyntaxRole {
+    ELEMENT,
+    INCLUDE,
+    INCLUDE_PARAMETER,
+}
+
 enum class BindingKind {
     INCLUDE_PARAMETER,
     ITERATION_VAR,
@@ -22,6 +28,7 @@ data class BindingCreationRule(
 )
 
 interface TagRule {
+    val syntaxRole: SyntaxRole
     val bindingRules: List<BindingCreationRule>
     val isTransparentStructureWrapper: Boolean
     val isNamingContainer: Boolean
@@ -30,6 +37,7 @@ interface TagRule {
 }
 
 data class StaticTagRule(
+    override val syntaxRole: SyntaxRole = SyntaxRole.ELEMENT,
     override val bindingRules: List<BindingCreationRule> = emptyList(),
     override val isTransparentStructureWrapper: Boolean = false,
     override val isNamingContainer: Boolean = false,
@@ -37,8 +45,15 @@ data class StaticTagRule(
     override val targetAttributeNames: Set<String> = emptySet(),
 ) : TagRule
 
+val TagRule.isIncludeTag: Boolean
+    get() = syntaxRole == SyntaxRole.INCLUDE
+
+val TagRule.isIncludeParameterTag: Boolean
+    get() = syntaxRole == SyntaxRole.INCLUDE_PARAMETER
+
 interface TagRuleRegistry {
     fun ruleFor(name: LogicalName): TagRule?
+    fun resolve(name: LogicalName): TagRule
 
     companion object {
         fun builtIns(): TagRuleRegistry = BuiltInTagRuleRegistry
@@ -65,6 +80,8 @@ internal class StaticTagRuleRegistry(
 
         return resolved
     }
+
+    override fun resolve(name: LogicalName): TagRule = ruleFor(name) ?: DEFAULT_TAG_RULE
 }
 
 object BuiltInTagRuleRegistry : TagRuleRegistry by StaticTagRuleRegistry(
@@ -72,11 +89,13 @@ object BuiltInTagRuleRegistry : TagRuleRegistry by StaticTagRuleRegistry(
         mapOf(
             TagSelector(FACELETS_NAMESPACE, "include") to
                 StaticTagRule(
+                    syntaxRole = SyntaxRole.INCLUDE,
                     isTransparentStructureWrapper = true,
                     elAttributeNames = linkedSetOf("src"),
                 ),
             TagSelector(FACELETS_NAMESPACE, "param") to
                 StaticTagRule(
+                    syntaxRole = SyntaxRole.INCLUDE_PARAMETER,
                     bindingRules =
                         listOf(
                             BindingCreationRule(
@@ -162,8 +181,11 @@ private data class TagSelector(
     val localName: String,
 )
 
+private val DEFAULT_TAG_RULE: TagRule = StaticTagRule()
+
 private fun TagRule.overlay(base: TagRule): TagRule =
     StaticTagRule(
+        syntaxRole = if (syntaxRole != SyntaxRole.ELEMENT) syntaxRole else base.syntaxRole,
         bindingRules = (bindingRules + base.bindingRules).distinct(),
         isTransparentStructureWrapper = isTransparentStructureWrapper || base.isTransparentStructureWrapper,
         isNamingContainer = isNamingContainer || base.isNamingContainer,

@@ -2,6 +2,12 @@ package dev.xhtmlinlinecheck.syntax
 
 import dev.xhtmlinlinecheck.analyzer.AnalysisRequest
 import dev.xhtmlinlinecheck.loader.SourceLoader
+import dev.xhtmlinlinecheck.rules.FACELETS_NAMESPACE
+import dev.xhtmlinlinecheck.rules.StaticTagRule
+import dev.xhtmlinlinecheck.rules.SyntaxRole
+import dev.xhtmlinlinecheck.rules.TagRule
+import dev.xhtmlinlinecheck.rules.TagRuleRegistry
+import dev.xhtmlinlinecheck.semantic.SemanticAnalyzer
 import dev.xhtmlinlinecheck.testing.TemporaryProjectTree
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -61,12 +67,15 @@ class XhtmlSyntaxParserIncludeExpansionTest {
         assertThat(includeNode.location.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(includeNode.provenance.logicalLocation.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(expandedRoot.name.localName).isEqualTo("fragment")
+        assertThat(expandedRoot.tagRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(expandedRoot.tagRule.isTransparentStructureWrapper).isTrue()
         assertThat(expandedRoot.location.render()).startsWith("fragments/table.xhtml:1:")
         assertThat(expandedRoot.provenance.physicalLocation.render()).startsWith("fragments/table.xhtml:1:")
         assertThat(expandedRoot.provenance.logicalLocation.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(expandedRoot.provenance.includeStack.single().includeSite.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(expandedRoot.provenance.includeStack.single().includedDocument.displayPath).isEqualTo("fragments/table.xhtml")
         assertThat(output.name.localName).isEqualTo("outputText")
+        assertThat(output.tagRule.targetAttributeNames).contains("for", "update", "render", "process", "execute")
         assertThat(output.attributes.single { it.name.localName == "value" }.value).isEqualTo("#{row.label}")
     }
 
@@ -304,4 +313,84 @@ class XhtmlSyntaxParserIncludeExpansionTest {
         assertThat(normalizedNames).containsExactly("before", "included", "after")
         assertThat(normalizedRoots).allMatch { it is LogicalElementNode && !it.isTransparentStructureWrapper }
     }
+
+    @Test
+    fun `custom registry drives include expansion and semantic handoff consistently`() {
+        val customFaceletsNamespace = "urn:test:facelets"
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <legacy:composition xmlns:legacy="$customFaceletsNamespace" xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <legacy:include src="/fragments/content.xhtml">
+                <legacy:param name="label" value="#{bean.label}" />
+              </legacy:include>
+            </legacy:composition>
+            """,
+        )
+        tree.write(
+            "fragments/content.xhtml",
+            """
+            <legacy:fragment xmlns:legacy="$customFaceletsNamespace" xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:outputText value="#{label}" />
+            </legacy:fragment>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="$FACELETS_NAMESPACE" />
+            """,
+        )
+        val customRegistry = registryWithCustomFaceletsNamespace(customFaceletsNamespace)
+
+        val loadedSources = SourceLoader.scaffold(customRegistry).load(
+            AnalysisRequest(
+                oldRoot = tempDir.relativize(oldRoot),
+                newRoot = tempDir.relativize(newRoot),
+                baseOld = tempDir,
+                baseNew = tempDir,
+            ),
+        )
+        val parsedTrees = XhtmlSyntaxParser.scaffold(customRegistry).parse(loadedSources)
+        val semanticModels = SemanticAnalyzer.scaffold(customRegistry).analyze(parsedTrees)
+
+        val includeEdge = loadedSources.oldRoot.sourceGraphFile.includeEdges.single()
+        val includeNode = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalIncludeNode
+        val expandedRoot = includeNode.children.single() as LogicalElementNode
+
+        assertThat(includeEdge.parameters.map { it.name }).containsExactly("label")
+        assertThat(includeNode.parameters.map { it.name }).containsExactly("label")
+        assertThat(expandedRoot.tagRule.isTransparentStructureWrapper).isTrue()
+        assertThat((expandedRoot.children.single() as LogicalElementNode).attributes.single().value).isEqualTo("#{label}")
+        assertThat(semanticModels.oldRoot.tagRules).isSameAs(customRegistry)
+    }
+
+    private fun registryWithCustomFaceletsNamespace(customNamespace: String): TagRuleRegistry {
+        val builtIns = TagRuleRegistry.builtIns()
+        val customRules =
+            mapOf(
+                "composition" to StaticTagRule(isTransparentStructureWrapper = true),
+                "fragment" to StaticTagRule(isTransparentStructureWrapper = true),
+                "include" to StaticTagRule(syntaxRole = SyntaxRole.INCLUDE, isTransparentStructureWrapper = true),
+                "param" to StaticTagRule(syntaxRole = SyntaxRole.INCLUDE_PARAMETER),
+            )
+
+        return CustomFaceletsNamespaceRegistry(customNamespace, customRules, builtIns)
+    }
+}
+
+private class CustomFaceletsNamespaceRegistry(
+    private val customNamespace: String,
+    private val customRules: Map<String, TagRule>,
+    private val builtIns: TagRuleRegistry,
+) : TagRuleRegistry {
+    override fun ruleFor(name: LogicalName): TagRule? =
+        if (name.namespaceUri == customNamespace) {
+            customRules[name.localName]
+        } else {
+            builtIns.ruleFor(name)
+        }
+
+    override fun resolve(name: LogicalName): TagRule = ruleFor(name) ?: builtIns.resolve(name)
 }

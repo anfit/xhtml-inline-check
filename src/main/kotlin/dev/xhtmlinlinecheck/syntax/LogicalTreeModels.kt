@@ -5,7 +5,7 @@ import dev.xhtmlinlinecheck.domain.SourceGraphFile
 import dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailure
 import dev.xhtmlinlinecheck.domain.SourceGraphParameter
 import dev.xhtmlinlinecheck.domain.SourceLocation
-import dev.xhtmlinlinecheck.rules.TagRuleRegistry
+import dev.xhtmlinlinecheck.rules.TagRule
 
 data class LogicalName(
     val localName: String,
@@ -35,6 +35,7 @@ data class XhtmlSyntaxTree(
 
 data class LogicalElementNode(
     val name: LogicalName,
+    val tagRule: TagRule,
     val attributes: List<LogicalAttribute>,
     val namespaceBindings: List<LogicalNamespaceBinding> = emptyList(),
     val children: List<LogicalNode>,
@@ -59,12 +60,10 @@ data class LogicalIncludeNode(
     override val provenance: Provenance,
 ) : LogicalNode
 
-private val builtInTagRules: TagRuleRegistry = TagRuleRegistry.builtIns()
-
 val LogicalNode.isTransparentStructureWrapper: Boolean
     get() =
         when (this) {
-            is LogicalElementNode -> builtInTagRules.ruleFor(name)?.isTransparentStructureWrapper == true
+            is LogicalElementNode -> tagRule.isTransparentStructureWrapper
             is LogicalIncludeNode -> true
             is LogicalTextNode -> false
         }
