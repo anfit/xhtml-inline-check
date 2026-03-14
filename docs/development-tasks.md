@@ -1,4 +1,3 @@
-Add fixture tests for nested includes, extending the simple include-expansion test task to prove provenance and parameter flow survive deeper trees.
 Add fixture tests for missing includes, targeting the missing-file diagnostic task and asserting that the loader surfaces precise provenance.
 Add fixture tests for include cycles, targeting the cycle-detection task and proving the source graph records recursive provenance correctly.
 Add fixture tests for dynamic includes causing inconclusive results, tying together the dynamic-include diagnostic task with the result-model task.

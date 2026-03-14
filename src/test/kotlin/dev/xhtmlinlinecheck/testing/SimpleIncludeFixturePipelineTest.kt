@@ -55,4 +55,61 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(output.name.localName).isEqualTo("outputText")
         assertThat(output.attributes.single { it.name.localName == "value" }.value).isEqualTo("#{label}")
     }
+
+    @Test
+    fun `nested include fixture preserves parameter flow and provenance through deeper expansion`() {
+        val scenario = FixtureScenarios.scenario("support/include-expansion-nested")
+
+        val loadedSources = SourceLoader.scaffold().load(
+            AnalysisRequest(
+                oldRoot = FixtureScenarios.repositoryRoot.relativize(scenario.oldRoot),
+                newRoot = FixtureScenarios.repositoryRoot.relativize(scenario.newRoot),
+                baseOld = FixtureScenarios.repositoryRoot,
+                baseNew = FixtureScenarios.repositoryRoot,
+            ),
+        )
+
+        val outerIncludeEdge = loadedSources.oldRoot.sourceGraphFile.includeEdges.single()
+        val layoutFile = outerIncludeEdge.includedFile!!
+        val innerIncludeEdge = layoutFile.includeEdges.single()
+
+        assertThat(outerIncludeEdge.sourcePath).isEqualTo("/fragments/layout.xhtml")
+        assertThat(outerIncludeEdge.parameters.map { it.name }).containsExactly("sectionLabel")
+        assertThat(outerIncludeEdge.parameters.single().valueExpression).isEqualTo("#{bean.sectionLabel}")
+        assertThat(outerIncludeEdge.parameters.single().provenance.logicalLocation.render())
+            .startsWith("fixtures/support/include-expansion-nested/old/root.xhtml:3:")
+
+        assertThat(innerIncludeEdge.sourcePath).isEqualTo("/fragments/content.xhtml")
+        assertThat(innerIncludeEdge.parameters.map { it.name }).containsExactly("resolvedLabel", "wrapperClass")
+        assertThat(innerIncludeEdge.parameters[0].valueExpression).isEqualTo("#{sectionLabel}")
+        assertThat(innerIncludeEdge.parameters[0].provenance.logicalLocation.render())
+            .startsWith("fixtures/support/include-expansion-nested/old/fragments/layout.xhtml:4:")
+        assertThat(innerIncludeEdge.parameters[1].valueExpression).isEqualTo("hero")
+        assertThat(innerIncludeEdge.parameters[1].provenance.logicalLocation.render())
+            .startsWith("fixtures/support/include-expansion-nested/old/fragments/layout.xhtml:5:")
+
+        val parsedTrees = XhtmlSyntaxParser.scaffold().parse(loadedSources)
+        val outerInclude = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+        val layoutRoot = outerInclude.children.single() as LogicalElementNode
+        val layoutPanel = layoutRoot.children.single() as LogicalElementNode
+        val innerInclude = layoutPanel.children.single() as LogicalIncludeNode
+        val contentRoot = innerInclude.children.single() as LogicalElementNode
+        val output = contentRoot.children.single() as LogicalElementNode
+
+        assertThat(outerInclude.parameters.map { it.name }).containsExactly("sectionLabel")
+        assertThat(innerInclude.parameters.map { it.name }).containsExactly("resolvedLabel", "wrapperClass")
+        assertThat(output.provenance.includeStack).hasSize(2)
+        assertThat(output.provenance.includeStack.map { it.includedDocument.displayPath })
+            .containsExactly(
+                "fixtures/support/include-expansion-nested/old/fragments/layout.xhtml",
+                "fixtures/support/include-expansion-nested/old/fragments/content.xhtml",
+            )
+        assertThat(output.provenance.includeStack.map { it.parameterNames })
+            .containsExactly(
+                listOf("sectionLabel"),
+                listOf("resolvedLabel", "wrapperClass"),
+            )
+        assertThat(output.attributes.single { it.name.localName == "styleClass" }.value).isEqualTo("#{wrapperClass}")
+        assertThat(output.attributes.single { it.name.localName == "value" }.value).isEqualTo("#{resolvedLabel}")
+    }
 }
