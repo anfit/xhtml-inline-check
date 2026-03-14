@@ -1,34 +1,80 @@
-1. Purpose
+# Specification
 
-Build a CLI tool that compares two JSF Facelets root XHTML pages and determines whether they are statically equivalent with respect to EL scope and page structure after refactoring, especially include inlining.
+## 1. Product Goal
 
-The tool does not execute JSF lifecycle or browser rendering. It performs fast static verification and returns either:
+Build a CLI tool that compares two JSF Facelets root XHTML pages and determines whether they are statically equivalent for the purpose of include-inlining refactors.
 
-success, with a compact summary of why the pages are equivalent under the static model
+The tool answers a practical migration question:
 
-or failure, with precise, navigable diagnostics tied to concrete source locations and semantic mismatches
+"Did the refactored XHTML preserve the same effective scope and behaviorally relevant structure as the original page, under a static model?"
 
-2. Scope
+This project is intentionally a static verifier. It does not execute a JSF runtime, build a live component tree, or prove runtime equivalence.
 
-The tool verifies two things.
+## 2. Primary Use Case
 
-First, EL scope equivalence. Every EL expression in the old and new page must resolve its local roots against equivalent symbolic bindings.
+Teams have legacy JSF 2.2 XHTML composed from nested includes and fragments. They want to inline those fragments to simplify ownership and enable larger UI overhauls, but they need a fast way to check whether a refactored page still means the same thing.
 
-Second, structural equivalence. Behaviorally relevant structure must match, including forms, naming-container boundaries, ids, iteration context, rendered guards, and target references such as `for`, `render`, `update`, `process`, and `execute`.
+The tool compares:
 
-The tool is intended for JSF XHTML built from `ui:*`, JSTL, `h:*`, and component-library tags.
+- an "old" root XHTML, often include-heavy
+- a "new" root XHTML, often partially or fully inlined
 
-3. Non-goals
+The output must be useful both during local refactoring and in CI.
 
-It does not prove runtime equivalence.
+## 3. Result States
 
-It does not evaluate managed beans, converters, validators, custom EL resolvers, or action methods.
+The tool can return exactly three semantic outcomes:
 
-It does not run a server, instantiate a component tree, or execute regression tests.
+1. `EQUIVALENT`
+   - all checked facts match under the static model
+   - no fatal unsupported constructs were encountered
+2. `NOT_EQUIVALENT`
+   - at least one checked fact mismatched
+3. `INCONCLUSIVE`
+   - no mismatch was proven, but unsupported constructs or parse limitations prevent a trustworthy equivalence claim
 
-It does not guarantee equivalence when pages depend on dynamic includes, custom Java tag handlers, or runtime behavior hidden from the XHTML.
+These states are central to the product. Unsupported constructs must never be silently treated as equivalent.
 
-4. CLI contract
+## 4. Scope
+
+The verifier checks two classes of invariants.
+
+### 4.1 Scope Equivalence
+
+Every EL expression in the old and new trees must resolve local roots against equivalent symbolic bindings.
+
+This must detect:
+
+- iterator-variable capture
+- lost `ui:param` scope
+- accidental shadowing changes
+- alpha-renaming that is safe and should be treated as equivalent
+
+### 4.2 Structural Equivalence
+
+Behaviorally relevant page structure must remain equivalent, especially:
+
+- component ids
+- form ancestry
+- naming-container ancestry
+- iteration ancestry
+- rendered guards
+- label/message targets such as `for`
+- AJAX/process targets such as `update`, `render`, `process`, and `execute`
+
+The tool targets JSF XHTML built from `ui:*`, JSTL, `h:*`, and common component-library tags.
+
+## 5. Non-Goals
+
+The initial product does not:
+
+- evaluate managed beans, converters, validators, or action methods
+- emulate JSF lifecycle phases
+- render HTML or execute browser behavior
+- infer semantics hidden in custom Java tag handlers
+- guarantee equivalence when runtime-only behavior dominates the page
+
+## 6. CLI Contract
 
 Executable name:
 
@@ -38,481 +84,434 @@ Primary usage:
 
 `facelets-verify oldRoot.xhtml newRoot.xhtml`
 
-Optional flags:
+Options:
 
-`--base-old <dir>` to resolve includes relative to the old tree
-
-`--base-new <dir>` to resolve includes relative to the new tree
-
-`--format text|json`
-
-`--verbose`
-
-`--fail-on-warning`
-
-`--max-problems <n>`
-
-`--explain <problem-id>` to print deep detail for a previously reported issue
+- `--base-old <dir>` resolves includes relative to the old tree
+- `--base-new <dir>` resolves includes relative to the new tree
+- `--format text|json`
+- `--verbose`
+- `--fail-on-warning`
+- `--max-problems <n>`
+- `--explain <problem-id>`
 
 Exit codes:
 
-`0` equivalent under static model
+- `0` equivalent
+- `1` not equivalent
+- `2` inconclusive or analysis failure
 
-`1` not equivalent
+### 6.1 Example Success Output
 
-`2` analysis incomplete due to unsupported dynamic constructs or parse failure
+```text
+EQUIVALENT
+Static model says pages are equivalent
+EL bindings matched: 146/146
+Structural facts matched: 89/89
+Warnings: 1
+W12 Dynamic map access at newRoot.xhtml:88 may hide runtime differences
+```
 
-Example success output:
+### 6.2 Example Failure Output
 
-`EQUIVALENT`
-`Expressions compared: 146`
-`Resolved bindings matched: 146`
-`Structural nodes matched: 89`
-`Warnings: 1`
-`Warning W12: dynamic map access at newRoot.xhtml:88 may hide runtime differences`
+```text
+NOT EQUIVALENT
+Problems: 3
 
-Example failure output:
+P01 Scope mismatch
+oldRoot.xhtml:114:23 -> #{row.label}
+newRoot.xhtml:97:19  -> #{item.label}
+Root binding differs
+Old: ui:repeat var=row from /fragments/table.xhtml:8
+New: ui:repeat var=item from /newRoot.xhtml:72
+Reason: expression moved from inner iteration context to outer iteration context
 
-`NOT EQUIVALENT`
-`Problems: 3`
+P02 Form ancestry changed
+Component id=saveBtn
+Old path: /ui:composition/h:form[1]/p:commandButton[2]
+New path: /ui:composition/p:commandButton[2]
+Reason: component is no longer inside a form
 
-`P01 Scope mismatch`
-`oldRoot.xhtml:114:23 -> #{row.label}`
-`newRoot.xhtml:97:19  -> #{item.label}`
-`Root binding differs`
-`Old: ui:repeat var=row from /fragments/table.xhtml:8`
-`New: ui:repeat var=item from /newRoot.xhtml:72`
-`Reason: expression moved from inner iteration context to outer iteration context`
+P03 Update target no longer resolves the same way
+oldRoot.xhtml:140: update="msgs panel"
+newRoot.xhtml:125: update="panel"
+Missing target: msgs
+```
 
-`P02 Form ancestry changed`
-`Component id=saveBtn`
-`Old path: /ui:composition/h:form[1]/p:commandButton[2]`
-`New path: /ui:composition/p:commandButton[2]`
-`Reason: component is no longer inside a form`
+### 6.3 Example Inconclusive Output
 
-`P03 Update target no longer resolves the same way`
-`oldRoot.xhtml:140: update="msgs panel"`
-`newRoot.xhtml:125: update="panel"`
-`Missing target: msgs`
+```text
+INCONCLUSIVE
+Warnings: 1
 
-5. High-level architecture
+W02 Unsupported dynamic include
+legacy/order.xhtml:31:17 -> src=#{bean.fragmentPath}
+Comparison beneath this node is not trustworthy
+```
 
-The tool has six stages.
+## 7. Core Design Decisions
 
-Stage one reads and expands both root XHTMLs into a normalized source graph.
+### 7.1 Comparison Happens On Semantic Models
 
-Stage two parses XHTML into a namespace-aware AST.
+The tool compares semantic facts, not raw text and not raw XML tree equality.
 
-Stage three walks the AST and builds a symbolic scope model.
+Each page is converted into an intermediate representation of semantic nodes. Each node records:
 
-Stage four extracts a semantic model containing normalized EL usages and structural facts.
+- physical source file and line/column
+- logical include path
+- AST path
+- tag name and namespace
+- relevant attributes
+- binding introductions
+- naming-container status
+- form ancestry
+- iteration ancestry
+- relevant ids and target references
+- normalized EL expressions attached to the node
 
-Stage five compares the two semantic models.
+### 7.2 Include Expansion Is Mandatory
 
-Stage six renders a result, either compact success or verbose failure with source-linked problems.
+Both sides are converted into fully expanded logical trees before semantic comparison.
 
-6. Core design
+Why this is required:
 
-The comparison is based on semantic normalization, not raw text or raw DOM equality.
+- the old tree may be fragmented across many includes
+- the new tree may inline those fragments directly
+- meaningful comparison depends on the same logical view of the page
 
-Each page is converted into an intermediate representation made of semantic nodes. A semantic node records:
+### 7.3 Unsupported Constructs Must Surface Explicitly
 
-source file and line/column
+Dynamic includes, unsupported EL syntax, or unknown tag semantics may reduce confidence. They must be reported as warnings or fatal limitations, not hidden behind optimistic assumptions.
 
-AST path
+### 7.4 Matching Must Be Anchor-First
 
-tag name and namespace
+Comparison must not begin as a generic tree diff. The matching strategy should prefer:
 
-relevant attributes
+1. explicit component ids
+2. explicit target relationships
+3. semantic signatures built from tag, ancestry, iteration context, and rendered guard
+4. unmatched-node diagnostics when no reliable pairing exists
 
-whether it introduces variables
+This is a spec requirement because output stability is part of product quality.
 
-whether it is a naming container
+## 8. Supported Semantics
 
-current form ancestry
+### 8.1 MVP Support
 
-current iteration ancestry
+The minimum viable product must support:
 
-id, `for`, `rendered`, `update`, `render`, `process`, `execute`
+- `ui:include`
+- `ui:param`
+- `ui:composition`
+- `ui:fragment`
+- `ui:repeat`
+- `c:set`
+- `c:forEach`
+- `c:if`
+- `h:form`
+- common JSF components with `id`, `rendered`, and `for`
+- AJAX/process attributes such as `update`, `render`, `process`, and `execute`
+- local-variable normalization in EL
+- file-linked diagnostics with include provenance
 
-normalized EL expressions attached to the node
+### 8.2 Deferred Support
 
-Each EL expression is parsed into a symbolic representation. The key normalization step replaces local variable names with canonical binding ids so that alpha-renaming remains equivalent.
+The first production-ready release may treat the following as secondary or registry-driven:
 
-Example:
+- `ui:decorate`
+- third-party naming containers beyond the built-in rule set
+- method-expression details beyond root/method shape
+- advanced EL features that do not affect local-root binding
 
-Old `#{row.name}` and new `#{item.name}` are equal if both normalize to something like:
+## 9. Include Expansion Model
 
-`IterBinding[#12].property(name)`
+Expansion algorithm requirements:
 
-7. Supported constructs
+1. resolve each `ui:include src=...` statically
+2. load included XHTML
+3. inject `ui:param` bindings into the child scope
+4. replace the include node with an include-boundary marker plus expanded child content
+5. record provenance so diagnostics can refer to both physical file and logical include chain
 
-Initial version should support:
+If `src` is a dynamic EL expression, the analyzer must mark the subtree unsupported and return `INCONCLUSIVE` unless flags upgrade the warning to failure.
 
-`ui:include`
+Cycle detection and missing-file handling are required for MVP.
 
-`ui:param`
-
-`ui:composition`
-
-`ui:decorate`
-
-`ui:fragment`
-
-`ui:repeat`
-
-`c:set`
-
-`c:forEach`
-
-`c:if`
-
-`h:form`
-
-common JSF components with `id`, `rendered`, `for`
-
-common AJAX attributes such as `update`, `render`, `process`, `execute`
-
-component-library tags can be treated generically unless they create known naming containers or iteration scopes
-
-Known tag semantics are modeled in a rule registry.
-
-8. Include expansion model
-
-The old tree may consist of many includes while the new tree may inline them. To compare fairly, both sides are converted into a fully expanded logical tree.
-
-Expansion algorithm:
-
-Resolve each `ui:include src=...` statically
-
-Load included XHTML
-
-Inject `ui:param` bindings into the child scope
-
-Replace include node with an include boundary marker plus expanded child content
-
-Record provenance so diagnostics can refer back to original files and include chains
-
-If include `src` is dynamic EL, mark analysis incomplete for that subtree and emit a warning or failure depending on flags.
-
-9. Scope model
+## 10. Scope Model
 
 The scope model is a stack of bindings active at each AST location.
 
-Each binding has:
+Each binding records:
 
-binding id
+- binding id
+- written name
+- kind such as `ui:param`, `ui:repeat var`, `varStatus`, `c:set`, `c:forEach`, or implicit root
+- source location
+- parent scope id
+- symbolic origin descriptor
 
-name as written
+When walking the tree:
 
-kind, such as `ui:param`, `ui:repeat var`, `varStatus`, `c:set`, `c:forEach`, implicit root
+- entering a node may push bindings
+- leaving a node pops them
+- every EL root reference is resolved against the active stack
 
-source location
+Global bean names remain symbolic global roots unless shadowed by local bindings.
 
-parent scope id
+## 11. EL Normalization
 
-symbolic origin descriptor
+The tool does not evaluate EL. It performs syntax-aware symbolic normalization.
 
-When the walker enters a node, it pushes new bindings introduced by that node. When leaving, it pops them.
+For each EL occurrence, the analyzer must preserve enough structure to compare meaningfully:
 
-For every EL expression, the tool resolves each root identifier against the current scope stack and records which binding it maps to.
+- root identifiers
+- property chains
+- index access
+- method-call roots
+- boolean and ternary shape when needed to preserve referenced roots
 
-Global bean names are treated as unresolved-global roots unless a local binding shadows them.
-
-10. EL normalization
-
-The tool need not evaluate EL. It only needs syntax-aware symbolic parsing.
-
-For each EL occurrence, extract:
-
-literal fragments
-
-root identifiers
-
-property chains
-
-method-call roots
-
-ternary and boolean structure only insofar as needed to preserve referenced roots
-
-Normalize local references to canonical binding ids.
+Local bindings are normalized to canonical ids so alpha-renaming remains equivalent.
 
 Examples:
 
-`#{row.visible ? row.label : 'x'}` becomes something like
-`ternary(binding#12.visible, binding#12.label, literal)`
+`#{row.name}` and `#{item.name}` are equivalent if both normalize to:
 
-`#{bean.map[row.code]}` becomes
+`binding#12.property(name)`
+
+`#{bean.map[row.code]}` may normalize to:
+
 `global(bean).map[index(binding#12.code)]`
 
-This makes scope-sensitive changes visible while preserving enough structure to compare expressions meaningfully.
+### 11.1 Attribute-Level Precision
 
-11. Structural model
+Attribute-level line and column should be captured where practical. If the initial parser can only report the owning element location plus attribute name, that fallback is acceptable for MVP, but the limitation must be explicit in diagnostics and documentation.
 
-For each relevant node, compute:
+## 12. Structural Model
 
-semantic signature
+For each relevant semantic node, compute:
 
-effective ancestry through forms and naming containers
+- semantic signature
+- effective form ancestry
+- effective naming-container ancestry
+- effective iteration ancestry
+- normalized rendered guard
+- outgoing target references
 
-iteration context
-
-normalized rendered guard
-
-target references
-
-The comparator treats some tags as transparent wrappers, especially `ui:include`, `ui:composition`, and some `ui:fragment` cases, so include inlining does not create false mismatches.
+Transparent wrappers must not create false mismatches. At minimum, `ui:include`, `ui:composition`, and transparent `ui:fragment` cases are treated as non-semantic for matching.
 
 The comparator is strict about:
 
-id collisions
+- id collisions
+- changes in form ancestry
+- changes in naming-container ancestry
+- changes in iteration ancestry
+- loss or gain of rendered guards
+- changes in message/AJAX target resolution
 
-change in form ancestry
+## 13. Rule Registry
 
-change in naming-container ancestry
+Known tag semantics must live in a rule registry rather than hardcoded parser branches.
 
-change in iteration ancestry
+Each rule answers questions such as:
 
-loss or gain of rendered guards
+- does this tag introduce bindings?
+- does it create a naming container?
+- is it transparent during matching?
+- which attributes contain EL?
+- which attributes contain target references?
 
-change in message or AJAX targets
+This enables safe incremental support for third-party component libraries.
 
-12. Comparison algorithm
+## 14. Comparison Algorithm
 
-Comparison runs in three passes.
+Comparison runs in three passes:
 
-Pass one matches semantic nodes between old and new trees using signatures and ancestry constraints.
+1. match semantic nodes using anchors and ancestry constraints
+2. compare EL usages at matched nodes after normalization
+3. verify global invariants such as ids, targets, and ancestry consistency
 
-Pass two compares EL usages at matched nodes after normalization.
+Possible outcomes for each fact:
 
-Pass three checks global invariants, such as ids, target references, and ancestry consistency.
+- match
+- mismatch
+- unknown due to unsupported construct
 
-Possible outcomes for each compared fact are:
+Final result rules:
 
-match
+- `EQUIVALENT` if all checked facts match and no fatal unknowns exist
+- `NOT_EQUIVALENT` if any mismatch exists
+- `INCONCLUSIVE` if no mismatch exists but unsupported constructs prevent confidence
 
-mismatch
+The tool should suppress duplicate cascade problems where a single upstream mismatch already explains a group of downstream symptoms.
 
-unknown due to unsupported construct
+## 15. Problem Model
 
-The final result is:
+Every issue must be emitted as a structured problem with:
 
-equivalent if all compared facts match and no fatal unknowns exist
+- problem id
+- severity: `error` or `warning`
+- category: `scope`, `structure`, `target`, `parse`, `unsupported`
+- summary
+- old location, if any
+- new location, if any
+- old snippet, if any
+- new snippet, if any
+- semantic explanation
+- remediation hint
 
-not equivalent if any mismatch exists
+Example:
 
-inconclusive if no mismatch exists but unsupported dynamic constructs prevent trustable comparison
+```text
+P17
+severity=error
+category=scope
+summary=Local variable resolves to different binding
+old=/fragments/grid.xhtml:22:15
+new=/pages/order.xhtml:88:11
+oldSnippet=#{row.total}
+newSnippet=#{row.total}
+explanation=The name row referred to inner ui:repeat before refactor and now refers to outer ui:repeat
+hint=Preserve the inner iteration scope or rename the outer var to avoid capture
+```
 
-13. Problem model
+## 16. Output Formats
 
-Every detected issue is emitted as a structured problem.
+### 16.1 Text Output
 
-Fields:
+Text output is concise and human-focused.
 
-problem id
+Requirements:
 
-severity: error or warning
+- success output stays compact
+- failure output leads with the most actionable mismatch
+- warnings about unsupported constructs are always visible
+- ordering is deterministic
 
-category: scope, structure, target, parse, unsupported
+### 16.2 JSON Output
 
-summary
+JSON output is machine-consumable and must include:
 
-old location, if any
+- result
+- summary
+- problems
+- warnings
+- stats
+- provenance metadata needed for editor or CI navigation
 
-new location, if any
+Recommended top-level shape:
 
-old snippet, if any
+```json
+{
+  "result": "NOT_EQUIVALENT",
+  "summary": {},
+  "problems": [],
+  "warnings": [],
+  "stats": {}
+}
+```
 
-new snippet, if any
+## 17. Internal Modules
 
-semantic explanation
+Recommended module boundaries:
 
-remediation hint
+- `cli`
+- `loader`
+- `syntax`
+- `scope`
+- `el`
+- `semantic`
+- `compare`
+- `report`
 
-example:
+The implementation may collapse or split these packages, but the responsibilities must remain clearly separated.
 
-`P17`
-`severity=error`
-`category=scope`
-`summary=Local variable resolves to different binding`
-`old=/fragments/grid.xhtml:22:15`
-`new=/pages/order.xhtml:88:11`
-`oldSnippet=#{row.total}`
-`newSnippet=#{row.total}`
-`explanation=The name row referred to inner ui:repeat before refactor and now refers to outer ui:repeat`
-`hint=Preserve the inner iteration scope or rename the outer var to avoid capture`
+## 18. Implementation Plan
 
-14. Output formats
+The recommended implementation sequence is part of the spec because delivery order affects correctness.
 
-Text format is human-focused and must be concise by default.
+### Phase 1: Input And Provenance
 
-JSON format is machine-consumable and includes all problem metadata, source paths, include provenance, and normalized semantic excerpts.
+Build:
 
-Recommended JSON top-level structure:
+- CLI shell
+- loader
+- include expansion
+- provenance model
+- namespace-aware XHTML parser
 
-`result`
-`summary`
-`problems`
-`warnings`
-`stats`
+### Phase 2: Scope And EL
 
-This enables IDE integrations, CI annotations, and editor navigation.
+Build:
 
-15. Linking to specific problems
+- binding stack
+- EL extraction
+- symbolic EL parser/normalizer
+- scope-based mismatch reporting
 
-Every problem must point to exact file, line, and column where possible.
+### Phase 3: Structural Checks
 
-To support that, the parser must preserve location metadata from the original source and include-expanded source graph.
+Build:
 
-When an issue originates inside an included fragment, the diagnostic should show both the physical file location and the logical include path, for example:
+- ancestry tracking
+- id and target resolution
+- structural comparator
 
-`/pages/order.xhtml -> /fragments/table.xhtml:22:15`
+### Phase 4: Reporting And Hardening
 
-That gives immediate navigability even after include expansion.
+Build:
 
-16. Recommended implementation
+- text reporter
+- JSON reporter
+- problem explanation mode
+- deterministic sorting and suppression
+- CI-oriented fixture coverage
 
-Use Kotlin on the JVM.
+## 19. Test Strategy
 
-Reasons:
+The project should be fixture-driven from the start.
 
-easy CLI packaging
+Required test layers:
 
-strong XML and EL ecosystem alignment
+1. unit tests for loader, scope, EL normalization, and target resolution
+2. semantic fixture tests for extracted facts
+3. comparison fixture tests for equivalent, non-equivalent, and inconclusive outcomes
+4. CLI golden tests for text and JSON output
 
-good data classes and sealed types for AST and diagnostics
+Minimum fixture categories:
 
-simple integration with Jackson for JSON output
+- safe include inlining
+- safe variable alpha-renaming
+- unsafe variable capture
+- lost `ui:param`
+- moved component outside form
+- changed naming-container ancestry
+- changed AJAX target
+- unresolved dynamic include
 
-Suggested libraries:
+## 20. Risks And Limitations
 
-Picocli for CLI
+- false negatives are possible when custom tags or runtime behavior alter semantics outside XHTML
+- false positives are possible when third-party components are treated too generically
+- dynamic includes and advanced EL forms must be reported as unsupported, never assumed safe
+- parser location fidelity may vary depending on XML tooling, especially for attributes
 
-standard namespace-aware XML parser or Woodstox
-
-a small internal EL parser, or Jakarta EL APIs where useful for syntax compatibility
-
-Jackson for JSON output
-
-JUnit for the tool’s own test suite
-
-17. Internal modules
-
-`cli`
-argument parsing and exit codes
-
-`loader`
-file reading, include resolution, provenance tracking
-
-`xml`
-namespace-aware parsing and source location capture
-
-`scope`
-binding stack and scope resolution
-
-`el`
-EL tokenization, parsing, normalization
-
-`semantic`
-semantic node construction
-
-`compare`
-matching and mismatch detection
-
-`report`
-text and JSON rendering
-
-18. Minimum viable product
-
-The first version should support enough to validate the main refactor class.
-
-That means:
-
-static include expansion
-
-`ui:param`
-
-`ui:repeat`
-
-`c:set`
-
-`c:forEach`
-
-`h:form`
-
-ids
-
-`rendered`
-
-`for`
-
-AJAX target attributes
-
-local variable normalization in EL
-
-verbose file-linked diagnostics
-
-This already catches the most common inlining failures.
-
-19. Risks and limitations
-
-False negatives can occur when custom tags or runtime behavior alter semantics outside XHTML.
-
-False positives can occur if third-party components are treated too generically and actually have transparent behavior.
-
-Dynamic include paths, method expressions with nontrivial semantics, and custom EL resolvers should be reported as unsupported or uncertain, never silently assumed safe.
-
-20. Acceptance criteria
+## 21. Acceptance Criteria
 
 The tool is acceptable when:
 
-it runs from CLI with two root XHTML paths
+- it runs from CLI with two root XHTML paths
+- it resolves includes and tracks provenance
+- it reports `EQUIVALENT` for known-safe include-inlining refactors
+- it reports clear file-linked failures for known-unsafe scope and structure changes
+- it reports `INCONCLUSIVE` for unsupported constructs that prevent confidence
+- it emits both human-readable and JSON output
+- it exits with stable codes suitable for CI
 
-it resolves includes and tracks provenance
+## 22. Example Invocation
 
-it reports equivalence for known-safe include-inlining refactors
+```text
+facelets-verify legacy/order.xhtml refactored/order.xhtml --base-old legacy --base-new refactored --format text --verbose
+```
 
-it reports clear, file-linked failures for known-unsafe scope and structure changes
+## 23. Recommendation
 
-it emits both human-readable and JSON output
-
-it exits with stable codes suitable for CI
-
-21. Example invocation
-
-`facelets-verify legacy/order.xhtml refactored/order.xhtml --base-old legacy --base-new refactored --format text --verbose`
-
-22. Example success contract
-
-`EQUIVALENT`
-`Static model says pages are equivalent`
-`EL bindings matched: 93/93`
-`Structural facts matched: 57/57`
-`Warnings: 0`
-
-23. Example failure contract
-
-`NOT EQUIVALENT`
-`3 errors, 1 warning`
-
-`P04 Scope mismatch at legacy/fragments/row.xhtml:18:9`
-`Old expression #{row.status}`
-`New expression #{row.status}`
-`Different binding origins`
-`Old origin: ui:repeat at legacy/fragments/table.xhtml:6`
-`New origin: ui:repeat at refactored/order.xhtml:44`
-
-`P09 Component moved outside form at refactored/order.xhtml:77:5`
-`id=submitBtn`
-`Old form ancestry: mainForm`
-`New form ancestry: none`
-
-`W02 Unsupported dynamic include at legacy/order.xhtml:31:17`
-`src=#{bean.fragmentPath}`
-`Comparison beneath this node is inconclusive`
-
-24. Recommendation
-
-Build the MVP first as a strict static checker for include expansion, scope binding, and structural ancestry. That gives the best speed-to-value ratio and directly addresses the risky parts of subpage inlining. After that, add tag-library-specific rules only where real projects show gaps.
-
-If you want, I can next turn this into a concrete implementation plan with class names, interfaces, and a sample JSON schema.
+Build the MVP as a strict static checker for include expansion, scope binding, and structural ancestry. That gives the best speed-to-value ratio for subpage inlining work. Expand the rule registry only when real project samples reveal gaps, not before.
