@@ -15,4 +15,18 @@ class FixtureScenariosTest {
         assertThat(Files.isDirectory(scenario.oldDir)).isTrue()
         assertThat(Files.isDirectory(scenario.newDir)).isTrue()
     }
+
+    @Test
+    fun `reads expected contracts for canonical comparison fixtures`() {
+        val scenario = FixtureScenarios.scenario("inconclusive/dynamic-include")
+        val expectation = FixtureExpectations.read(scenario)
+
+        assertThat(scenario.expectedJson).isRegularFile()
+        assertThat(expectation.result).isEqualTo("INCONCLUSIVE")
+        assertThat(expectation.problemIds).isEmpty()
+        assertThat(expectation.warningIds).containsExactly(
+            "W-UNSUPPORTED-DYNAMIC_INCLUDE",
+            "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+        )
+    }
 }

@@ -1,6 +1,7 @@
 package dev.xhtmlinlinecheck.testing
 
 import dev.xhtmlinlinecheck.analyzer.AnalysisRequest
+import dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailureKind
 import dev.xhtmlinlinecheck.loader.SourceLoader
 import dev.xhtmlinlinecheck.syntax.LogicalElementNode
 import dev.xhtmlinlinecheck.syntax.LogicalIncludeNode
@@ -228,5 +229,46 @@ class SimpleIncludeFixturePipelineTest {
                 "fixtures/support/include-cycle/old/fragments/outer.xhtml",
                 "fixtures/support/include-cycle/old/root.xhtml",
             )
+    }
+
+    @Test
+    fun `dynamic include fixture preserves unresolved include boundaries for later inconclusive reporting`() {
+        val scenario = FixtureScenarios.scenario("inconclusive/dynamic-include")
+
+        val loadedSources = SourceLoader.scaffold().load(
+            AnalysisRequest(
+                oldRoot = FixtureScenarios.repositoryRoot.relativize(scenario.oldRoot),
+                newRoot = FixtureScenarios.repositoryRoot.relativize(scenario.newRoot),
+                baseOld = FixtureScenarios.repositoryRoot,
+                baseNew = FixtureScenarios.repositoryRoot,
+            ),
+        )
+
+        val includeEdge = loadedSources.oldRoot.sourceGraphFile.includeEdges.single()
+
+        assertThat(includeEdge.sourcePath).isEqualTo("#{bean.fragmentPath}")
+        assertThat(includeEdge.includeSite.render())
+            .startsWith("fixtures/inconclusive/dynamic-include/old/root.xhtml:2:")
+        assertThat(includeEdge.includeSite.attributeName).isEqualTo("src")
+        assertThat(includeEdge.includedDocument).isNull()
+        assertThat(includeEdge.includedFile).isNull()
+        assertThat(includeEdge.includeFailure).isNotNull()
+        assertThat(includeEdge.includeFailure!!.kind).isEqualTo(SourceGraphIncludeFailureKind.DYNAMIC_PATH)
+        assertThat(includeEdge.includeFailure!!.dynamicSourcePath).isEqualTo("#{bean.fragmentPath}")
+        assertThat(includeEdge.parameters.map { it.name }).containsExactly("label")
+        assertThat(includeEdge.parameters.single().valueExpression).isEqualTo("#{bean.label}")
+
+        val parsedTrees = XhtmlSyntaxParser.scaffold().parse(loadedSources)
+        val includeNode = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+
+        assertThat(includeNode.sourcePath).isEqualTo("#{bean.fragmentPath}")
+        assertThat(includeNode.children).isEmpty()
+        assertThat(includeNode.provenance.logicalLocation.render())
+            .startsWith("fixtures/inconclusive/dynamic-include/old/root.xhtml:2:")
+        assertThat(includeNode.provenance.logicalLocation.attributeName).isEqualTo("src")
+        assertThat(includeNode.includeFailure).isNotNull()
+        assertThat(includeNode.includeFailure!!.kind).isEqualTo(SourceGraphIncludeFailureKind.DYNAMIC_PATH)
+        assertThat(includeNode.includeFailure!!.dynamicSourcePath).isEqualTo("#{bean.fragmentPath}")
+        assertThat(includeNode.parameters.map { it.name }).containsExactly("label")
     }
 }

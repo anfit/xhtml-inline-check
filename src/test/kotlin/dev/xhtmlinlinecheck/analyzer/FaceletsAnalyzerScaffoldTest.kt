@@ -1,6 +1,7 @@
 package dev.xhtmlinlinecheck.analyzer
 
 import dev.xhtmlinlinecheck.domain.AnalysisResult
+import dev.xhtmlinlinecheck.testing.FixtureExpectations
 import dev.xhtmlinlinecheck.testing.FixtureScenarios
 import dev.xhtmlinlinecheck.testing.TemporaryProjectTree
 import dev.xhtmlinlinecheck.testing.assertThatReport
@@ -134,6 +135,37 @@ class FaceletsAnalyzerScaffoldTest {
         assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(report.problems.first().locations.old?.snippet).isEqualTo("#{bean.fragmentPath}")
         assertThat(report.problems.first().explanation).contains("#{bean.fragmentPath}")
+    }
+
+    @Test
+    fun `dynamic include fixture keeps dedicated warning ids and derived inconclusive result stable`() {
+        val scenario = FixtureScenarios.scenario("inconclusive/dynamic-include")
+        val expectation = FixtureExpectations.read(scenario)
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = FixtureScenarios.repositoryRoot.relativize(scenario.oldRoot),
+                newRoot = FixtureScenarios.repositoryRoot.relativize(scenario.newRoot),
+                baseOld = FixtureScenarios.repositoryRoot,
+                baseNew = FixtureScenarios.repositoryRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.valueOf(expectation.result))
+            .hasProblemCount(expectation.problemIds.size + expectation.warningIds.size)
+            .hasWarningCount(expectation.warningIds.size)
+            .hasProblemIds(*(expectation.problemIds + expectation.warningIds).toTypedArray())
+        assertThat(report.problems.first().summary).isEqualTo("Dynamic include path is not statically resolvable")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.render())
+            .startsWith("fixtures/inconclusive/dynamic-include/old/root.xhtml:2:")
+        assertThat(report.problems.first().locations.old?.physicalLocation?.render())
+            .startsWith("fixtures/inconclusive/dynamic-include/old/root.xhtml:2:")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.attributeName).isEqualTo("src")
+        assertThat(report.problems.first().locations.old?.physicalLocation?.attributeName).isEqualTo("src")
+        assertThat(report.problems.first().locations.old?.snippet).isEqualTo("#{bean.fragmentPath}")
+        assertThat(report.problems.first().explanation).contains("comparison beneath this node is not trustworthy")
+        assertThat(report.summary.headline).contains("Scaffolded analyzer pipeline only")
     }
 
     @Test

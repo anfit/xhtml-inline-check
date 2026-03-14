@@ -1,0 +1,9 @@
+{
+  "result": "INCONCLUSIVE",
+  "problemIds": [],
+  "warningIds": [
+    "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+    "W-UNSUPPORTED-DYNAMIC_INCLUDE"
+  ],
+  "notes": "Dynamic ui:include src values must keep the comparison inconclusive without proving a mismatch."
+}
