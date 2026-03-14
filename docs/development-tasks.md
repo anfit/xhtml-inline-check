@@ -1,4 +1,3 @@
-Add core dependencies for CLI parsing, XML parsing, JSON output, and testing, choosing libraries that fit the parser, reporter, and fixture tasks defined later in this file.
 Add baseline JUnit-based test infrastructure that the domain-model, loader, parser, EL, comparator, reporter, and CLI tasks can all reuse.
 Add a minimal CI workflow or local verification script placeholder that runs the baseline checks established by the Gradle, entrypoint, and test-infrastructure tasks.
 Add a smoke test proving the CLI starts and returns a stable exit code, using the entrypoint and baseline test infrastructure tasks as prerequisites.

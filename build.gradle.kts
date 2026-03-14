@@ -21,8 +21,16 @@ repositories {
 }
 
 dependencies {
+    implementation("com.github.ajalt.clikt:clikt:4.4.0")
+    implementation(platform("com.fasterxml.jackson:jackson-bom:2.17.2"))
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("com.fasterxml.woodstox:woodstox-core:6.6.2")
+
     testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testImplementation(platform("org.junit:junit-bom:5.11.4"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.junit.jupiter:junit-jupiter-params")
+    testImplementation("org.assertj:assertj-core:3.26.3")
 }
 
 kotlin {
@@ -60,6 +68,7 @@ tasks.distTar {
 
 tasks.test {
     useJUnitPlatform()
+    jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
 }
 
 val sourceSets = the<SourceSetContainer>()
