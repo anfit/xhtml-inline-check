@@ -129,6 +129,106 @@ class ScopeStackModelTest {
     }
 
     @Test
+    fun `nested scopes create and pop frames in traversal order across include repeat foreach and c set`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:c="http://java.sun.com/jsp/jstl/core"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <c:set var="outer" value="#{bean.outer}" />
+              <ui:include src="/fragments/panel.xhtml">
+                <ui:param name="panelLabel" value="#{outer}" />
+              </ui:include>
+              <h:outputText id="outsideOutput" value="#{outer}" />
+            </ui:composition>
+            """,
+        )
+        tree.write(
+            "fragments/panel.xhtml",
+            """
+            <ui:fragment xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                         xmlns:c="http://java.sun.com/jsp/jstl/core"
+                         xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:repeat var="row" varStatus="rowStatus" value="#{bean.rows}">
+                <c:set var="selected" value="#{row.selected}" />
+                <c:forEach var="child" varStatus="childStatus" items="#{row.children}">
+                  <h:outputText id="deepOutput" value="#{panelLabel}-#{selected}-#{child.label}" />
+                </c:forEach>
+                <h:outputText id="afterLoop" value="#{panelLabel}-#{selected}-#{row.label}" />
+              </ui:repeat>
+            </ui:fragment>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val scopeModel = semanticModels.oldRoot.scopeModel
+        val setPath = findPathByAttribute(semanticModels.oldRoot.syntaxTree, "var", "selected")
+        val repeatPath = findPathByLocalName(semanticModels.oldRoot.syntaxTree, "repeat")
+        val forEachPath = findPathByLocalName(semanticModels.oldRoot.syntaxTree, "forEach")
+        val deepOutputPath = findPathById(semanticModels.oldRoot.syntaxTree, "deepOutput")
+        val afterLoopPath = findPathById(semanticModels.oldRoot.syntaxTree, "afterLoop")
+        val outsideOutputPath = findPathById(semanticModels.oldRoot.syntaxTree, "outsideOutput")
+        val includePath = repeatPath.parent().parent()
+
+        val rootSnapshot = scopeModel.snapshotAt(LogicalNodePath.root())
+        val includeSnapshot = scopeModel.snapshotAt(includePath)
+        val repeatSnapshot = scopeModel.snapshotAt(repeatPath)
+        val setSnapshot = scopeModel.snapshotAt(setPath)
+        val forEachSnapshot = scopeModel.snapshotAt(forEachPath)
+        val deepOutputSnapshot = scopeModel.snapshotAt(deepOutputPath)
+        val afterLoopSnapshot = scopeModel.snapshotAt(afterLoopPath)
+        val outsideOutputSnapshot = scopeModel.snapshotAt(outsideOutputPath)
+
+        assertThat(rootSnapshot.nodeScopeId).isEqualTo(scopeModel.rootScopeId)
+        assertThat(includeSnapshot.nodeScopeId).isNotEqualTo(scopeModel.rootScopeId)
+        assertThat(includeSnapshot.descendantScopeId).isNotEqualTo(includeSnapshot.nodeScopeId)
+        assertThat(repeatSnapshot.nodeScopeId).isEqualTo(includeSnapshot.descendantScopeId)
+        assertThat(repeatSnapshot.descendantScopeId).isNotEqualTo(repeatSnapshot.nodeScopeId)
+        assertThat(setSnapshot.nodeScopeId).isEqualTo(repeatSnapshot.descendantScopeId)
+        assertThat(setSnapshot.descendantScopeId).isNotEqualTo(setSnapshot.nodeScopeId)
+        assertThat(forEachSnapshot.nodeScopeId).isEqualTo(setSnapshot.descendantScopeId)
+        assertThat(forEachSnapshot.descendantScopeId).isNotEqualTo(forEachSnapshot.nodeScopeId)
+        assertThat(deepOutputSnapshot.nodeScopeId).isEqualTo(forEachSnapshot.descendantScopeId)
+        assertThat(afterLoopSnapshot.nodeScopeId).isEqualTo(setSnapshot.descendantScopeId)
+        assertThat(outsideOutputSnapshot.nodeScopeId).isEqualTo(includeSnapshot.nodeScopeId)
+
+        assertThat(bindingNamesForScope(scopeModel, includeSnapshot.nodeScopeId)).containsExactly("outer")
+        assertThat(bindingNamesForScope(scopeModel, includeSnapshot.descendantScopeId)).containsExactly("panelLabel")
+        assertThat(bindingNamesForScope(scopeModel, repeatSnapshot.descendantScopeId)).containsExactly("row", "rowStatus")
+        assertThat(bindingNamesForScope(scopeModel, setSnapshot.descendantScopeId)).containsExactly("selected")
+        assertThat(bindingNamesForScope(scopeModel, forEachSnapshot.descendantScopeId)).containsExactly("child", "childStatus")
+
+        assertThat(scopeModel.resolve("panelLabel", deepOutputPath))
+            .extracting("kind", "origin.descriptor")
+            .containsExactly(dev.xhtmlinlinecheck.domain.BindingKind.UI_PARAM, "ui:param name=panelLabel")
+        assertThat(scopeModel.resolve("selected", deepOutputPath))
+            .extracting("kind", "origin.descriptor")
+            .containsExactly(dev.xhtmlinlinecheck.domain.BindingKind.C_SET, "c:set var=selected")
+        assertThat(scopeModel.resolve("child", deepOutputPath))
+            .extracting("kind", "origin.descriptor")
+            .containsExactly(dev.xhtmlinlinecheck.domain.BindingKind.ITERATION_VAR, "c:forEach var=child")
+        assertThat(scopeModel.resolve("child", afterLoopPath)).isNull()
+        assertThat(scopeModel.resolve("selected", afterLoopPath))
+            .extracting("kind", "origin.descriptor")
+            .containsExactly(dev.xhtmlinlinecheck.domain.BindingKind.C_SET, "c:set var=selected")
+        assertThat(scopeModel.resolve("panelLabel", outsideOutputPath)).isNull()
+        assertThat(scopeModel.resolve("selected", outsideOutputPath)).isNull()
+        assertThat(scopeModel.resolve("outer", outsideOutputPath))
+            .extracting("kind", "origin.descriptor")
+            .containsExactly(dev.xhtmlinlinecheck.domain.BindingKind.C_SET, "c:set var=outer")
+        assertThat(scopeModel.visibleBindingsAt(deepOutputPath).map { it.writtenName })
+            .containsExactly("childStatus", "child", "selected", "rowStatus", "row", "panelLabel", "outer")
+    }
+
+    @Test
     fun `c set binding persists into later siblings within the same enclosing scope`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(
@@ -298,6 +398,31 @@ class ScopeStackModelTest {
         return requireNotNull(foundPath) { "missing node with localName=$localName" }
     }
 
+    private fun findPathByAttribute(
+        syntaxTree: dev.xhtmlinlinecheck.syntax.XhtmlSyntaxTree,
+        attributeName: String,
+        attributeValue: String,
+    ): LogicalNodePath {
+        var foundPath: LogicalNodePath? = null
+        syntaxTree.walkDepthFirstWithPath { path, node ->
+            if (node is LogicalElementNode) {
+                val matchingAttribute = node.attributes.firstOrNull { it.name.localName == attributeName && it.value == attributeValue }
+                if (matchingAttribute != null) {
+                    foundPath = path
+                }
+            }
+        }
+        return requireNotNull(foundPath) { "missing node with $attributeName=$attributeValue" }
+    }
+
     private fun LogicalNodePath.parent(): LogicalNodePath =
         LogicalNodePath(segments.dropLast(1))
+
+    private fun bindingNamesForScope(
+        scopeModel: ScopeStackModel,
+        scopeId: dev.xhtmlinlinecheck.domain.ScopeId,
+    ): List<String> =
+        scopeModel.scopes.getValue(scopeId).bindingIds.map { bindingId ->
+            scopeModel.bindings.first { it.id == bindingId }.writtenName
+        }
 }
