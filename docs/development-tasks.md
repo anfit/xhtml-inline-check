@@ -1,4 +1,3 @@
-Define binding kinds for `ui:param`, iterator vars, `varStatus`, `c:set`, `c:forEach`, and implicit globals, because the scope stack and EL normalizer need a shared vocabulary.
 Implement the scope-stack model, building on the binding-kind task and the syntax-tree task so bindings can be resolved relative to tree position.
 Implement scope push and pop behavior while walking the syntax tree, using the rule-registry tasks so binding-introducing tags change scope at the right points.
 Implement binding creation for `ui:param`, building on the include-parameter extraction task and the scope-stack task.

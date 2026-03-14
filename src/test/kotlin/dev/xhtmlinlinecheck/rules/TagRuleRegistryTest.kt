@@ -1,5 +1,6 @@
 package dev.xhtmlinlinecheck.rules
 
+import dev.xhtmlinlinecheck.domain.BindingKind
 import dev.xhtmlinlinecheck.syntax.LogicalName
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -41,7 +42,7 @@ class TagRuleRegistryTest {
                 nameAttribute = "var",
             ),
             BindingCreationRule(
-                kind = BindingKind.ITERATION_STATUS,
+                kind = BindingKind.VAR_STATUS,
                 nameAttribute = "varStatus",
             ),
         )
@@ -58,7 +59,7 @@ class TagRuleRegistryTest {
         assertThat(setRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
         assertThat(setRule.bindingRules).containsExactly(
             BindingCreationRule(
-                kind = BindingKind.SET_VAR,
+                kind = BindingKind.C_SET,
                 nameAttribute = "var",
                 valueAttribute = "value",
             ),
@@ -69,11 +70,11 @@ class TagRuleRegistryTest {
         assertThat(forEachRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
         assertThat(forEachRule.bindingRules).containsExactly(
             BindingCreationRule(
-                kind = BindingKind.FOR_EACH_VAR,
+                kind = BindingKind.C_FOR_EACH,
                 nameAttribute = "var",
             ),
             BindingCreationRule(
-                kind = BindingKind.FOR_EACH_STATUS,
+                kind = BindingKind.VAR_STATUS,
                 nameAttribute = "varStatus",
             ),
         )
@@ -109,7 +110,7 @@ class TagRuleRegistryTest {
                                 bindingRules =
                                     listOf(
                                         BindingCreationRule(
-                                            kind = BindingKind.SET_VAR,
+                                            kind = BindingKind.C_SET,
                                             nameAttribute = "exactVar",
                                         ),
                                     ),
@@ -124,7 +125,7 @@ class TagRuleRegistryTest {
                                 bindingRules =
                                     listOf(
                                         BindingCreationRule(
-                                            kind = BindingKind.FOR_EACH_VAR,
+                                            kind = BindingKind.C_FOR_EACH,
                                             nameAttribute = "namespaceVar",
                                         ),
                                     ),
@@ -152,11 +153,11 @@ class TagRuleRegistryTest {
         assertThat(firstLookup).isEqualTo(secondLookup)
         assertThat(firstLookup.bindingRules).containsExactly(
             BindingCreationRule(
-                kind = BindingKind.SET_VAR,
+                kind = BindingKind.C_SET,
                 nameAttribute = "exactVar",
             ),
             BindingCreationRule(
-                kind = BindingKind.FOR_EACH_VAR,
+                kind = BindingKind.C_FOR_EACH,
                 nameAttribute = "namespaceVar",
             ),
             BindingCreationRule(
@@ -236,7 +237,7 @@ class TagRuleRegistryTest {
         assertThat(paramRule.inheritsFallbackRule).isFalse()
         assertThat(paramRule.bindingRules).containsExactly(
             BindingCreationRule(
-                kind = BindingKind.INCLUDE_PARAMETER,
+                kind = BindingKind.UI_PARAM,
                 nameAttribute = "name",
                 valueAttribute = "value",
             ),

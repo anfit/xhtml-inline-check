@@ -1,5 +1,6 @@
 package dev.xhtmlinlinecheck.rules
 
+import dev.xhtmlinlinecheck.domain.BindingKind
 import dev.xhtmlinlinecheck.syntax.LogicalName
 
 const val FACELETS_NAMESPACE: String = "http://xmlns.jcp.org/jsf/facelets"
@@ -10,15 +11,6 @@ enum class SyntaxRole {
     ELEMENT,
     INCLUDE,
     INCLUDE_PARAMETER,
-}
-
-enum class BindingKind {
-    INCLUDE_PARAMETER,
-    ITERATION_VAR,
-    ITERATION_STATUS,
-    SET_VAR,
-    FOR_EACH_VAR,
-    FOR_EACH_STATUS,
 }
 
 data class BindingCreationRule(
@@ -107,7 +99,7 @@ object BuiltInTagRuleRegistry : TagRuleRegistry by StaticTagRuleRegistry(
                     bindingRules =
                         listOf(
                             BindingCreationRule(
-                                kind = BindingKind.INCLUDE_PARAMETER,
+                                kind = BindingKind.UI_PARAM,
                                 nameAttribute = "name",
                                 valueAttribute = "value",
                             ),
@@ -133,7 +125,7 @@ object BuiltInTagRuleRegistry : TagRuleRegistry by StaticTagRuleRegistry(
                                 nameAttribute = "var",
                             ),
                             BindingCreationRule(
-                                kind = BindingKind.ITERATION_STATUS,
+                                kind = BindingKind.VAR_STATUS,
                                 nameAttribute = "varStatus",
                             ),
                         ),
@@ -144,7 +136,7 @@ object BuiltInTagRuleRegistry : TagRuleRegistry by StaticTagRuleRegistry(
                     bindingRules =
                         listOf(
                             BindingCreationRule(
-                                kind = BindingKind.SET_VAR,
+                                kind = BindingKind.C_SET,
                                 nameAttribute = "var",
                                 valueAttribute = "value",
                             ),
@@ -156,11 +148,11 @@ object BuiltInTagRuleRegistry : TagRuleRegistry by StaticTagRuleRegistry(
                     bindingRules =
                         listOf(
                             BindingCreationRule(
-                                kind = BindingKind.FOR_EACH_VAR,
+                                kind = BindingKind.C_FOR_EACH,
                                 nameAttribute = "var",
                             ),
                             BindingCreationRule(
-                                kind = BindingKind.FOR_EACH_STATUS,
+                                kind = BindingKind.VAR_STATUS,
                                 nameAttribute = "varStatus",
                             ),
                         ),
