@@ -5,5 +5,6 @@ import dev.xhtmlinlinecheck.domain.SourceDocument
 
 data class LoadedSource(
     val document: SourceDocument,
+    val contents: String,
     val provenance: Provenance = Provenance.forRoot(document),
 )

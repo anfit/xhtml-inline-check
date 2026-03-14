@@ -3,11 +3,22 @@ package dev.xhtmlinlinecheck.loader
 import dev.xhtmlinlinecheck.analyzer.AnalysisRequest
 import dev.xhtmlinlinecheck.domain.AnalysisSide
 import dev.xhtmlinlinecheck.domain.SourceDocument
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.NoSuchFileException
+import java.nio.file.Path
+import kotlin.io.path.invariantSeparatorsPathString
 
 data class LoadedSources(
     val oldRoot: LoadedSource,
     val newRoot: LoadedSource,
 )
+
+class SourceLoadException(
+    val document: SourceDocument,
+    override val message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
 
 fun interface SourceLoader {
     fun load(request: AnalysisRequest): LoadedSources
@@ -16,20 +27,54 @@ fun interface SourceLoader {
         fun scaffold(): SourceLoader =
             SourceLoader { request ->
                 LoadedSources(
-                    oldRoot = LoadedSource(
-                        document = SourceDocument.fromPath(
-                            side = AnalysisSide.OLD,
-                            path = request.oldRoot,
-                            rootDirectory = request.baseOld,
-                        ),
+                    oldRoot = loadRoot(
+                        side = AnalysisSide.OLD,
+                        path = request.oldRoot,
+                        rootDirectory = request.baseOld,
                     ),
-                    newRoot = LoadedSource(
-                        document = SourceDocument.fromPath(
-                            side = AnalysisSide.NEW,
-                            path = request.newRoot,
-                            rootDirectory = request.baseNew,
-                        ),
+                    newRoot = loadRoot(
+                        side = AnalysisSide.NEW,
+                        path = request.newRoot,
+                        rootDirectory = request.baseNew,
                     ),
+                )
+            }
+
+        private fun loadRoot(
+            side: AnalysisSide,
+            path: Path,
+            rootDirectory: Path?,
+        ): LoadedSource {
+            val document = SourceDocument.fromPath(
+                side = side,
+                path = path,
+                rootDirectory = rootDirectory,
+            )
+            val contents = readContents(document)
+            return LoadedSource(
+                document = document,
+                contents = contents,
+            )
+        }
+
+        private fun readContents(document: SourceDocument): String =
+            try {
+                Files.readString(document.absolutePath)
+            } catch (exception: NoSuchFileException) {
+                throw SourceLoadException(
+                    document = document,
+                    message =
+                        "Missing source file for ${document.side.name.lowercase()}: " +
+                            "${document.displayPath} (${document.absolutePath.invariantSeparatorsPathString})",
+                    cause = exception,
+                )
+            } catch (exception: IOException) {
+                throw SourceLoadException(
+                    document = document,
+                    message =
+                        "Failed to read source file for ${document.side.name.lowercase()}: " +
+                            "${document.displayPath} (${document.absolutePath.invariantSeparatorsPathString})",
+                    cause = exception,
                 )
             }
     }
