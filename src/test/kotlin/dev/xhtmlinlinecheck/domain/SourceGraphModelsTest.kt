@@ -16,6 +16,7 @@ class SourceGraphModelsTest {
 
         assertThat(file.document).isEqualTo(document)
         assertThat(file.provenance).isEqualTo(Provenance.forRoot(document))
+        assertThat(file.contents).isEmpty()
         assertThat(file.stack.steps).isEmpty()
         assertThat(file.includeEdges).isEmpty()
     }
@@ -59,7 +60,7 @@ class SourceGraphModelsTest {
             ),
         )
 
-        val includedFile = SourceGraphFile.included(includedDocument, edge)
+        val includedFile = SourceGraphFile.included(includedDocument, edge, contents = "<ui:fragment />")
 
         assertThat(edge.asIncludeStep().parameterNames).containsExactly("row")
         assertThat(edge.sourcePath).isEqualTo("/fragments/table.xhtml")
@@ -71,6 +72,7 @@ class SourceGraphModelsTest {
         assertThat(includedFile.stack.steps).containsExactly(edge.asIncludeStep())
         assertThat(includedFile.provenance.includeStack).containsExactly(edge.asIncludeStep())
         assertThat(includedFile.provenance.logicalLocation.render()).isEqualTo("legacy/fragments/table.xhtml")
+        assertThat(includedFile.contents).isEqualTo("<ui:fragment />")
     }
 
     @Test
@@ -91,6 +93,7 @@ class SourceGraphModelsTest {
 
         assertThat(edge.sourcePath).isEqualTo("#{bean.fragmentPath}")
         assertThat(edge.includedDocument).isNull()
+        assertThat(edge.includedFile).isNull()
         assertThat(edge.parameters).isEmpty()
         assertThat(edge.isResolved).isFalse()
     }

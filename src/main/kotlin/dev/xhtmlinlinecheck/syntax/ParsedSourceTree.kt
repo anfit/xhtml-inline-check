@@ -8,6 +8,7 @@ data class ParsedSourceTree(
     val document: SourceDocument,
     val provenance: Provenance,
     val sourceGraphFile: SourceGraphFile,
+    val rootNode: LogicalElementNode?,
 ) {
     init {
         require(sourceGraphFile.document == document) {

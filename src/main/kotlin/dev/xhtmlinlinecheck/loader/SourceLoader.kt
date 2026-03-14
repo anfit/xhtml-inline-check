@@ -3,6 +3,7 @@ package dev.xhtmlinlinecheck.loader
 import dev.xhtmlinlinecheck.analyzer.AnalysisRequest
 import dev.xhtmlinlinecheck.domain.AnalysisSide
 import dev.xhtmlinlinecheck.domain.SourceDocument
+import dev.xhtmlinlinecheck.domain.SourceGraphEdge
 import dev.xhtmlinlinecheck.domain.SourceGraphFile
 import java.io.IOException
 import java.nio.file.Files
@@ -51,24 +52,41 @@ fun interface SourceLoader {
                 path = path,
                 rootDirectory = rootDirectory,
             )
-            val contents = readContents(document)
-            val sourceGraphFile =
-                SourceGraphFile.root(document).copy(
-                    includeEdges =
-                        SourceGraphIncludeDiscovery.discover(
-                            document = document,
-                            contents = contents,
-                        ).map { edge ->
-                            edge.copy(
-                                includedDocument = edge.sourcePath?.let(document::resolveIncludeSource),
-                            )
-                        },
-                )
+            val sourceGraphFile = loadGraph(document)
             return LoadedSource(
                 document = document,
-                contents = contents,
+                contents = sourceGraphFile.contents,
                 sourceGraphFile = sourceGraphFile,
             )
+        }
+
+        private fun loadGraph(
+            document: SourceDocument,
+            parentEdge: SourceGraphEdge? = null,
+            ancestry: Set<Path> = setOf(document.absolutePath),
+        ): SourceGraphFile {
+            val contents = readContents(document)
+            val graphFile =
+                parentEdge?.let { SourceGraphFile.included(document = document, edge = it, contents = contents) }
+                    ?: SourceGraphFile.root(document).copy(contents = contents)
+
+            val includeEdges =
+                SourceGraphIncludeDiscovery.discover(
+                    document = document,
+                    contents = contents,
+                    stackBefore = graphFile.stack,
+                ).map { discoveredEdge ->
+                    val includedDocument = discoveredEdge.sourcePath?.let(document::resolveIncludeSource)
+                    val includedFile =
+                        includedDocument
+                            ?.takeIf { Files.exists(it.absolutePath) && it.absolutePath !in ancestry }
+                            ?.let { loadGraph(it, parentEdge = discoveredEdge.copy(includedDocument = it), ancestry = ancestry + it.absolutePath) }
+                    discoveredEdge.copy(
+                        includedDocument = includedDocument,
+                        includedFile = includedFile,
+                    )
+                }
+            return graphFile.copy(includeEdges = includeEdges)
         }
 
         private fun readContents(document: SourceDocument): String =

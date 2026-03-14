@@ -20,9 +20,19 @@ data class SourceGraphEdge(
     val includeSite: SourceLocation,
     val sourcePath: String? = null,
     val includedDocument: SourceDocument? = null,
+    val includedFile: SourceGraphFile? = null,
     val parameters: List<SourceGraphParameter> = emptyList(),
     val stackBefore: SourceGraphStack = SourceGraphStack.root(),
 ) {
+    init {
+        require(includedFile == null || includedDocument != null) {
+            "included source graph files require a resolved included document"
+        }
+        require(includedFile == null || includedFile.document == includedDocument) {
+            "included source graph file must match the resolved included document"
+        }
+    }
+
     val isResolved: Boolean
         get() = includedDocument != null
 
@@ -54,12 +64,14 @@ data class SourceGraphEdge(
         fun discovered(
             includeSite: SourceLocation,
             sourcePath: String?,
+            includedFile: SourceGraphFile? = null,
             parameters: List<SourceGraphParameter> = emptyList(),
             stackBefore: SourceGraphStack = SourceGraphStack.root(),
         ): SourceGraphEdge =
             SourceGraphEdge(
                 includeSite = includeSite,
                 sourcePath = sourcePath,
+                includedFile = includedFile,
                 parameters = parameters,
                 stackBefore = stackBefore,
             )
@@ -68,6 +80,7 @@ data class SourceGraphEdge(
             includeSite: SourceLocation,
             includedDocument: SourceDocument,
             sourcePath: String? = null,
+            includedFile: SourceGraphFile? = null,
             parameters: List<SourceGraphParameter> = emptyList(),
             stackBefore: SourceGraphStack = SourceGraphStack.root(),
         ): SourceGraphEdge =
@@ -75,6 +88,7 @@ data class SourceGraphEdge(
                 includeSite = includeSite,
                 sourcePath = sourcePath,
                 includedDocument = includedDocument,
+                includedFile = includedFile,
                 parameters = parameters,
                 stackBefore = stackBefore,
             )
@@ -83,6 +97,7 @@ data class SourceGraphEdge(
 
 data class SourceGraphFile(
     val document: SourceDocument,
+    val contents: String,
     val provenance: Provenance,
     val stack: SourceGraphStack,
     val includeEdges: List<SourceGraphEdge> = emptyList(),
@@ -104,6 +119,7 @@ data class SourceGraphFile(
             val provenance = Provenance.forRoot(document)
             return SourceGraphFile(
                 document = document,
+                contents = "",
                 provenance = provenance,
                 stack = SourceGraphStack(provenance.includeStack),
             )
@@ -112,11 +128,13 @@ data class SourceGraphFile(
         fun included(
             document: SourceDocument,
             edge: SourceGraphEdge,
+            contents: String = "",
             includeEdges: List<SourceGraphEdge> = emptyList(),
         ): SourceGraphFile {
             val provenance = edge.provenanceForIncludedFile()
             return SourceGraphFile(
                 document = document,
+                contents = contents,
                 provenance = provenance,
                 stack = edge.stackAfter,
                 includeEdges = includeEdges,

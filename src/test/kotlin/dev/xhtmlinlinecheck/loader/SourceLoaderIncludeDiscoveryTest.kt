@@ -45,6 +45,8 @@ class SourceLoaderIncludeDiscoveryTest {
         assertThat(edge.isResolved).isTrue()
         assertThat(edge.includedDocument).isNotNull()
         assertThat(edge.includedDocument!!.displayPath).isEqualTo("fragments/table.xhtml")
+        assertThat(edge.includedFile).isNotNull()
+        assertThat(edge.includedFile!!.contents).contains("<ui:fragment")
         assertThat(edge.includeSite.document).isEqualTo(loadedSources.oldRoot.document)
         assertThat(edge.includeSite.attributeName).isEqualTo("src")
         assertThat(edge.includeSite.span?.start?.line).isEqualTo(2)
@@ -91,6 +93,7 @@ class SourceLoaderIncludeDiscoveryTest {
         assertThat(includedDocument).isNotNull()
         assertThat(includedDocument!!.displayPath).isEqualTo("legacy/views/fragments/table.xhtml")
         assertThat(includedDocument.rootDirectory).isEqualTo(loadedSources.oldRoot.document.rootDirectory)
+        assertThat(loadedSources.oldRoot.sourceGraphFile.includeEdges.single().includedFile).isNotNull()
     }
 
     @Test
@@ -125,6 +128,7 @@ class SourceLoaderIncludeDiscoveryTest {
         assertThat(edge.sourcePath).isEqualTo("#{bean.fragmentPath}")
         assertThat(edge.includeSite.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(edge.includeSite.render()).endsWith(" @src")
+        assertThat(edge.includedFile).isNull()
     }
 
     @Test

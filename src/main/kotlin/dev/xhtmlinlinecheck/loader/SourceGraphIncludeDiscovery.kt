@@ -4,6 +4,7 @@ import dev.xhtmlinlinecheck.domain.SourceDocument
 import dev.xhtmlinlinecheck.domain.SourceGraphEdge
 import dev.xhtmlinlinecheck.domain.SourceGraphParameter
 import dev.xhtmlinlinecheck.domain.Provenance
+import dev.xhtmlinlinecheck.domain.SourceGraphStack
 import dev.xhtmlinlinecheck.domain.SourceLocation
 import dev.xhtmlinlinecheck.domain.SourcePosition
 import dev.xhtmlinlinecheck.domain.SourceSpan
@@ -19,7 +20,11 @@ internal object SourceGraphIncludeDiscovery {
     private const val SRC_ATTRIBUTE = "src"
     private const val VALUE_ATTRIBUTE = "value"
 
-    fun discover(document: SourceDocument, contents: String): List<SourceGraphEdge> {
+    fun discover(
+        document: SourceDocument,
+        contents: String,
+        stackBefore: SourceGraphStack = SourceGraphStack.root(),
+    ): List<SourceGraphEdge> {
         val reader = xmlInputFactory().createXMLStreamReader(document.displayPath, StringReader(contents))
 
         reader.use {
@@ -37,6 +42,7 @@ internal object SourceGraphIncludeDiscovery {
                     includeSite = reader.toSourceLocation(document, if (sourcePath != null) SRC_ATTRIBUTE else null),
                     sourcePath = sourcePath,
                     parameters = reader.readIncludeParameters(document),
+                    stackBefore = stackBefore,
                 )
             }
             return edges

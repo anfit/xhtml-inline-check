@@ -1,4 +1,3 @@
-Implement include expansion into a logical tree representation, using the source graph, include-resolution, and `ui:param`-extraction tasks so old and new trees can be compared on equal footing.
 Implement cycle detection for recursive includes, integrating with the source graph and include-expansion tasks so the analyzer fails predictably instead of looping.
 Implement missing-file diagnostics for unresolved includes, reusing the problem, location, and include-resolution tasks so these failures are actionable.
 Implement unsupported diagnostics for dynamic include paths, building on the result-model and problem-model tasks so unsupported constructs can later produce `INCONCLUSIVE`.
