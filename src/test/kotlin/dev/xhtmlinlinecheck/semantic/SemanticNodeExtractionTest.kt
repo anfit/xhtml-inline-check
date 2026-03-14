@@ -57,6 +57,7 @@ class SemanticNodeExtractionTest {
 
         assertThat(includeNode.nodeId.value).isEqualTo("node:/0/0")
         assertThat(includeNode.isTransparentStructureWrapper).isTrue()
+        assertThat(includeNode.participatesInStructuralMatching).isFalse()
         assertThat(includeNode.elFacts)
             .extracting("carrierKind", "attributeName", "ownerName", "rawValue")
             .containsExactly(
@@ -65,10 +66,12 @@ class SemanticNodeExtractionTest {
             )
 
         assertThat(fragmentNode.isTransparentStructureWrapper).isTrue()
+        assertThat(fragmentNode.participatesInStructuralMatching).isFalse()
         assertThat(fragmentNode.provenance.physicalLocation.document.displayPath).isEqualTo("fragments/body.xhtml")
         assertThat(fragmentNode.provenance.logicalLocation.document.displayPath).isEqualTo("legacy/root.xhtml")
 
         assertThat(panelNode.nodePath.segments).containsExactly(0, 0, 0, 0, 0)
+        assertThat(panelNode.participatesInStructuralMatching).isTrue()
         assertThat(panelNode.explicitIdAttribute)
             .extracting("attributeName", "rawValue")
             .containsExactly("id", "panel")

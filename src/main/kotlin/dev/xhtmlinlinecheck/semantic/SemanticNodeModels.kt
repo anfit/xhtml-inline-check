@@ -91,4 +91,7 @@ data class SemanticNode(
 
     val iterationAncestry: List<SemanticIterationAncestor>
         get() = structuralContext.iterationAncestry
+
+    val participatesInStructuralMatching: Boolean
+        get() = kind == SemanticNodeKind.ELEMENT && !isTransparentStructureWrapper
 }
