@@ -1,4 +1,3 @@
-Define a tag-rule interface describing semantic behavior such as binding creation, transparency, naming-container status, EL-bearing attributes, and target-bearing attributes, because the semantic-extraction and comparator tasks should not hardcode tag logic.
 Implement a central registry for known tag rules so the syntax-walker, scope builder, structural analyzer, and later extension tasks can resolve semantics deterministically.
 Add registry rules for `ui:include`, `ui:param`, `ui:composition`, and `ui:fragment`, building on the parser and transparent-wrapper tasks so include-related behavior is explicit.
 Add a registry rule for `ui:repeat`, because the binding, iteration-ancestry, EL-normalization, and variable-capture comparison tasks depend on its semantics.

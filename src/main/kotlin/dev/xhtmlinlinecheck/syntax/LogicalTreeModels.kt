@@ -5,6 +5,7 @@ import dev.xhtmlinlinecheck.domain.SourceGraphFile
 import dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailure
 import dev.xhtmlinlinecheck.domain.SourceGraphParameter
 import dev.xhtmlinlinecheck.domain.SourceLocation
+import dev.xhtmlinlinecheck.rules.TagRuleRegistry
 
 data class LogicalName(
     val localName: String,
@@ -22,8 +23,6 @@ data class LogicalAttribute(
     val value: String,
     val location: SourceLocation,
 )
-
-private const val FACELETS_NAMESPACE = "http://xmlns.jcp.org/jsf/facelets"
 
 sealed interface LogicalNode {
     val location: SourceLocation
@@ -60,10 +59,12 @@ data class LogicalIncludeNode(
     override val provenance: Provenance,
 ) : LogicalNode
 
+private val builtInTagRules: TagRuleRegistry = TagRuleRegistry.builtIns()
+
 val LogicalNode.isTransparentStructureWrapper: Boolean
     get() =
         when (this) {
-            is LogicalElementNode -> name.namespaceUri == FACELETS_NAMESPACE && name.localName in transparentFaceletsElementNames
+            is LogicalElementNode -> builtInTagRules.ruleFor(name)?.isTransparentStructureWrapper == true
             is LogicalIncludeNode -> true
             is LogicalTextNode -> false
         }
@@ -111,5 +112,3 @@ private fun List<LogicalNode>.flattenTransparentStructureWrappers(): List<Logica
             listOf(node)
         }
     }
-
-private val transparentFaceletsElementNames = setOf("composition", "fragment")
