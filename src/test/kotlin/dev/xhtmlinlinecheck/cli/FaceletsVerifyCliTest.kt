@@ -1,19 +1,28 @@
 package dev.xhtmlinlinecheck.cli
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import dev.xhtmlinlinecheck.testing.TemporaryProjectTree
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.MethodSource
+import java.nio.file.Path
+import java.util.stream.Stream
 
 class FaceletsVerifyCliTest {
+    @TempDir
+    lateinit var tempDir: Path
+
     @Test
     fun `returns inconclusive exit code for scaffolded pipeline`() {
+        val args = smokeArgs()
         val output = StringBuilder()
 
-        val exitCode = FaceletsVerifyCli().run(listOf("legacy.xhtml", "refactored.xhtml"), output)
+        val exitCode = FaceletsVerifyCli().run(args, output)
 
-        assertEquals(2, exitCode)
-        assertTrue(output.toString().contains("INCONCLUSIVE"))
-        assertTrue(output.toString().contains("W00"))
+        assertThat(exitCode).isEqualTo(2)
+        assertThat(output.toString()).contains("INCONCLUSIVE")
+        assertThat(output.toString()).contains("W00")
     }
 
     @Test
@@ -22,33 +31,48 @@ class FaceletsVerifyCliTest {
 
         val exitCode = FaceletsVerifyCli().run(emptyList(), output)
 
-        assertEquals(64, exitCode)
-        assertTrue(output.toString().contains("Usage: facelets-verify"))
+        assertThat(exitCode).isEqualTo(64)
+        assertThat(output.toString()).contains("Usage: facelets-verify")
     }
 
-    @Test
-    fun `renders json when requested`() {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("jsonArgumentOrders")
+    fun `renders json when requested regardless of option ordering`(
+        order: String,
+    ) {
+        val roots = smokeArgs()
         val output = StringBuilder()
+        val args = when (order) {
+            "roots-first" -> roots + listOf("--format", "json")
+            "format-first" -> listOf("--format", "json") + roots
+            else -> error("Unsupported argument order: $order")
+        }
 
-        val exitCode = FaceletsVerifyCli().run(
-            listOf("legacy.xhtml", "refactored.xhtml", "--format", "json"),
-            output,
-        )
+        val exitCode = FaceletsVerifyCli().run(args, output)
 
-        assertEquals(2, exitCode)
-        assertTrue(output.toString().contains("\"result\": \"INCONCLUSIVE\""))
+        assertThat(exitCode).isEqualTo(2)
+        assertThat(output.toString()).contains("\"result\": \"INCONCLUSIVE\"")
     }
 
-    @Test
-    fun `accepts format flag before root arguments`() {
-        val output = StringBuilder()
-
-        val exitCode = FaceletsVerifyCli().run(
-            listOf("--format", "json", "legacy.xhtml", "refactored.xhtml"),
-            output,
+    private fun smokeArgs(): List<String> {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "old/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
         )
+        val newRoot = tree.write(
+            "new/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+        return listOf(oldRoot.toString(), newRoot.toString())
+    }
 
-        assertEquals(2, exitCode)
-        assertTrue(output.toString().contains("\"result\": \"INCONCLUSIVE\""))
+    companion object {
+        @JvmStatic
+        fun jsonArgumentOrders(): Stream<String> = Stream.of("roots-first", "format-first")
     }
 }

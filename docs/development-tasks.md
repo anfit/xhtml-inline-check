@@ -1,4 +1,3 @@
-Add baseline JUnit-based test infrastructure that the domain-model, loader, parser, EL, comparator, reporter, and CLI tasks can all reuse.
 Add a minimal CI workflow or local verification script placeholder that runs the baseline checks established by the Gradle, entrypoint, and test-infrastructure tasks.
 Add a smoke test proving the CLI starts and returns a stable exit code, using the entrypoint and baseline test infrastructure tasks as prerequisites.
 Define the top-level result model for `EQUIVALENT`, `NOT_EQUIVALENT`, and `INCONCLUSIVE`, because the comparison, reporting, and CLI exit-code tasks all depend on a stable outcome vocabulary.

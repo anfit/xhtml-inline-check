@@ -5,8 +5,8 @@
 - Use `gradle runFaceletsVerify --args="old.xhtml new.xhtml"` as the dedicated Gradle-backed CLI entrypoint; `installDist` now installs a stable launcher under `build/facelets-verify/bin/`.
 - Main source packages are split by responsibility under `src/main/kotlin/dev/xhtmlinlinecheck`: `cli`, `domain`, `loader`, `syntax`, `semantic`, `compare`, and `report`.
 - The current analyzer stages are placeholders that intentionally return an `INCONCLUSIVE` result with warning `W00`; later tasks should replace stage internals without collapsing those package boundaries.
-- Baseline tests live under `src/test/kotlin` and currently exercise CLI startup, usage handling, and JSON/text rendering shape.
+- Baseline tests live under `src/test/kotlin`; reusable helpers are under `src/test/kotlin/dev/xhtmlinlinecheck/testing` with `FixtureScenarios` for repository fixtures, `TemporaryProjectTree` for per-test XHTML trees, and `assertThatReport(...)` for concise report assertions.
 - Core library choices are now wired in `build.gradle.kts`: use `Clikt` for CLI parsing, `Woodstox` for namespace-aware StAX parsing and location capture, and `Jackson Kotlin` for deterministic JSON reporting plus fixture-contract loading.
-- Test infrastructure now includes JUnit Jupiter parameterized tests and AssertJ in addition to `kotlin("test")`; prefer those for fixture matrices, golden-output assertions, and concise domain-model checks.
+- Test infrastructure now includes JUnit Jupiter parameterized tests and AssertJ in addition to `kotlin("test")`; prefer those for fixture matrices, golden-output assertions, and concise domain-model checks. The shared smoke fixture currently lives at `fixtures/support/smoke/`.
 - The executable jar manifest is wired to `dev.xhtmlinlinecheck.cli.MainKt` so the plain jar remains directly runnable outside Gradle-managed distributions.
 - This environment has Java 17 but no local `gradle` executable and restricted network access, so Gradle-based compilation, packaging, and wrapper generation could not be validated during this task.

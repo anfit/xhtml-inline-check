@@ -87,6 +87,8 @@ The current scaffold defines a single JVM application with a placeholder analyze
 - assemble the runnable distribution in `build/facelets-verify/` with `gradle installDist`
 - assemble distribution archives with `gradle distZip distTar`
 
+Reusable JUnit 5 test support now lives under `src/test/kotlin/dev/xhtmlinlinecheck/testing`. New tasks should prefer those helpers for temporary XHTML trees, fixture-path resolution under `fixtures/`, and AssertJ-based `AnalysisReport` assertions instead of duplicating setup in each package.
+
 A Gradle wrapper has not been generated yet in this environment, so use a local Gradle installation until the wrapper task lands.
 
 ## Near-Term Roadmap
