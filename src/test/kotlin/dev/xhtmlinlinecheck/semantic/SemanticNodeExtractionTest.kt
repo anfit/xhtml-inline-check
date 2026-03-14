@@ -130,6 +130,140 @@ class SemanticNodeExtractionTest {
     }
 
     @Test
+    fun `semantic nodes deterministically join path ids EL facts and target attributes into one canonical model`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:form id="mainForm">
+                <ui:include src="/fragments/actions.xhtml">
+                  <ui:param name="item" value="#{bean.selected}" />
+                </ui:include>
+              </h:form>
+            </ui:composition>
+            """,
+        )
+        tree.write(
+            "fragments/actions.xhtml",
+            """
+            <ui:fragment xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                         xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup id="details">
+                Summary #{item.name}
+                <h:outputLabel id="nameLabel" for="nameInput" rendered="#{item.visible}" />
+                <h:commandButton id="saveButton" update="msgs details" process="@form" rendered="#{item.editable}" />
+              </h:panelGroup>
+            </ui:fragment>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val semanticModel = semanticModelsFor(oldRoot, newRoot, tempDir).oldRoot
+        val semanticNodes = semanticModel.semanticNodes
+
+        assertThat(semanticNodes)
+            .extracting("nodePath.segments", "nodeId.value", "nodeName")
+            .containsExactly(
+                Tuple.tuple(emptyList<Int>(), "node:/", "ui:composition"),
+                Tuple.tuple(listOf(0), "node:/0", "h:form"),
+                Tuple.tuple(listOf(0, 0), "node:/0/0", "ui:include"),
+                Tuple.tuple(listOf(0, 0, 0), "node:/0/0/0", "ui:fragment"),
+                Tuple.tuple(listOf(0, 0, 0, 0), "node:/0/0/0/0", "h:panelGroup"),
+                Tuple.tuple(listOf(0, 0, 0, 0, 0), "node:/0/0/0/0/0", "#text"),
+                Tuple.tuple(listOf(0, 0, 0, 0, 1), "node:/0/0/0/0/1", "h:outputLabel"),
+                Tuple.tuple(listOf(0, 0, 0, 0, 2), "node:/0/0/0/0/2", "h:commandButton"),
+            )
+
+        assertThat(
+            semanticNodes.flatMap { node ->
+                node.elFacts.map { fact ->
+                    Tuple.tuple(
+                        node.nodeId.value,
+                        fact.carrierKind,
+                        fact.attributeName,
+                        fact.ownerName,
+                        fact.rawValue,
+                        fact.normalizedTemplate?.render(),
+                    )
+                }
+            },
+        ).containsExactly(
+            Tuple.tuple(
+                "node:/0/0",
+                SemanticElCarrierKind.INCLUDE_ATTRIBUTE,
+                "src",
+                null,
+                "/fragments/actions.xhtml",
+                "/fragments/actions.xhtml",
+            ),
+            Tuple.tuple(
+                "node:/0/0",
+                SemanticElCarrierKind.INCLUDE_PARAMETER,
+                "value",
+                "item",
+                "#{bean.selected}",
+                "#{global(bean).selected}",
+            ),
+            Tuple.tuple(
+                "node:/0/0/0/0/0",
+                SemanticElCarrierKind.TEXT_NODE,
+                null,
+                null,
+                "\n    Summary #{item.name}\n    ",
+                "\n    Summary #{binding#1.name}\n    ",
+            ),
+            Tuple.tuple(
+                "node:/0/0/0/0/1",
+                SemanticElCarrierKind.ELEMENT_ATTRIBUTE,
+                "rendered",
+                null,
+                "#{item.visible}",
+                "#{binding#1.visible}",
+            ),
+            Tuple.tuple(
+                "node:/0/0/0/0/2",
+                SemanticElCarrierKind.ELEMENT_ATTRIBUTE,
+                "rendered",
+                null,
+                "#{item.editable}",
+                "#{binding#1.editable}",
+            ),
+        )
+
+        assertThat(semanticNodes.flatMap { node -> node.elFacts })
+            .extracting("carrierKind", "attributeName", "ownerName", "rawValue")
+            .containsExactlyElementsOf(
+                semanticModel.elOccurrences.map { occurrence ->
+                    Tuple.tuple(
+                        occurrence.carrierKind,
+                        occurrence.attributeName,
+                        occurrence.ownerName,
+                        occurrence.rawValue,
+                    )
+                },
+            )
+
+        assertThat(
+            semanticNodes.flatMap { node ->
+                node.targetAttributes.map { attribute ->
+                    Tuple.tuple(node.nodeId.value, attribute.attributeName, attribute.rawValue)
+                }
+            },
+        ).containsExactly(
+            Tuple.tuple("node:/0/0/0/0/1", "for", "nameInput"),
+            Tuple.tuple("node:/0/0/0/0/2", "update", "msgs details"),
+            Tuple.tuple("node:/0/0/0/0/2", "process", "@form"),
+        )
+    }
+
+    @Test
     fun `semantic nodes accumulate combined form naming container and iteration ancestry without wrapper noise`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(
