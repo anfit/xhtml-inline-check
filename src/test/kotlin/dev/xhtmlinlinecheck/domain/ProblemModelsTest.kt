@@ -11,6 +11,8 @@ class ProblemModelsTest {
             .isEqualTo("P-STRUCTURE-FORM_ANCESTRY_CHANGED")
         assertThat(WarningIds.UNSUPPORTED_INCLUDE_CYCLE.value)
             .isEqualTo("W-UNSUPPORTED-INCLUDE_CYCLE")
+        assertThat(WarningIds.UNSUPPORTED_MISSING_INCLUDE.value)
+            .isEqualTo("W-UNSUPPORTED-MISSING_INCLUDE")
         assertThat(WarningIds.UNSUPPORTED_ANALYZER_PIPELINE_SCAFFOLD.value)
             .isEqualTo("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
         assertThat(DiagnosticId.parse("P-TARGET-RESOLUTION_CHANGED"))

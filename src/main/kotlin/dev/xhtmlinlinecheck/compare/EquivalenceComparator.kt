@@ -2,6 +2,7 @@ package dev.xhtmlinlinecheck.compare
 
 import dev.xhtmlinlinecheck.domain.AnalysisReport
 import dev.xhtmlinlinecheck.domain.AnalysisResult
+import dev.xhtmlinlinecheck.domain.AnalysisSide
 import dev.xhtmlinlinecheck.domain.AnalysisSummary
 import dev.xhtmlinlinecheck.domain.AnalysisStats
 import dev.xhtmlinlinecheck.domain.AggregateCounts
@@ -10,7 +11,10 @@ import dev.xhtmlinlinecheck.domain.Problem
 import dev.xhtmlinlinecheck.domain.ProblemCategory
 import dev.xhtmlinlinecheck.domain.ProblemLocation
 import dev.xhtmlinlinecheck.domain.ProblemLocations
+import dev.xhtmlinlinecheck.domain.Provenance
 import dev.xhtmlinlinecheck.domain.Severity
+import dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailure
+import dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailureKind
 import dev.xhtmlinlinecheck.domain.WarningIds
 import dev.xhtmlinlinecheck.domain.WarningTotals
 import dev.xhtmlinlinecheck.semantic.SemanticModels
@@ -26,8 +30,8 @@ fun interface EquivalenceComparator {
             EquivalenceComparator { semanticModels ->
                 val includeProblems =
                     buildList {
-                        addAll(semanticModels.oldRoot.rootNode.collectIncludeCycleProblems())
-                        addAll(semanticModels.newRoot.rootNode.collectIncludeCycleProblems())
+                        addAll(semanticModels.oldRoot.rootNode.collectIncludeProblems())
+                        addAll(semanticModels.newRoot.rootNode.collectIncludeProblems())
                     }
                 val problems =
                     includeProblems +
@@ -81,7 +85,7 @@ fun interface EquivalenceComparator {
     }
 }
 
-private fun LogicalElementNode?.collectIncludeCycleProblems(): List<Problem> {
+private fun LogicalElementNode?.collectIncludeProblems(): List<Problem> {
     if (this == null) {
         return emptyList()
     }
@@ -93,25 +97,7 @@ private fun LogicalElementNode?.collectIncludeCycleProblems(): List<Problem> {
             is LogicalElementNode -> node.children.forEach(::visit)
             is LogicalIncludeNode -> {
                 node.includeFailure?.let { includeFailure ->
-                    val cyclePath =
-                        includeFailure.cycleDocuments
-                            .joinToString(" -> ") { it.displayPath }
-                    problems +=
-                        Problem(
-                            id = WarningIds.UNSUPPORTED_INCLUDE_CYCLE,
-                            severity = Severity.WARNING,
-                            category = ProblemCategory.UNSUPPORTED,
-                            summary = "Recursive include cycle detected",
-                            locations =
-                                when (node.provenance.logicalLocation.document.side) {
-                                    dev.xhtmlinlinecheck.domain.AnalysisSide.OLD ->
-                                        ProblemLocations(old = ProblemLocation(node.provenance))
-                                    dev.xhtmlinlinecheck.domain.AnalysisSide.NEW ->
-                                        ProblemLocations(new = ProblemLocation(node.provenance))
-                                },
-                            explanation = "The include graph loops back on itself: $cyclePath",
-                            hint = "Break the recursive include chain before relying on static equivalence analysis.",
-                        )
+                    problems += includeProblemFor(node, includeFailure)
                 }
                 node.children.forEach(::visit)
             }
@@ -122,3 +108,51 @@ private fun LogicalElementNode?.collectIncludeCycleProblems(): List<Problem> {
     visit(this)
     return problems
 }
+
+private fun includeProblemFor(
+    node: LogicalIncludeNode,
+    includeFailure: SourceGraphIncludeFailure,
+): Problem {
+    val locations = locationsFor(node.provenance, node.sourcePath)
+
+    return when (includeFailure.kind) {
+        SourceGraphIncludeFailureKind.INCLUDE_CYCLE -> {
+            val cyclePath = includeFailure.cycleDocuments.joinToString(" -> ") { it.displayPath }
+            Problem(
+                id = WarningIds.UNSUPPORTED_INCLUDE_CYCLE,
+                severity = Severity.WARNING,
+                category = ProblemCategory.UNSUPPORTED,
+                summary = "Recursive include cycle detected",
+                locations = locations,
+                explanation = "The include graph loops back on itself: $cyclePath",
+                hint = "Break the recursive include chain before relying on static equivalence analysis.",
+            )
+        }
+
+        SourceGraphIncludeFailureKind.MISSING_FILE -> {
+            val missingDocument = requireNotNull(includeFailure.missingDocument) {
+                "missing include diagnostics require the unresolved target document"
+            }
+            val requestedPath = node.sourcePath ?: missingDocument.displayPath
+            Problem(
+                id = WarningIds.UNSUPPORTED_MISSING_INCLUDE,
+                severity = Severity.WARNING,
+                category = ProblemCategory.UNSUPPORTED,
+                summary = "Included file could not be found",
+                locations = locations,
+                explanation =
+                    "Static include $requestedPath resolved to ${missingDocument.displayPath}, but that file does not exist.",
+                hint = "Fix the include path or restore the missing file before relying on static equivalence analysis.",
+            )
+        }
+    }
+}
+
+private fun locationsFor(
+    provenance: Provenance,
+    snippet: String?,
+): ProblemLocations =
+    when (provenance.logicalLocation.document.side) {
+        AnalysisSide.OLD -> ProblemLocations(old = ProblemLocation(provenance, snippet))
+        AnalysisSide.NEW -> ProblemLocations(new = ProblemLocation(provenance, snippet))
+    }

@@ -87,6 +87,9 @@ fun interface SourceLoader {
                                         .dropWhile { it.absolutePath != included.absolutePath } + included,
                                 )
                             }
+                            ?: includedDocument
+                                ?.takeIf { included -> !Files.exists(included.absolutePath) }
+                                ?.let(SourceGraphIncludeFailure::missingFile)
                     val includedFile =
                         includedDocument
                             ?.takeIf { Files.exists(it.absolutePath) && includeFailure == null }

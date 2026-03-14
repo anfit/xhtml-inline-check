@@ -1,4 +1,3 @@
-Implement missing-file diagnostics for unresolved includes, reusing the problem, location, and include-resolution tasks so these failures are actionable.
 Implement unsupported diagnostics for dynamic include paths, building on the result-model and problem-model tasks so unsupported constructs can later produce `INCONCLUSIVE`.
 Add fixture tests for simple include expansion, validating the root-path, file-reading, `ui:include`-detection, include-resolution, and logical-expansion tasks together.
 Add fixture tests for nested includes, extending the simple include-expansion test task to prove provenance and parameter flow survive deeper trees.

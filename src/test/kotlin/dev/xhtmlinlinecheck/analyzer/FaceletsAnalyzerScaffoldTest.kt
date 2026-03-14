@@ -93,4 +93,46 @@ class FaceletsAnalyzerScaffoldTest {
         assertThat(report.problems.first().explanation)
             .contains("legacy/root.xhtml -> fragments/outer.xhtml -> legacy/root.xhtml")
     }
+
+    @Test
+    fun `scaffold analyzer emits a dedicated warning for missing include files before the generic scaffold warning`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+              <ui:include src="/fragments/missing.xhtml" />
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "new/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = tempDir.relativize(oldRoot),
+                newRoot = tempDir.relativize(newRoot),
+                baseOld = tempDir,
+                baseNew = tempDir,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasProblemCount(2)
+            .hasWarningCount(2)
+            .hasProblemIds(
+                "W-UNSUPPORTED-MISSING_INCLUDE",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().summary).isEqualTo("Included file could not be found")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("legacy/root.xhtml:2:")
+        assertThat(report.problems.first().locations.old?.snippet).isEqualTo("/fragments/missing.xhtml")
+        assertThat(report.problems.first().explanation)
+            .contains("Static include /fragments/missing.xhtml resolved to fragments/missing.xhtml")
+    }
 }

@@ -86,6 +86,12 @@ object WarningIds {
             slug = "INCLUDE_CYCLE",
         )
 
+    val UNSUPPORTED_MISSING_INCLUDE: DiagnosticId =
+        DiagnosticId.warning(
+            category = ProblemCategory.UNSUPPORTED,
+            slug = "MISSING_INCLUDE",
+        )
+
     val UNSUPPORTED_ANALYZER_PIPELINE_SCAFFOLD: DiagnosticId =
         DiagnosticId.warning(
             category = ProblemCategory.UNSUPPORTED,

@@ -209,4 +209,42 @@ class XhtmlSyntaxParserIncludeExpansionTest {
         assertThat(recursiveInclude.includeFailure!!.cycleDocuments.map { it.displayPath })
             .containsExactly("legacy/root.xhtml", "fragments/outer.xhtml", "legacy/root.xhtml")
     }
+
+    @Test
+    fun `parser keeps missing include failures on logical boundaries without expanded children`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+              <ui:include src="/fragments/missing.xhtml" />
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val parsedTrees = XhtmlSyntaxParser.scaffold().parse(
+            SourceLoader.scaffold().load(
+                AnalysisRequest(
+                    oldRoot = tempDir.relativize(oldRoot),
+                    newRoot = tempDir.relativize(newRoot),
+                    baseOld = tempDir,
+                    baseNew = tempDir,
+                ),
+            ),
+        )
+
+        val includeNode = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+
+        assertThat(includeNode.sourcePath).isEqualTo("/fragments/missing.xhtml")
+        assertThat(includeNode.expandedFile).isNull()
+        assertThat(includeNode.children).isEmpty()
+        assertThat(includeNode.includeFailure).isNotNull()
+        assertThat(includeNode.includeFailure!!.missingDocument!!.displayPath).isEqualTo("fragments/missing.xhtml")
+    }
 }

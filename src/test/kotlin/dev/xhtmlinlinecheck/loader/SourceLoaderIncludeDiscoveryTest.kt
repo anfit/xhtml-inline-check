@@ -270,4 +270,41 @@ class SourceLoaderIncludeDiscoveryTest {
         assertThat(recursiveEdge.includeFailure!!.cycleDocuments.map { it.displayPath })
             .containsExactly("legacy/root.xhtml", "fragments/outer.xhtml", "legacy/root.xhtml")
     }
+
+    @Test
+    fun `loader records missing static includes with resolved target provenance`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+              <ui:include src="/fragments/missing.xhtml" />
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val loadedSources = SourceLoader.scaffold().load(
+            AnalysisRequest(
+                oldRoot = tempDir.relativize(oldRoot),
+                newRoot = tempDir.relativize(newRoot),
+                baseOld = tempDir,
+                baseNew = tempDir,
+            ),
+        )
+
+        val edge = loadedSources.oldRoot.sourceGraphFile.includeEdges.single()
+
+        assertThat(edge.includedDocument).isNotNull()
+        assertThat(edge.includedDocument!!.displayPath).isEqualTo("fragments/missing.xhtml")
+        assertThat(edge.includedFile).isNull()
+        assertThat(edge.includeFailure).isNotNull()
+        assertThat(edge.includeFailure!!.kind).isEqualTo(dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailureKind.MISSING_FILE)
+        assertThat(edge.includeFailure!!.missingDocument).isEqualTo(edge.includedDocument)
+    }
 }

@@ -18,15 +18,20 @@ data class SourceGraphStack(
 
 enum class SourceGraphIncludeFailureKind {
     INCLUDE_CYCLE,
+    MISSING_FILE,
 }
 
 data class SourceGraphIncludeFailure(
     val kind: SourceGraphIncludeFailureKind,
     val cycleDocuments: List<SourceDocument> = emptyList(),
+    val missingDocument: SourceDocument? = null,
 ) {
     init {
         require(kind != SourceGraphIncludeFailureKind.INCLUDE_CYCLE || cycleDocuments.size >= 2) {
             "include cycles must record the ordered document chain"
+        }
+        require(kind != SourceGraphIncludeFailureKind.MISSING_FILE || missingDocument != null) {
+            "missing include files must record the unresolved target document"
         }
     }
 
@@ -35,6 +40,12 @@ data class SourceGraphIncludeFailure(
             SourceGraphIncludeFailure(
                 kind = SourceGraphIncludeFailureKind.INCLUDE_CYCLE,
                 cycleDocuments = documents,
+            )
+
+        fun missingFile(document: SourceDocument): SourceGraphIncludeFailure =
+            SourceGraphIncludeFailure(
+                kind = SourceGraphIncludeFailureKind.MISSING_FILE,
+                missingDocument = document,
             )
     }
 }

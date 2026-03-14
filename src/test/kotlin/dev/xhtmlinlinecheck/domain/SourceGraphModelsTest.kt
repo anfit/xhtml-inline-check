@@ -127,4 +127,32 @@ class SourceGraphModelsTest {
         assertThat(edge.includeFailure!!.cycleDocuments.map { it.displayPath })
             .containsExactly("legacy/root.xhtml", "legacy/fragments/outer.xhtml", "legacy/root.xhtml")
     }
+
+    @Test
+    fun `missing include failures keep the resolved target document`() {
+        val rootDocument = SourceDocument.fromPath(
+            side = AnalysisSide.NEW,
+            path = Path.of("refactored", "root.xhtml"),
+        )
+        val missingDocument = SourceDocument.fromPath(
+            side = AnalysisSide.NEW,
+            path = Path.of("refactored", "fragments", "missing.xhtml"),
+        )
+
+        val edge = SourceGraphEdge.resolved(
+            includeSite = SourceLocation(
+                document = rootDocument,
+                span = SourceSpan(SourcePosition(line = 4, column = 11)),
+                attributeName = "src",
+            ),
+            includedDocument = missingDocument,
+            sourcePath = "/fragments/missing.xhtml",
+            includeFailure = SourceGraphIncludeFailure.missingFile(missingDocument),
+        )
+
+        assertThat(edge.includeFailure).isNotNull()
+        assertThat(edge.includeFailure!!.kind).isEqualTo(SourceGraphIncludeFailureKind.MISSING_FILE)
+        assertThat(edge.includeFailure!!.missingDocument).isEqualTo(missingDocument)
+        assertThat(edge.includedFile).isNull()
+    }
 }
