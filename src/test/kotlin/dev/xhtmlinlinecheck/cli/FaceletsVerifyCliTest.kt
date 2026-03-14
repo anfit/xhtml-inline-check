@@ -38,4 +38,17 @@ class FaceletsVerifyCliTest {
         assertEquals(2, exitCode)
         assertTrue(output.toString().contains("\"result\": \"INCONCLUSIVE\""))
     }
+
+    @Test
+    fun `accepts format flag before root arguments`() {
+        val output = StringBuilder()
+
+        val exitCode = FaceletsVerifyCli().run(
+            listOf("--format", "json", "legacy.xhtml", "refactored.xhtml"),
+            output,
+        )
+
+        assertEquals(2, exitCode)
+        assertTrue(output.toString().contains("\"result\": \"INCONCLUSIVE\""))
+    }
 }

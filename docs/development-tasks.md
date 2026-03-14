@@ -1,4 +1,3 @@
-Configure the executable entrypoint for `facelets-verify`, building directly on the Gradle and Kotlin setup tasks so later CLI integration work has a stable process boundary.
 Add core dependencies for CLI parsing, XML parsing, JSON output, and testing, choosing libraries that fit the parser, reporter, and fixture tasks defined later in this file.
 Add baseline JUnit-based test infrastructure that the domain-model, loader, parser, EL, comparator, reporter, and CLI tasks can all reuse.
 Add a minimal CI workflow or local verification script placeholder that runs the baseline checks established by the Gradle, entrypoint, and test-infrastructure tasks.

@@ -83,8 +83,9 @@ settings.gradle.kts
 The current scaffold defines a single JVM application with a placeholder analyzer pipeline and smoke tests. The Gradle application setup is configured around the `facelets-verify` entrypoint, so a local Gradle installation can:
 
 - compile and test with `gradle test`
-- run the CLI with `gradle run --args="legacy.xhtml refactored.xhtml"`
-- assemble distribution archives with `gradle installDist distZip distTar`
+- run the CLI with `gradle runFaceletsVerify --args="legacy.xhtml refactored.xhtml"`
+- assemble the runnable distribution in `build/facelets-verify/` with `gradle installDist`
+- assemble distribution archives with `gradle distZip distTar`
 
 A Gradle wrapper has not been generated yet in this environment, so use a local Gradle installation until the wrapper task lands.
 

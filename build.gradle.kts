@@ -1,3 +1,8 @@
+import org.gradle.api.plugins.ApplicationPlugin
+import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.SourceSetContainer
+import org.gradle.api.tasks.Sync
+
 plugins {
     kotlin("jvm") version "2.1.10"
     application
@@ -9,6 +14,7 @@ description = "Static verifier for JSF Facelets XHTML include-inlining refactors
 
 val faceletsVerifyMainClass = "dev.xhtmlinlinecheck.cli.MainKt"
 val faceletsVerifyApplicationName = "facelets-verify"
+val faceletsVerifyInstallDir = layout.buildDirectory.dir(faceletsVerifyApplicationName)
 
 repositories {
     mavenCentral()
@@ -40,6 +46,10 @@ tasks.jar {
     }
 }
 
+tasks.named<Sync>("installDist") {
+    into(faceletsVerifyInstallDir)
+}
+
 tasks.distZip {
     archiveBaseName = faceletsVerifyApplicationName
 }
@@ -50,4 +60,13 @@ tasks.distTar {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+val sourceSets = the<SourceSetContainer>()
+
+tasks.register<JavaExec>("runFaceletsVerify") {
+    group = ApplicationPlugin.APPLICATION_GROUP
+    description = "Runs the facelets-verify CLI entrypoint."
+    classpath = sourceSets.named("main").get().runtimeClasspath
+    mainClass = faceletsVerifyMainClass
 }

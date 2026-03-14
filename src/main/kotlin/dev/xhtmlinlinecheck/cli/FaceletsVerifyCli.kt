@@ -66,7 +66,7 @@ class FaceletsVerifyCli(
                 }
 
                 else -> {
-                    roots += current
+                    roots += args[index]
                     index += 1
                 }
             }
