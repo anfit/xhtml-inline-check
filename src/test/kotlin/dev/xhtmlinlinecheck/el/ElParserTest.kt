@@ -67,8 +67,41 @@ class ElParserTest {
     }
 
     @Test
+    fun `parser supports nested property access inside index expressions`() {
+        val parsed = ElParser.parseExpression("bean.rows[outer.items[index].code].selected")
+
+        assertThat(parsed).isEqualTo(
+            ElPropertyAccess(
+                receiver =
+                    ElIndexAccess(
+                        receiver =
+                            ElPropertyAccess(
+                                receiver = ElIdentifier("bean"),
+                                property = "rows",
+                            ),
+                        index =
+                            ElPropertyAccess(
+                                receiver =
+                                    ElIndexAccess(
+                                        receiver =
+                                            ElPropertyAccess(
+                                                receiver = ElIdentifier("outer"),
+                                                property = "items",
+                                            ),
+                                        index = ElIdentifier("index"),
+                                    ),
+                                property = "code",
+                            ),
+                    ),
+                property = "selected",
+            ),
+        )
+    }
+
+    @Test
     fun `parser preserves boolean grouping unary operators and ternary shape`() {
-        val parsed = ElParser.parseExpression("(!disabled and not empty bean.items) ? bean.open(item) : helper.resolve(row.id)")
+        val parsed =
+            ElParser.parseExpression("(!disabled and not empty bean.items) ? bean.open(item) : helper.resolve(row.id)")
 
         assertThat(parsed).isEqualTo(
             ElTernaryOperation(
@@ -83,11 +116,15 @@ class ElParserTest {
                             operator = ElBinaryOperator.AND,
                             right =
                                 ElUnaryOperation(
-                                    operator = ElUnaryOperator.EMPTY,
+                                    operator = ElUnaryOperator.NOT,
                                     operand =
-                                        ElPropertyAccess(
-                                            receiver = ElIdentifier("bean"),
-                                            property = "items",
+                                        ElUnaryOperation(
+                                            operator = ElUnaryOperator.EMPTY,
+                                            operand =
+                                                ElPropertyAccess(
+                                                    receiver = ElIdentifier("bean"),
+                                                    property = "items",
+                                                ),
                                         ),
                                 ),
                         ),
@@ -115,8 +152,34 @@ class ElParserTest {
     }
 
     @Test
+    fun `parser preserves boolean literals inside ternaries and method arguments`() {
+        val parsed = ElParser.parseExpression("enabled ? helper.resolve(true, false) : bean.defaultFlag")
+
+        assertThat(parsed).isEqualTo(
+            ElTernaryOperation(
+                condition = ElIdentifier("enabled"),
+                whenTrue =
+                    ElMethodCall(
+                        receiver = ElIdentifier("helper"),
+                        methodName = "resolve",
+                        arguments =
+                            listOf(
+                                ElBooleanLiteral(true),
+                                ElBooleanLiteral(false),
+                            ),
+                    ),
+                whenFalse =
+                    ElPropertyAccess(
+                        receiver = ElIdentifier("bean"),
+                        property = "defaultFlag",
+                    ),
+            ),
+        )
+    }
+
+    @Test
     fun `template parser preserves literal segments and both EL container kinds`() {
-        val parsed = ElParser.parseTemplate("prefix-#{row.code}-${helper.resolve(item.id)}-suffix")
+        val parsed = ElParser.parseTemplate("prefix-#{row.code}-\${helper.resolve(item.id)}-suffix")
 
         assertThat(parsed).isEqualTo(
             ElTemplate(
@@ -153,6 +216,21 @@ class ElParserTest {
                     ),
             ),
         )
+    }
+
+    @Test
+    fun `parser rejects unsupported collection assignment and semicolon constructs explicitly`() {
+        assertThatThrownBy { ElParser.parseExpression("{'label': row.code}") }
+            .isInstanceOf(ElParseException::class.java)
+            .hasMessageContaining("Unsupported EL token '{'")
+
+        assertThatThrownBy { ElParser.parseExpression("row = item") }
+            .isInstanceOf(ElParseException::class.java)
+            .hasMessageContaining("Unsupported EL token '='")
+
+        assertThatThrownBy { ElParser.parseExpression("bean.first(); bean.second()") }
+            .isInstanceOf(ElParseException::class.java)
+            .hasMessageContaining("Unsupported EL token ';'")
     }
 
     @Test

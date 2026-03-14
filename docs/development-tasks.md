@@ -1,4 +1,3 @@
-Add unit tests for EL parsing that cover nested property access, index expressions, booleans, ternaries, and unsupported constructs so grammar boundaries are locked before semantic comparison work deepens.
 Implement EL extraction from semantically relevant attributes first, using the tag registry as the source of truth for which attributes should feed the EL pipeline.
 Implement EL extraction from text nodes where the MVP needs it, extending the same extraction path used for attributes so mixed XHTML content is not silently ignored.
 Emit explicit unsupported diagnostics for extracted EL forms outside the MVP subset so unsupported syntax contributes to `INCONCLUSIVE` instead of degrading into silent fallback behavior.
