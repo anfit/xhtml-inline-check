@@ -89,6 +89,44 @@ class SemanticElNormalizationTest {
         assertThat(newNormalized.bindingReferences.single().binding.origin.descriptor).isEqualTo("c:set var=row")
     }
 
+    @Test
+    fun `normalization keeps unresolved global roots distinct from resolved local bindings`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:repeat var="row" value="#{bean.items}">
+                <h:outputText id="value" value="#{row.label eq bean.selectedLabel}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:repeat var="item" value="#{bean.items}">
+                <h:outputText id="value" value="#{item.label eq bean.selectedLabel}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+
+        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val oldNormalized = normalizedValueOccurrence(semanticModels.oldRoot)
+        val newNormalized = normalizedValueOccurrence(semanticModels.newRoot)
+
+        assertThat(oldNormalized.normalizedTemplate.render()).isEqualTo("#{binding#1.label == global(bean).selectedLabel}")
+        assertThat(newNormalized.normalizedTemplate.render()).isEqualTo("#{binding#1.label == global(bean).selectedLabel}")
+        assertThat(oldNormalized.bindingReferences).single()
+        assertThat(newNormalized.bindingReferences).single()
+        assertThat(oldNormalized.globalReferences.map { it.writtenName }).containsExactly("bean")
+        assertThat(newNormalized.globalReferences.map { it.writtenName }).containsExactly("bean")
+    }
+
     private fun semanticModelsFor(oldRoot: Path, newRoot: Path, baseDir: Path): SemanticModels =
         SemanticAnalyzer.scaffold().analyze(
             XhtmlSyntaxParser.scaffold().parse(

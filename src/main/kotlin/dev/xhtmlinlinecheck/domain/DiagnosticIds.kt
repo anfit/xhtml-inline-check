@@ -80,6 +80,12 @@ object ProblemIds {
 }
 
 object WarningIds {
+    val UNSUPPORTED_UNRESOLVED_GLOBAL_ROOT: DiagnosticId =
+        DiagnosticId.warning(
+            category = ProblemCategory.UNSUPPORTED,
+            slug = "UNRESOLVED_GLOBAL_ROOT",
+        )
+
     val UNSUPPORTED_EXTRACTED_EL: DiagnosticId =
         DiagnosticId.warning(
             category = ProblemCategory.UNSUPPORTED,

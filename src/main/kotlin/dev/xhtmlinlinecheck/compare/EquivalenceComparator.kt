@@ -89,6 +89,7 @@ private data class ElComparisonResult(
     val checked: Int,
     val matched: Int,
     val mismatched: Int,
+    val uncertain: Int,
     val problems: List<Problem>,
 )
 
@@ -96,12 +97,14 @@ private fun compareNormalizedEl(semanticModels: SemanticModels): ElComparisonRes
     val oldOccurrences = semanticModels.oldRoot.normalizedElOccurrences
     val newOccurrences = semanticModels.newRoot.normalizedElOccurrences
     if (oldOccurrences.size != newOccurrences.size) {
-        return ElComparisonResult(checked = 0, matched = 0, mismatched = 0, problems = emptyList())
+        return ElComparisonResult(checked = 0, matched = 0, mismatched = 0, uncertain = 0, problems = emptyList())
     }
 
     val problems = mutableListOf<Problem>()
     var checked = 0
     var matched = 0
+    var mismatched = 0
+    var uncertain = 0
 
     oldOccurrences.zip(newOccurrences).forEach { (oldOccurrence, newOccurrence) ->
         if (!oldOccurrence.hasComparableShapeTo(newOccurrence)) {
@@ -110,11 +113,17 @@ private fun compareNormalizedEl(semanticModels: SemanticModels): ElComparisonRes
         if (oldOccurrence.bindingReferences.isEmpty() && newOccurrence.bindingReferences.isEmpty()) {
             return@forEach
         }
+        if (oldOccurrence.globalReferences.isNotEmpty() || newOccurrence.globalReferences.isNotEmpty()) {
+            uncertain++
+            problems += unresolvedGlobalRootProblem(oldOccurrence, newOccurrence)
+            return@forEach
+        }
 
         checked++
         if (oldOccurrence.normalizedTemplate == newOccurrence.normalizedTemplate) {
             matched++
         } else {
+            mismatched++
             problems += bindingMismatchProblem(oldOccurrence, newOccurrence)
         }
     }
@@ -122,7 +131,8 @@ private fun compareNormalizedEl(semanticModels: SemanticModels): ElComparisonRes
     return ElComparisonResult(
         checked = checked,
         matched = matched,
-        mismatched = problems.size,
+        mismatched = mismatched,
+        uncertain = uncertain,
         problems = problems,
     )
 }
@@ -157,12 +167,41 @@ private fun bindingMismatchProblem(
     )
 }
 
+private fun unresolvedGlobalRootProblem(
+    oldOccurrence: NormalizedSemanticElOccurrence,
+    newOccurrence: NormalizedSemanticElOccurrence,
+): Problem {
+    val oldBindingOrigin = oldOccurrence.firstBindingOrigin()
+    val newBindingOrigin = newOccurrence.firstBindingOrigin()
+    val oldGlobals = oldOccurrence.globalReferences.joinToString(", ") { it.writtenName }
+    val newGlobals = newOccurrence.globalReferences.joinToString(", ") { it.writtenName }
+
+    return Problem(
+        id = WarningIds.UNSUPPORTED_UNRESOLVED_GLOBAL_ROOT,
+        severity = Severity.WARNING,
+        category = ProblemCategory.UNSUPPORTED,
+        summary = "Unresolved global roots keep EL comparison uncertain",
+        locations =
+            ProblemLocations(
+                old = ProblemLocation(oldOccurrence.occurrence.provenance, oldOccurrence.occurrence.rawValue, oldBindingOrigin),
+                new = ProblemLocation(newOccurrence.occurrence.provenance, newOccurrence.occurrence.rawValue, newBindingOrigin),
+            ),
+        explanation =
+            "The occurrence still depends on symbolic global roots, so the EL layer can only compare local-binding shape here. " +
+                "Old globals: [$oldGlobals] -> ${oldOccurrence.normalizedTemplate.render()} " +
+                "New globals: [$newGlobals] -> ${newOccurrence.normalizedTemplate.render()}",
+        hint = "Treat bean-level equivalence for these unresolved roots as unknown until broader EL or bean analysis exists.",
+    )
+}
+
 private fun NormalizedSemanticElOccurrence.firstBindingOrigin() = bindingReferences.firstOrNull()?.binding?.origin
 
 private fun summaryHeadline(elComparison: ElComparisonResult): String =
     when {
         elComparison.mismatched > 0 ->
             "Detected local-binding EL mismatches; broader semantic comparison is still scaffolded."
+        elComparison.uncertain > 0 ->
+            "Local-binding EL comparison encountered unresolved global roots, so bean-level equivalence remains uncertain."
         elComparison.checked > 0 ->
             "Local-binding EL normalization matched for comparable occurrences; broader semantic comparison is still scaffolded."
         else ->

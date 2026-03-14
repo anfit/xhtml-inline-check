@@ -52,10 +52,15 @@ data class SemanticElBindingReference(
     val binding: ScopeBinding,
 )
 
+data class SemanticElGlobalReference(
+    val writtenName: String,
+)
+
 data class NormalizedSemanticElOccurrence(
     val occurrence: SemanticElOccurrence,
     val normalizedTemplate: NormalizedElTemplate,
     val bindingReferences: List<SemanticElBindingReference>,
+    val globalReferences: List<SemanticElGlobalReference>,
 )
 
 data class NormalizedElTemplate(

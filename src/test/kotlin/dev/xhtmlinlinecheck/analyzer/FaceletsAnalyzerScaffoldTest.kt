@@ -348,6 +348,102 @@ class FaceletsAnalyzerScaffoldTest {
     }
 
     @Test
+    fun `scaffold analyzer treats unresolved global roots as uncertainty instead of local-binding matches`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:repeat var="row" value="#{bean.items}">
+                <h:outputText id="value" value="#{row.label eq bean.selectedLabel}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:repeat var="item" value="#{bean.items}">
+                <h:outputText id="value" value="#{item.label eq bean.selectedLabel}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasProblemCount(2)
+            .hasWarningCount(2)
+            .hasProblemIds(
+                "W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().summary).isEqualTo("Unresolved global roots keep EL comparison uncertain")
+        assertThat(report.problems.first().locations.old?.bindingOrigin?.descriptor).isEqualTo("ui:repeat var=row")
+        assertThat(report.problems.first().locations.new?.bindingOrigin?.descriptor).isEqualTo("ui:repeat var=item")
+        assertThat(report.problems.first().explanation).contains("Old globals: [bean]")
+        assertThat(report.problems.first().explanation).contains("New globals: [bean]")
+        assertThat(report.summary.headline).contains("unresolved global roots")
+        assertThat(report.summary.headline).doesNotContain("normalization matched")
+    }
+
+    @Test
+    fun `scaffold analyzer treats local to global EL drift as uncertainty instead of a proven local-binding mismatch`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:repeat var="row" value="#{bean.items}">
+                <h:outputText id="value" value="#{row.label}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:outputText id="value" value="#{bean.label}" />
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasProblemCount(2)
+            .hasWarningCount(2)
+            .hasProblemIds(
+                "W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().locations.old?.bindingOrigin?.descriptor).isEqualTo("ui:repeat var=row")
+        assertThat(report.problems.first().locations.new?.bindingOrigin).isNull()
+        assertThat(report.problems.map { it.id.value }).doesNotContain("P-SCOPE-BINDING_MISMATCH")
+        assertThat(report.problems.first().explanation).contains("Old globals: []")
+        assertThat(report.problems.first().explanation).contains("New globals: [bean]")
+    }
+
+    @Test
     fun `scaffold analyzer emits a dedicated warning for missing include files before the generic scaffold warning`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(
