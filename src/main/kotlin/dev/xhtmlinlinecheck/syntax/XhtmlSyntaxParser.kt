@@ -87,6 +87,7 @@ private object LogicalTreeBuilder {
                         children +=
                             LogicalTextNode(
                                 text = text,
+                                location = location,
                                 provenance = sourceGraphFile.provenanceAt(location),
                             )
                     }
@@ -97,6 +98,7 @@ private object LogicalTreeBuilder {
                     attributes = attributes,
                     namespaceBindings = namespaceBindings,
                     children = children,
+                    location = location,
                     provenance = sourceGraphFile.provenanceAt(location),
                 )
             }
@@ -107,6 +109,7 @@ private object LogicalTreeBuilder {
             attributes = attributes,
             namespaceBindings = namespaceBindings,
             children = children,
+            location = location,
             provenance = sourceGraphFile.provenanceAt(location),
         )
     }
@@ -128,6 +131,7 @@ private object LogicalTreeBuilder {
                     ?.let(::parse)
                     ?.let(::listOf)
                     ?: emptyList(),
+            location = edge.includeSite,
             provenance = sourceGraphFile.provenanceAt(edge.includeSite),
         )
     }

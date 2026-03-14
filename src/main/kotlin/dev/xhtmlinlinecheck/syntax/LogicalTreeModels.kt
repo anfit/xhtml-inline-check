@@ -24,6 +24,7 @@ data class LogicalAttribute(
 )
 
 sealed interface LogicalNode {
+    val location: SourceLocation
     val provenance: Provenance
 }
 
@@ -36,11 +37,13 @@ data class LogicalElementNode(
     val attributes: List<LogicalAttribute>,
     val namespaceBindings: List<LogicalNamespaceBinding> = emptyList(),
     val children: List<LogicalNode>,
+    override val location: SourceLocation,
     override val provenance: Provenance,
 ) : LogicalNode
 
 data class LogicalTextNode(
     val text: String,
+    override val location: SourceLocation,
     override val provenance: Provenance,
 ) : LogicalNode
 
@@ -51,6 +54,7 @@ data class LogicalIncludeNode(
     val expandedFile: SourceGraphFile? = null,
     val includeFailure: SourceGraphIncludeFailure? = null,
     val children: List<LogicalNode> = emptyList(),
+    override val location: SourceLocation = includeSite,
     override val provenance: Provenance,
 ) : LogicalNode
 

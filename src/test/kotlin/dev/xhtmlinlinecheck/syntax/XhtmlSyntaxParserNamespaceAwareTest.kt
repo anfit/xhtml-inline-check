@@ -98,10 +98,58 @@ class XhtmlSyntaxParserNamespaceAwareTest {
         val output = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalElementNode
         val valueAttribute = output.attributes.single { it.name.localName == "value" }
 
+        assertThat(output.location.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(output.provenance.logicalLocation.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(valueAttribute.value).isEqualTo("#{bean.message}")
         assertThat(valueAttribute.location.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(valueAttribute.location.attributeName).isEqualTo("value")
+    }
+
+    @Test
+    fun `parser preserves explicit syntax-node locations for element text and include nodes`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup id="wrapper">hello<ui:include src="/fragments/content.xhtml" /></h:panelGroup>
+            </ui:composition>
+            """,
+        )
+        tree.write(
+            "fragments/content.xhtml",
+            """
+            <ui:fragment xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+              <h:outputText xmlns:h="http://xmlns.jcp.org/jsf/html" value="included" />
+            </ui:fragment>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val parsedTrees = XhtmlSyntaxParser.scaffold().parse(
+            SourceLoader.scaffold().load(
+                AnalysisRequest(
+                    oldRoot = tempDir.relativize(oldRoot),
+                    newRoot = tempDir.relativize(newRoot),
+                    baseOld = tempDir,
+                    baseNew = tempDir,
+                ),
+            ),
+        )
+
+        val wrapper = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalElementNode
+        val text = wrapper.children[0] as LogicalTextNode
+        val include = wrapper.children[1] as LogicalIncludeNode
+
+        assertThat(wrapper.location.render()).startsWith("legacy/root.xhtml:2:")
+        assertThat(text.location.render()).startsWith("legacy/root.xhtml:2:")
+        assertThat(include.location.render()).isEqualTo(include.includeSite.render())
+        assertThat((include.children.single() as LogicalElementNode).location.render()).startsWith("fragments/content.xhtml:1:")
     }
 
     @Test
