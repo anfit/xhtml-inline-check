@@ -1,11 +1,10 @@
 package dev.xhtmlinlinecheck.syntax
 
 import dev.xhtmlinlinecheck.loader.LoadedSources
-import java.nio.file.Path
 
 data class ParsedTrees(
-    val oldRoot: Path,
-    val newRoot: Path,
+    val oldRoot: ParsedSourceTree,
+    val newRoot: ParsedSourceTree,
 )
 
 fun interface XhtmlSyntaxParser {
@@ -15,8 +14,14 @@ fun interface XhtmlSyntaxParser {
         fun scaffold(): XhtmlSyntaxParser =
             XhtmlSyntaxParser { loadedSources ->
                 ParsedTrees(
-                    oldRoot = loadedSources.oldRoot,
-                    newRoot = loadedSources.newRoot,
+                    oldRoot = ParsedSourceTree(
+                        document = loadedSources.oldRoot.document,
+                        provenance = loadedSources.oldRoot.provenance,
+                    ),
+                    newRoot = ParsedSourceTree(
+                        document = loadedSources.newRoot.document,
+                        provenance = loadedSources.newRoot.provenance,
+                    ),
                 )
             }
     }

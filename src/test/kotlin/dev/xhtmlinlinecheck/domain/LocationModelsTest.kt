@@ -1,0 +1,49 @@
+package dev.xhtmlinlinecheck.domain
+
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
+import java.nio.file.Path
+
+class LocationModelsTest {
+    @Test
+    fun `normalizes source documents into stable display paths`() {
+        val document = SourceDocument.fromPath(
+            side = AnalysisSide.OLD,
+            path = Path.of("legacy", ".", "page.xhtml"),
+        )
+
+        assertThat(document.side).isEqualTo(AnalysisSide.OLD)
+        assertThat(document.absolutePath).isEqualTo(Path.of("legacy", "page.xhtml"))
+        assertThat(document.displayPath).isEqualTo("legacy/page.xhtml")
+    }
+
+    @Test
+    fun `renders source locations with line column and attribute context`() {
+        val location = SourceLocation(
+            document = SourceDocument.fromPath(
+                side = AnalysisSide.NEW,
+                path = Path.of("refactored", "page.xhtml"),
+            ),
+            span = SourceSpan(
+                start = SourcePosition(line = 12, column = 7),
+            ),
+            attributeName = "rendered",
+        )
+
+        assertThat(location.render()).isEqualTo("refactored/page.xhtml:12:7 @rendered")
+    }
+
+    @Test
+    fun `creates root provenance with matching physical and logical locations`() {
+        val document = SourceDocument.fromPath(
+            side = AnalysisSide.OLD,
+            path = Path.of("legacy", "root.xhtml"),
+        )
+
+        val provenance = Provenance.forRoot(document)
+
+        assertThat(provenance.physicalLocation.document).isEqualTo(document)
+        assertThat(provenance.logicalLocation.document).isEqualTo(document)
+        assertThat(provenance.includeStack).isEmpty()
+    }
+}

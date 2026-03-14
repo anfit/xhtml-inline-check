@@ -1,11 +1,12 @@
 package dev.xhtmlinlinecheck.loader
 
 import dev.xhtmlinlinecheck.analyzer.AnalysisRequest
-import java.nio.file.Path
+import dev.xhtmlinlinecheck.domain.AnalysisSide
+import dev.xhtmlinlinecheck.domain.SourceDocument
 
 data class LoadedSources(
-    val oldRoot: Path,
-    val newRoot: Path,
+    val oldRoot: LoadedSource,
+    val newRoot: LoadedSource,
 )
 
 fun interface SourceLoader {
@@ -15,8 +16,18 @@ fun interface SourceLoader {
         fun scaffold(): SourceLoader =
             SourceLoader { request ->
                 LoadedSources(
-                    oldRoot = request.oldRoot.normalize(),
-                    newRoot = request.newRoot.normalize(),
+                    oldRoot = LoadedSource(
+                        document = SourceDocument.fromPath(
+                            side = AnalysisSide.OLD,
+                            path = request.oldRoot,
+                        ),
+                    ),
+                    newRoot = LoadedSource(
+                        document = SourceDocument.fromPath(
+                            side = AnalysisSide.NEW,
+                            path = request.newRoot,
+                        ),
+                    ),
                 )
             }
     }

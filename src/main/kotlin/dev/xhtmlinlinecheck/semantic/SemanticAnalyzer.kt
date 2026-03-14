@@ -1,11 +1,10 @@
 package dev.xhtmlinlinecheck.semantic
 
 import dev.xhtmlinlinecheck.syntax.ParsedTrees
-import java.nio.file.Path
 
 data class SemanticModels(
-    val oldRoot: Path,
-    val newRoot: Path,
+    val oldRoot: SemanticModel,
+    val newRoot: SemanticModel,
 )
 
 fun interface SemanticAnalyzer {
@@ -15,8 +14,14 @@ fun interface SemanticAnalyzer {
         fun scaffold(): SemanticAnalyzer =
             SemanticAnalyzer { parsedTrees ->
                 SemanticModels(
-                    oldRoot = parsedTrees.oldRoot,
-                    newRoot = parsedTrees.newRoot,
+                    oldRoot = SemanticModel(
+                        document = parsedTrees.oldRoot.document,
+                        provenance = parsedTrees.oldRoot.provenance,
+                    ),
+                    newRoot = SemanticModel(
+                        document = parsedTrees.newRoot.document,
+                        provenance = parsedTrees.newRoot.provenance,
+                    ),
                 )
             }
     }
