@@ -12,6 +12,11 @@ data class LogicalName(
     val prefix: String? = null,
 )
 
+data class LogicalNamespaceBinding(
+    val prefix: String? = null,
+    val namespaceUri: String,
+)
+
 data class LogicalAttribute(
     val name: LogicalName,
     val value: String,
@@ -25,6 +30,7 @@ sealed interface LogicalNode {
 data class LogicalElementNode(
     val name: LogicalName,
     val attributes: List<LogicalAttribute>,
+    val namespaceBindings: List<LogicalNamespaceBinding> = emptyList(),
     val children: List<LogicalNode>,
     override val provenance: Provenance,
 ) : LogicalNode

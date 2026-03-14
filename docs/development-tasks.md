@@ -1,4 +1,3 @@
-Choose and wire a namespace-aware XML parser that can support the syntax-tree, source-location, namespace-rule, and attribute-extraction tasks that follow.
 Parse expanded XHTML into an internal syntax tree instead of using raw DOM directly downstream, building on the parser-selection and logical-tree-expansion tasks.
 Preserve element names, namespaces, attributes, and child ordering in the syntax tree so the rule-registry, semantic-extraction, and comparator tasks have stable raw material.
 Preserve source locations for elements in the syntax tree, reusing the shared location model so later diagnostics can point to real files.

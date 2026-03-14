@@ -4,11 +4,10 @@ import dev.xhtmlinlinecheck.domain.Provenance
 import dev.xhtmlinlinecheck.domain.SourceGraphEdge
 import dev.xhtmlinlinecheck.domain.SourceGraphFile
 import dev.xhtmlinlinecheck.domain.SourceLocation
-import dev.xhtmlinlinecheck.domain.SourcePosition
-import dev.xhtmlinlinecheck.domain.SourceSpan
 import dev.xhtmlinlinecheck.loader.LoadedSources
-import java.io.StringReader
-import javax.xml.stream.XMLInputFactory
+import dev.xhtmlinlinecheck.xml.NamespaceAwareXml
+import dev.xhtmlinlinecheck.xml.toSourceLocation
+import dev.xhtmlinlinecheck.xml.useAndClose
 import javax.xml.stream.XMLStreamConstants
 import javax.xml.stream.XMLStreamReader
 
@@ -44,8 +43,8 @@ private object LogicalTreeBuilder {
     private const val INCLUDE_LOCAL_NAME = "include"
 
     fun parse(sourceGraphFile: SourceGraphFile): LogicalElementNode? {
-        val reader = xmlInputFactory().createXMLStreamReader(sourceGraphFile.document.displayPath, StringReader(sourceGraphFile.contents))
-        reader.use {
+        val reader = NamespaceAwareXml.newReader(sourceGraphFile.document.displayPath, sourceGraphFile.contents)
+        reader.useAndClose {
             val includeEdges = ArrayDeque(sourceGraphFile.includeEdges)
             while (reader.hasNext()) {
                 if (reader.next() != XMLStreamConstants.START_ELEMENT) {
@@ -78,6 +77,7 @@ private object LogicalTreeBuilder {
         val children = mutableListOf<LogicalNode>()
         val name = reader.toLogicalName()
         val attributes = buildAttributes(reader, sourceGraphFile)
+        val namespaceBindings = buildNamespaceBindings(reader)
 
         while (reader.hasNext()) {
             when (reader.next()) {
@@ -95,6 +95,7 @@ private object LogicalTreeBuilder {
                 XMLStreamConstants.END_ELEMENT -> return LogicalElementNode(
                     name = name,
                     attributes = attributes,
+                    namespaceBindings = namespaceBindings,
                     children = children,
                     provenance = sourceGraphFile.provenanceAt(location),
                 )
@@ -104,6 +105,7 @@ private object LogicalTreeBuilder {
         return LogicalElementNode(
             name = name,
             attributes = attributes,
+            namespaceBindings = namespaceBindings,
             children = children,
             provenance = sourceGraphFile.provenanceAt(location),
         )
@@ -158,6 +160,19 @@ private object LogicalTreeBuilder {
             }
         }
 
+    private fun buildNamespaceBindings(reader: XMLStreamReader): List<LogicalNamespaceBinding> =
+        buildList {
+            for (index in 0 until reader.namespaceCount) {
+                val namespaceUri = reader.getNamespaceURI(index) ?: continue
+                add(
+                    LogicalNamespaceBinding(
+                        prefix = reader.getNamespacePrefix(index),
+                        namespaceUri = namespaceUri,
+                    ),
+                )
+            }
+        }
+
     private fun XMLStreamReader.toLogicalName(): LogicalName =
         LogicalName(
             localName = localName,
@@ -168,19 +183,7 @@ private object LogicalTreeBuilder {
     private fun XMLStreamReader.toSourceLocation(
         sourceGraphFile: SourceGraphFile,
         attributeName: String? = null,
-    ): SourceLocation =
-        SourceLocation(
-            document = sourceGraphFile.document,
-            span =
-                SourceSpan(
-                    start =
-                        SourcePosition(
-                            line = location.lineNumber.coerceAtLeast(1),
-                            column = location.columnNumber.coerceAtLeast(1),
-                        ),
-                ),
-            attributeName = attributeName,
-        )
+    ): SourceLocation = toSourceLocation(sourceGraphFile.document, attributeName)
 
     private fun SourceGraphFile.provenanceAt(location: SourceLocation): Provenance =
         Provenance(
@@ -188,17 +191,4 @@ private object LogicalTreeBuilder {
             logicalLocation = location,
             includeStack = stack.steps,
         )
-
-    private fun xmlInputFactory(): XMLInputFactory =
-        XMLInputFactory.newFactory().apply {
-            setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, true)
-            setProperty(XMLInputFactory.SUPPORT_DTD, false)
-        }
 }
-
-private inline fun <T : AutoCloseable?, R> T.use(block: (T) -> R): R =
-    try {
-        block(this)
-    } finally {
-        this?.close()
-    }

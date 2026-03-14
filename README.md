@@ -15,10 +15,12 @@ What exists today:
 - architecture and fixture-planning docs
 - repository conventions for future implementation
 - a single-module Gradle Kotlin CLI scaffold with placeholder pipeline stages, baseline tests, and application packaging for `facelets-verify`
+- loader-driven include discovery and expansion
+- a namespace-aware XHTML syntax tree built from a shared Woodstox-backed StAX reader
 
 What does not exist yet:
 
-- real parser and analyzer behavior
+- semantic equivalence analysis beyond the current scaffold
 - fixture corpus contents
 - CI automation
 
@@ -88,6 +90,8 @@ The current scaffold defines a single JVM application with a placeholder analyze
 - assemble distribution archives with `gradle distZip distTar`
 
 Reusable JUnit 5 test support now lives under `src/test/kotlin/dev/xhtmlinlinecheck/testing`. New tasks should prefer those helpers for temporary XHTML trees, fixture-path resolution under `fixtures/`, and AssertJ-based `AnalysisReport` assertions instead of duplicating setup in each package.
+
+Namespace-aware XML parsing is now centralized in `src/main/kotlin/dev/xhtmlinlinecheck/xml/NamespaceAwareXml.kt` and shared by the loader and syntax layers. Later namespace-rule, attribute-extraction, or syntax-tree tasks should extend that shared reader path instead of creating new ad hoc `XMLInputFactory` instances.
 
 A Gradle wrapper has not been generated yet, so repository verification currently assumes a system Gradle installation.
 
