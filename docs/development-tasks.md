@@ -1,5 +1,3 @@
-Add a registry rule for `h:form`, because the form-ancestry, target-resolution, and moved-component diagnostics tasks depend on it.
-Add generic JSF or component rules for `id`, `rendered`, `for`, `update`, `render`, `process`, and `execute`, connecting the registry work to semantic extraction and target comparison.
 Add tests proving rule lookup is deterministic and namespace-aware, covering the tag-rule interface and central-registry tasks before downstream analyzers depend on them.
 Define binding kinds for `ui:param`, iterator vars, `varStatus`, `c:set`, `c:forEach`, and implicit globals, because the scope stack and EL normalizer need a shared vocabulary.
 Implement the scope-stack model, building on the binding-kind task and the syntax-tree task so bindings can be resolved relative to tree position.

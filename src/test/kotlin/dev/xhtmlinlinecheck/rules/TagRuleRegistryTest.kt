@@ -91,9 +91,29 @@ class TagRuleRegistryTest {
         val formRule = registry.ruleFor(LogicalName(localName = "form", namespaceUri = JSF_HTML_NAMESPACE))
 
         assertThat(formRule).isNotNull()
-        assertThat(formRule!!.isNamingContainer).isTrue()
+        assertThat(formRule!!.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(formRule.isNamingContainer).isTrue()
+        assertThat(formRule.bindingRules).isEmpty()
         assertThat(formRule.elAttributeNames).containsExactly("rendered")
         assertThat(formRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
+    }
+
+    @Test
+    fun `h form stays an explicit built in rule for form ancestry dependent tasks`() {
+        val prefixedFormRule =
+            registry.resolve(
+                LogicalName(
+                    localName = "form",
+                    namespaceUri = JSF_HTML_NAMESPACE,
+                    prefix = "h",
+                ),
+            )
+
+        assertThat(prefixedFormRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(prefixedFormRule.isNamingContainer).isTrue()
+        assertThat(prefixedFormRule.isTransparentStructureWrapper).isFalse()
+        assertThat(prefixedFormRule.elAttributeNames).containsExactly("rendered")
+        assertThat(prefixedFormRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
     }
 
     @Test
