@@ -116,6 +116,20 @@ private fun includeProblemFor(
     val locations = locationsFor(node.provenance, node.sourcePath)
 
     return when (includeFailure.kind) {
+        SourceGraphIncludeFailureKind.DYNAMIC_PATH -> {
+            val requestedPath = includeFailure.dynamicSourcePath ?: node.sourcePath ?: "dynamic src"
+            Problem(
+                id = WarningIds.UNSUPPORTED_DYNAMIC_INCLUDE,
+                severity = Severity.WARNING,
+                category = ProblemCategory.UNSUPPORTED,
+                summary = "Dynamic include path is not statically resolvable",
+                locations = locations,
+                explanation =
+                    "The include src uses a dynamic expression ($requestedPath), so comparison beneath this node is not trustworthy.",
+                hint = "Replace the dynamic include with a static path or treat the result as inconclusive.",
+            )
+        }
+
         SourceGraphIncludeFailureKind.INCLUDE_CYCLE -> {
             val cyclePath = includeFailure.cycleDocuments.joinToString(" -> ") { it.displayPath }
             Problem(

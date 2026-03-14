@@ -17,16 +17,21 @@ data class SourceGraphStack(
 }
 
 enum class SourceGraphIncludeFailureKind {
+    DYNAMIC_PATH,
     INCLUDE_CYCLE,
     MISSING_FILE,
 }
 
 data class SourceGraphIncludeFailure(
     val kind: SourceGraphIncludeFailureKind,
+    val dynamicSourcePath: String? = null,
     val cycleDocuments: List<SourceDocument> = emptyList(),
     val missingDocument: SourceDocument? = null,
 ) {
     init {
+        require(kind != SourceGraphIncludeFailureKind.DYNAMIC_PATH || !dynamicSourcePath.isNullOrBlank()) {
+            "dynamic include paths must record the original src value"
+        }
         require(kind != SourceGraphIncludeFailureKind.INCLUDE_CYCLE || cycleDocuments.size >= 2) {
             "include cycles must record the ordered document chain"
         }
@@ -36,6 +41,12 @@ data class SourceGraphIncludeFailure(
     }
 
     companion object {
+        fun dynamicPath(sourcePath: String): SourceGraphIncludeFailure =
+            SourceGraphIncludeFailure(
+                kind = SourceGraphIncludeFailureKind.DYNAMIC_PATH,
+                dynamicSourcePath = sourcePath,
+            )
+
         fun includeCycle(documents: List<SourceDocument>): SourceGraphIncludeFailure =
             SourceGraphIncludeFailure(
                 kind = SourceGraphIncludeFailureKind.INCLUDE_CYCLE,

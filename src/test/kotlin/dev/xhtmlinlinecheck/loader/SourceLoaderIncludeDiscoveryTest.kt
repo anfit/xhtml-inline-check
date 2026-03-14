@@ -128,6 +128,10 @@ class SourceLoaderIncludeDiscoveryTest {
         assertThat(edge.sourcePath).isEqualTo("#{bean.fragmentPath}")
         assertThat(edge.includeSite.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(edge.includeSite.render()).endsWith(" @src")
+        assertThat(edge.includeFailure).isNotNull()
+        assertThat(edge.includeFailure!!.kind).isEqualTo(dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailureKind.DYNAMIC_PATH)
+        assertThat(edge.includeFailure!!.dynamicSourcePath).isEqualTo("#{bean.fragmentPath}")
+        assertThat(edge.includedDocument).isNull()
         assertThat(edge.includedFile).isNull()
     }
 

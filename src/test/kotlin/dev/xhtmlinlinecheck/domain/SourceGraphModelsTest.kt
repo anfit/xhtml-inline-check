@@ -99,6 +99,30 @@ class SourceGraphModelsTest {
     }
 
     @Test
+    fun `dynamic include failures keep the original unresolved src value`() {
+        val rootDocument = SourceDocument.fromPath(
+            side = AnalysisSide.OLD,
+            path = Path.of("legacy", "root.xhtml"),
+        )
+
+        val edge = SourceGraphEdge.discovered(
+            includeSite = SourceLocation(
+                document = rootDocument,
+                span = SourceSpan(SourcePosition(line = 9, column = 13)),
+                attributeName = "src",
+            ),
+            sourcePath = "#{bean.fragmentPath}",
+            includeFailure = SourceGraphIncludeFailure.dynamicPath("#{bean.fragmentPath}"),
+        )
+
+        assertThat(edge.includeFailure).isNotNull()
+        assertThat(edge.includeFailure!!.kind).isEqualTo(SourceGraphIncludeFailureKind.DYNAMIC_PATH)
+        assertThat(edge.includeFailure!!.dynamicSourcePath).isEqualTo("#{bean.fragmentPath}")
+        assertThat(edge.includedDocument).isNull()
+        assertThat(edge.includedFile).isNull()
+    }
+
+    @Test
     fun `include cycle failures keep the ordered recursive document chain`() {
         val rootDocument = SourceDocument.fromPath(
             side = AnalysisSide.OLD,

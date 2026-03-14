@@ -80,6 +80,12 @@ object ProblemIds {
 }
 
 object WarningIds {
+    val UNSUPPORTED_DYNAMIC_INCLUDE: DiagnosticId =
+        DiagnosticId.warning(
+            category = ProblemCategory.UNSUPPORTED,
+            slug = "DYNAMIC_INCLUDE",
+        )
+
     val UNSUPPORTED_INCLUDE_CYCLE: DiagnosticId =
         DiagnosticId.warning(
             category = ProblemCategory.UNSUPPORTED,

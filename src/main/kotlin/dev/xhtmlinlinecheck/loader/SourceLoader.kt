@@ -79,7 +79,10 @@ fun interface SourceLoader {
                 ).map { discoveredEdge ->
                     val includedDocument = discoveredEdge.sourcePath?.let(document::resolveIncludeSource)
                     val includeFailure =
-                        includedDocument
+                        discoveredEdge.sourcePath
+                            ?.takeIf(::isDynamicIncludePath)
+                            ?.let(SourceGraphIncludeFailure::dynamicPath)
+                            ?: includedDocument
                             ?.takeIf { included -> ancestry.any { it.absolutePath == included.absolutePath } }
                             ?.let { included ->
                                 SourceGraphIncludeFailure.includeCycle(
@@ -108,6 +111,8 @@ fun interface SourceLoader {
                 }
             return graphFile.copy(includeEdges = includeEdges)
         }
+
+        private fun isDynamicIncludePath(sourcePath: String): Boolean = "#{" in sourcePath || "${" in sourcePath
 
         private fun readContents(document: SourceDocument): String =
             try {

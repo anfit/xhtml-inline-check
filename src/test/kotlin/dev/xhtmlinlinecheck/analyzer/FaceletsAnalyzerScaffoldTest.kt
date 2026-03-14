@@ -95,6 +95,47 @@ class FaceletsAnalyzerScaffoldTest {
     }
 
     @Test
+    fun `scaffold analyzer emits a dedicated warning for dynamic include paths before the generic scaffold warning`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+              <ui:include src="#{bean.fragmentPath}" />
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "new/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = tempDir.relativize(oldRoot),
+                newRoot = tempDir.relativize(newRoot),
+                baseOld = tempDir,
+                baseNew = tempDir,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasProblemCount(2)
+            .hasWarningCount(2)
+            .hasProblemIds(
+                "W-UNSUPPORTED-DYNAMIC_INCLUDE",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().summary).isEqualTo("Dynamic include path is not statically resolvable")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("legacy/root.xhtml:2:")
+        assertThat(report.problems.first().locations.old?.snippet).isEqualTo("#{bean.fragmentPath}")
+        assertThat(report.problems.first().explanation).contains("#{bean.fragmentPath}")
+    }
+
+    @Test
     fun `scaffold analyzer emits a dedicated warning for missing include files before the generic scaffold warning`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(

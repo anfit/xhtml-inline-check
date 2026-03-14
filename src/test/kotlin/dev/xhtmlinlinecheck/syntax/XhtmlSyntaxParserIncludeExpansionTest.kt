@@ -102,6 +102,9 @@ class XhtmlSyntaxParserIncludeExpansionTest {
         assertThat(includeNode.expandedFile).isNull()
         assertThat(includeNode.children).isEmpty()
         assertThat(includeNode.parameters).isEmpty()
+        assertThat(includeNode.includeFailure).isNotNull()
+        assertThat(includeNode.includeFailure!!.kind).isEqualTo(dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailureKind.DYNAMIC_PATH)
+        assertThat(includeNode.includeFailure!!.dynamicSourcePath).isEqualTo("#{bean.fragmentPath}")
     }
 
     @Test

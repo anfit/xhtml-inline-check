@@ -9,6 +9,8 @@ class ProblemModelsTest {
     fun `diagnostic ids use stable kind-category-slug format`() {
         assertThat(ProblemIds.STRUCTURE_FORM_ANCESTRY_CHANGED.value)
             .isEqualTo("P-STRUCTURE-FORM_ANCESTRY_CHANGED")
+        assertThat(WarningIds.UNSUPPORTED_DYNAMIC_INCLUDE.value)
+            .isEqualTo("W-UNSUPPORTED-DYNAMIC_INCLUDE")
         assertThat(WarningIds.UNSUPPORTED_INCLUDE_CYCLE.value)
             .isEqualTo("W-UNSUPPORTED-INCLUDE_CYCLE")
         assertThat(WarningIds.UNSUPPORTED_MISSING_INCLUDE.value)
