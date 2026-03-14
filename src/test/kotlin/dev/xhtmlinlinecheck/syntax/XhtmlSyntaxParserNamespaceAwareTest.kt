@@ -103,4 +103,76 @@ class XhtmlSyntaxParserNamespaceAwareTest {
         assertThat(valueAttribute.location.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(valueAttribute.location.attributeName).isEqualTo("value")
     }
+
+    @Test
+    fun `parser preserves element names namespaces attributes and child order for downstream semantic work`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition
+                xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                xmlns:h="http://xmlns.jcp.org/jsf/html"
+                xmlns:p="http://primefaces.org/ui">
+              <h:panelGroup id="wrapper" p:widgetVar="ordersWidget">
+                <h:outputText value="first" />
+                <ui:fragment>
+                  <h:outputText value="second" />
+                </ui:fragment>
+                <h:outputText value="third" />
+              </h:panelGroup>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val parsedTrees = XhtmlSyntaxParser.scaffold().parse(
+            SourceLoader.scaffold().load(
+                AnalysisRequest(
+                    oldRoot = tempDir.relativize(oldRoot),
+                    newRoot = tempDir.relativize(newRoot),
+                    baseOld = tempDir,
+                    baseNew = tempDir,
+                ),
+            ),
+        )
+
+        val wrapper = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalElementNode
+        val fragment = wrapper.children[1] as LogicalElementNode
+
+        assertThat(wrapper.name)
+            .isEqualTo(
+                LogicalName(
+                    localName = "panelGroup",
+                    namespaceUri = "http://xmlns.jcp.org/jsf/html",
+                    prefix = "h",
+                ),
+            )
+        assertThat(wrapper.attributes.map { it.name to it.value })
+            .containsExactly(
+                LogicalName(localName = "id") to "wrapper",
+                LogicalName(localName = "widgetVar", namespaceUri = "http://primefaces.org/ui", prefix = "p") to "ordersWidget",
+            )
+        assertThat(wrapper.children.map { node ->
+            when (node) {
+                is LogicalElementNode -> node.name.localName
+                is LogicalIncludeNode -> "include"
+                is LogicalTextNode -> "#text"
+            }
+        }).containsExactly("outputText", "fragment", "outputText")
+        assertThat(fragment.name)
+            .isEqualTo(
+                LogicalName(
+                    localName = "fragment",
+                    namespaceUri = "http://xmlns.jcp.org/jsf/facelets",
+                    prefix = "ui",
+                ),
+            )
+        assertThat((fragment.children.single() as LogicalElementNode).attributes.single().value).isEqualTo("second")
+    }
 }
