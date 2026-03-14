@@ -255,4 +255,53 @@ class XhtmlSyntaxParserIncludeExpansionTest {
         assertThat(includeNode.includeFailure).isNotNull()
         assertThat(includeNode.includeFailure!!.missingDocument!!.displayPath).isEqualTo("fragments/missing.xhtml")
     }
+
+    @Test
+    fun `normalized structural roots flatten include boundaries and transparent facelets wrappers`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup id="before" />
+              <ui:include src="/fragments/content.xhtml" />
+              <h:panelGroup id="after" />
+            </ui:composition>
+            """,
+        )
+        tree.write(
+            "fragments/content.xhtml",
+            """
+            <ui:fragment xmlns:ui="http://xmlns.jcp.org/jsf/facelets" xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:outputText id="included" value="included" />
+            </ui:fragment>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val parsedTrees = XhtmlSyntaxParser.scaffold().parse(
+            SourceLoader.scaffold().load(
+                AnalysisRequest(
+                    oldRoot = tempDir.relativize(oldRoot),
+                    newRoot = tempDir.relativize(newRoot),
+                    baseOld = tempDir,
+                    baseNew = tempDir,
+                ),
+            ),
+        )
+
+        val normalizedRoots = parsedTrees.oldRoot.syntaxTree.normalizedStructureRoots()
+        val normalizedNames =
+            normalizedRoots.map { node ->
+                (node as LogicalElementNode).attributes.single { it.name.localName == "id" }.value
+            }
+
+        assertThat(normalizedNames).containsExactly("before", "included", "after")
+        assertThat(normalizedRoots).allMatch { it is LogicalElementNode && !it.isTransparentStructureWrapper }
+    }
 }

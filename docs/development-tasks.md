@@ -1,4 +1,3 @@
-Normalize transparent-wrapper handling in the syntax model where appropriate so later semantic and matching tasks do not treat include inlining itself as a structural change.
 Add unit tests for namespace preservation, validating the parser-selection and syntax-tree construction tasks before rule-registry logic depends on them.
 Add unit tests for location capture, validating the element-location and attribute-location tasks before diagnostics depend on them.
 Add fixture tests proving logical include provenance survives expansion into syntax nodes, tying together the include-expansion, provenance, and syntax-tree tasks.

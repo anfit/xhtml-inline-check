@@ -23,6 +23,8 @@ data class LogicalAttribute(
     val location: SourceLocation,
 )
 
+private const val FACELETS_NAMESPACE = "http://xmlns.jcp.org/jsf/facelets"
+
 sealed interface LogicalNode {
     val location: SourceLocation
     val provenance: Provenance
@@ -58,6 +60,27 @@ data class LogicalIncludeNode(
     override val provenance: Provenance,
 ) : LogicalNode
 
+val LogicalNode.isTransparentStructureWrapper: Boolean
+    get() =
+        when (this) {
+            is LogicalElementNode -> name.namespaceUri == FACELETS_NAMESPACE && name.localName in transparentFaceletsElementNames
+            is LogicalIncludeNode -> true
+            is LogicalTextNode -> false
+        }
+
+fun LogicalNode.normalizedStructureChildren(): List<LogicalNode> =
+    when (this) {
+        is LogicalElementNode -> children.flattenTransparentStructureWrappers()
+        is LogicalIncludeNode -> children.flattenTransparentStructureWrappers()
+        is LogicalTextNode -> emptyList()
+    }
+
+fun XhtmlSyntaxTree.normalizedStructureRoots(): List<LogicalNode> =
+    root
+        ?.let(::listOf)
+        ?.flattenTransparentStructureWrappers()
+        ?: emptyList()
+
 fun XhtmlSyntaxTree.walkDepthFirst(visitor: (LogicalNode) -> Unit) {
     fun visit(node: LogicalNode) {
         visitor(node)
@@ -70,3 +93,23 @@ fun XhtmlSyntaxTree.walkDepthFirst(visitor: (LogicalNode) -> Unit) {
 
     root?.let(::visit)
 }
+
+fun XhtmlSyntaxTree.walkNormalizedStructureDepthFirst(visitor: (LogicalNode) -> Unit) {
+    fun visit(node: LogicalNode) {
+        visitor(node)
+        node.normalizedStructureChildren().forEach(::visit)
+    }
+
+    normalizedStructureRoots().forEach(::visit)
+}
+
+private fun List<LogicalNode>.flattenTransparentStructureWrappers(): List<LogicalNode> =
+    flatMap { node ->
+        if (node.isTransparentStructureWrapper) {
+            node.normalizedStructureChildren()
+        } else {
+            listOf(node)
+        }
+    }
+
+private val transparentFaceletsElementNames = setOf("composition", "fragment")
