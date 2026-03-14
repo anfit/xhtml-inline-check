@@ -101,10 +101,9 @@ data class SourceGraphEdge(
         val resolvedDocument = requireNotNull(includedDocument) {
             "included file provenance requires a resolved included document"
         }
-        val rootLocation = SourceLocation(document = resolvedDocument)
         return Provenance(
-            physicalLocation = rootLocation,
-            logicalLocation = rootLocation,
+            physicalLocation = SourceLocation(document = resolvedDocument),
+            logicalLocation = includeSite,
             includeStack = stackAfter.steps,
         )
     }
@@ -156,8 +155,8 @@ data class SourceGraphFile(
     val includeEdges: List<SourceGraphEdge> = emptyList(),
 ) {
     init {
-        require(provenance.logicalLocation.document == document) {
-            "source graph file provenance must point at its document"
+        require(provenance.physicalLocation.document == document) {
+            "source graph file provenance physical location must point at its document"
         }
         require(stack.steps == provenance.includeStack) {
             "source graph file stack must match provenance include stack"

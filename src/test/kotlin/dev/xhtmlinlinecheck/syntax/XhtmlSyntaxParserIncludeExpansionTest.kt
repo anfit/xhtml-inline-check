@@ -62,7 +62,8 @@ class XhtmlSyntaxParserIncludeExpansionTest {
         assertThat(includeNode.provenance.logicalLocation.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(expandedRoot.name.localName).isEqualTo("fragment")
         assertThat(expandedRoot.location.render()).startsWith("fragments/table.xhtml:1:")
-        assertThat(expandedRoot.provenance.logicalLocation.render()).startsWith("fragments/table.xhtml:1:")
+        assertThat(expandedRoot.provenance.physicalLocation.render()).startsWith("fragments/table.xhtml:1:")
+        assertThat(expandedRoot.provenance.logicalLocation.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(expandedRoot.provenance.includeStack.single().includeSite.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(expandedRoot.provenance.includeStack.single().includedDocument.displayPath).isEqualTo("fragments/table.xhtml")
         assertThat(output.name.localName).isEqualTo("outputText")
@@ -162,6 +163,8 @@ class XhtmlSyntaxParserIncludeExpansionTest {
 
         assertThat(panel.name.localName).isEqualTo("panelGroup")
         assertThat(panel.provenance.includeStack).hasSize(2)
+        assertThat(panel.provenance.physicalLocation.render()).startsWith("fragments/inner.xhtml:2:")
+        assertThat(panel.provenance.logicalLocation.render()).startsWith("fragments/outer.xhtml:2:")
         assertThat(panel.provenance.includeStack.map { it.includedDocument.displayPath })
             .containsExactly("fragments/outer.xhtml", "fragments/inner.xhtml")
     }

@@ -23,18 +23,32 @@ class ProblemModelsTest {
 
     @Test
     fun `problem locations expose logical and physical locations from provenance`() {
-        val document = SourceDocument.fromPath(
+        val rootDocument = SourceDocument.fromPath(
+            side = AnalysisSide.OLD,
+            path = Path.of("legacy", "root.xhtml"),
+        )
+        val fragmentDocument = SourceDocument.fromPath(
             side = AnalysisSide.OLD,
             path = Path.of("legacy", "fragment.xhtml"),
         )
         val problemLocation = ProblemLocation(
-            provenance = Provenance.forRoot(document),
+            provenance =
+                Provenance(
+                    physicalLocation = SourceLocation(document = fragmentDocument),
+                    logicalLocation =
+                        SourceLocation(
+                            document = rootDocument,
+                            span = SourceSpan(SourcePosition(line = 4, column = 7)),
+                            attributeName = "src",
+                            attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
+                        ),
+                ),
             snippet = "#{row.total}",
         )
 
-        assertThat(problemLocation.logicalLocation.render()).isEqualTo("legacy/fragment.xhtml")
+        assertThat(problemLocation.logicalLocation.render()).isEqualTo("legacy/root.xhtml:4:7 @src (element fallback)")
         assertThat(problemLocation.physicalLocation.render()).isEqualTo("legacy/fragment.xhtml")
-        assertThat(problemLocation.render()).isEqualTo("legacy/fragment.xhtml")
+        assertThat(problemLocation.render()).isEqualTo("legacy/root.xhtml:4:7 @src (element fallback)")
         assertThat(problemLocation.snippet).isEqualTo("#{row.total}")
     }
 

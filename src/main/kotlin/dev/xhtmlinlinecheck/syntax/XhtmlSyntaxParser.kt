@@ -192,7 +192,12 @@ private object LogicalTreeBuilder {
     private fun SourceGraphFile.provenanceAt(location: SourceLocation): Provenance =
         Provenance(
             physicalLocation = location,
-            logicalLocation = location,
+            logicalLocation =
+                if (stack.steps.isEmpty()) {
+                    location
+                } else {
+                    provenance.logicalLocation
+                },
             includeStack = stack.steps,
         )
 }

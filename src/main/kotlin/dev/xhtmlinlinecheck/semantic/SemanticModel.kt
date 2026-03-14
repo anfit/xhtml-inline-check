@@ -10,8 +10,8 @@ data class SemanticModel(
     val syntaxTree: XhtmlSyntaxTree,
 ) {
     init {
-        require(provenance.logicalLocation.document == document) {
-            "semantic provenance must point at the semantic document"
+        require(provenance.physicalLocation.document == document) {
+            "semantic provenance physical location must point at the semantic document"
         }
     }
 }

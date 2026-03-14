@@ -74,7 +74,9 @@ class SourceGraphModelsTest {
         assertThat(edge.stackAfter.steps).containsExactly(edge.asIncludeStep())
         assertThat(includedFile.stack.steps).containsExactly(edge.asIncludeStep())
         assertThat(includedFile.provenance.includeStack).containsExactly(edge.asIncludeStep())
-        assertThat(includedFile.provenance.logicalLocation.render()).isEqualTo("legacy/fragments/table.xhtml")
+        assertThat(includedFile.provenance.physicalLocation.render()).isEqualTo("legacy/fragments/table.xhtml")
+        assertThat(includedFile.provenance.logicalLocation.render())
+            .isEqualTo("legacy/root.xhtml:5:5 @src (element fallback)")
         assertThat(includedFile.contents).isEqualTo("<ui:fragment />")
     }
 

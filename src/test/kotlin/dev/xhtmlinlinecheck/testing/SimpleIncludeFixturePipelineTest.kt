@@ -50,8 +50,10 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(includeNode.provenance.logicalLocation.render())
             .startsWith("fixtures/support/include-expansion/old/root.xhtml:2:")
         assertThat(expandedRoot.name.localName).isEqualTo("fragment")
-        assertThat(expandedRoot.provenance.logicalLocation.render())
+        assertThat(expandedRoot.provenance.physicalLocation.render())
             .startsWith("fixtures/support/include-expansion/old/fragments/panel.xhtml:1:")
+        assertThat(expandedRoot.provenance.logicalLocation.render())
+            .startsWith("fixtures/support/include-expansion/old/root.xhtml:2:")
         assertThat(expandedRoot.provenance.includeStack.single().includeSite.render())
             .startsWith("fixtures/support/include-expansion/old/root.xhtml:2:")
         assertThat(output.name.localName).isEqualTo("outputText")
@@ -101,6 +103,10 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(outerInclude.parameters.map { it.name }).containsExactly("sectionLabel")
         assertThat(innerInclude.parameters.map { it.name }).containsExactly("resolvedLabel", "wrapperClass")
         assertThat(output.provenance.includeStack).hasSize(2)
+        assertThat(output.provenance.physicalLocation.render())
+            .startsWith("fixtures/support/include-expansion-nested/old/fragments/content.xhtml:2:")
+        assertThat(output.provenance.logicalLocation.render())
+            .startsWith("fixtures/support/include-expansion-nested/old/fragments/layout.xhtml:4:")
         assertThat(output.provenance.includeStack.map { it.includedDocument.displayPath })
             .containsExactly(
                 "fixtures/support/include-expansion-nested/old/fragments/layout.xhtml",
