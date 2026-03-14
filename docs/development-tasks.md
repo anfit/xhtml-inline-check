@@ -1,4 +1,3 @@
-Add unit tests for location capture, validating the element-location and attribute-location tasks before diagnostics depend on them.
 Add fixture tests proving logical include provenance survives expansion into syntax nodes, tying together the include-expansion, provenance, and syntax-tree tasks.
 Define a tag-rule interface describing semantic behavior such as binding creation, transparency, naming-container status, EL-bearing attributes, and target-bearing attributes, because the semantic-extraction and comparator tasks should not hardcode tag logic.
 Implement a central registry for known tag rules so the syntax-walker, scope builder, structural analyzer, and later extension tasks can resolve semantics deterministically.
