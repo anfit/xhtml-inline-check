@@ -80,6 +80,12 @@ object ProblemIds {
 }
 
 object WarningIds {
+    val UNSUPPORTED_EXTRACTED_EL: DiagnosticId =
+        DiagnosticId.warning(
+            category = ProblemCategory.UNSUPPORTED,
+            slug = "EXTRACTED_EL",
+        )
+
     val UNSUPPORTED_DYNAMIC_INCLUDE: DiagnosticId =
         DiagnosticId.warning(
             category = ProblemCategory.UNSUPPORTED,

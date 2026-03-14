@@ -1,4 +1,3 @@
-Emit explicit unsupported diagnostics for extracted EL forms outside the MVP subset so unsupported syntax contributes to `INCONCLUSIVE` instead of degrading into silent fallback behavior.
 Implement symbolic EL normalization for local bindings to canonical ids, using the scope stack and binding-origin models so safe alpha-renames compare equal.
 Implement symbolic handling of unresolved global roots so the EL layer can distinguish local-binding equivalence from bean-level uncertainty without pretending unresolved globals are local matches.
 Add unit tests for alpha-renaming equivalence and binding-sensitive EL behavior, including capture and shadowing cases, so the normalization layer is locked before node comparison depends on it.

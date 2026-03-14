@@ -17,6 +17,8 @@ import dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailure
 import dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailureKind
 import dev.xhtmlinlinecheck.domain.WarningIds
 import dev.xhtmlinlinecheck.domain.WarningTotals
+import dev.xhtmlinlinecheck.semantic.SemanticElCarrierKind
+import dev.xhtmlinlinecheck.semantic.SemanticElOccurrence
 import dev.xhtmlinlinecheck.semantic.SemanticModels
 import dev.xhtmlinlinecheck.syntax.LogicalIncludeNode
 import dev.xhtmlinlinecheck.syntax.XhtmlSyntaxTree
@@ -33,8 +35,12 @@ fun interface EquivalenceComparator {
                         addAll(semanticModels.oldRoot.syntaxTree.collectIncludeProblems())
                         addAll(semanticModels.newRoot.syntaxTree.collectIncludeProblems())
                     }
+                val extractedElProblems =
+                    semanticModels.oldRoot.elOccurrences.collectUnsupportedElProblems() +
+                        semanticModels.newRoot.elOccurrences.collectUnsupportedElProblems()
                 val problems =
                     includeProblems +
+                        extractedElProblems +
                         Problem(
                             id = WarningIds.UNSUPPORTED_ANALYZER_PIPELINE_SCAFFOLD,
                             severity = Severity.WARNING,
@@ -84,6 +90,27 @@ fun interface EquivalenceComparator {
             }
     }
 }
+
+private fun List<SemanticElOccurrence>.collectUnsupportedElProblems(): List<Problem> =
+    filter { !it.isSupported }.map { occurrence ->
+        val locations = locationsFor(occurrence.provenance, occurrence.rawValue)
+        val carrierDescription = occurrence.describeCarrier()
+        val failure = requireNotNull(occurrence.parseFailure) {
+            "unsupported semantic EL occurrences must carry a parse failure"
+        }
+
+        Problem(
+            id = WarningIds.UNSUPPORTED_EXTRACTED_EL,
+            severity = Severity.WARNING,
+            category = ProblemCategory.UNSUPPORTED,
+            summary = "Extracted EL falls outside the MVP subset",
+            locations = locations,
+            explanation =
+                "$carrierDescription uses extracted EL that the MVP parser does not support yet: ${failure.message}. " +
+                    "The affected semantic fact is treated as unknown, so equivalence remains inconclusive.",
+            hint = "Rewrite the EL into the documented MVP subset or keep the result inconclusive until support is added.",
+        )
+    }
 
 private fun XhtmlSyntaxTree.collectIncludeProblems(): List<Problem> {
     val problems = mutableListOf<Problem>()
@@ -157,4 +184,21 @@ private fun locationsFor(
     when (provenance.logicalLocation.document.side) {
         AnalysisSide.OLD -> ProblemLocations(old = ProblemLocation(provenance, snippet))
         AnalysisSide.NEW -> ProblemLocations(new = ProblemLocation(provenance, snippet))
+    }
+
+private fun SemanticElOccurrence.describeCarrier(): String =
+    when (carrierKind) {
+        SemanticElCarrierKind.ELEMENT_ATTRIBUTE ->
+            "$ownerTagName @$attributeName"
+
+        SemanticElCarrierKind.TEXT_NODE ->
+            "$ownerTagName text"
+
+        SemanticElCarrierKind.INCLUDE_ATTRIBUTE ->
+            "$ownerTagName @$attributeName"
+
+        SemanticElCarrierKind.INCLUDE_PARAMETER -> {
+            val parameterNameSuffix = ownerName?.let { " name=$it" }.orEmpty()
+            "$ownerTagName$parameterNameSuffix @$attributeName"
+        }
     }

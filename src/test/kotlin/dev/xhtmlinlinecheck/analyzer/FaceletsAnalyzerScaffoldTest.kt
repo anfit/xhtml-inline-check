@@ -174,6 +174,89 @@ class FaceletsAnalyzerScaffoldTest {
     }
 
     @Test
+    fun `scaffold analyzer emits explicit unsupported diagnostics for extracted attribute EL outside the MVP subset`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup rendered="#{fn:length(bean.items)}" />
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasProblemCount(2)
+            .hasWarningCount(2)
+            .hasProblemIds(
+                "W-UNSUPPORTED-EXTRACTED_EL",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().summary).isEqualTo("Extracted EL falls outside the MVP subset")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("legacy/root.xhtml:2:")
+        assertThat(report.problems.first().locations.old?.snippet).isEqualTo("#{fn:length(bean.items)}")
+        assertThat(report.problems.first().explanation).contains("h:panelGroup @rendered")
+        assertThat(report.problems.first().explanation).contains("Unexpected token ':'")
+        assertThat(report.problems.first().explanation).contains("treated as unknown")
+    }
+
+    @Test
+    fun `scaffold analyzer emits explicit unsupported diagnostics for extracted text EL outside the MVP subset`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup>#{fn:length(bean.items)}</h:panelGroup>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasProblemCount(2)
+            .hasWarningCount(2)
+            .hasProblemIds(
+                "W-UNSUPPORTED-EXTRACTED_EL",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().summary).isEqualTo("Extracted EL falls outside the MVP subset")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("legacy/root.xhtml:2:")
+        assertThat(report.problems.first().locations.old?.snippet).isEqualTo("#{fn:length(bean.items)}")
+        assertThat(report.problems.first().explanation).contains("h:panelGroup text")
+        assertThat(report.problems.first().explanation).contains("Unexpected token ':'")
+    }
+
+    @Test
     fun `scaffold analyzer emits a dedicated warning for missing include files before the generic scaffold warning`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(
