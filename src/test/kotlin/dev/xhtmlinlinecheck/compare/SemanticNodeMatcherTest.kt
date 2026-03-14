@@ -152,6 +152,10 @@ class SemanticNodeMatcherTest {
             .containsExactly("update=msgs panel", "process=@this @form")
         assertThat(newButton.componentTargetAttributes.map { it.render() })
             .containsExactly("update=msgs panel", "process=@this @form")
+        assertThat(oldButton.componentTargetAttributes.map { it.attribute.rawValue })
+            .containsExactly("msgs   panel", "@this   @form")
+        assertThat(newButton.componentTargetAttributes.map { it.attribute.rawValue })
+            .containsExactly("msgs panel", "@this @form")
         assertThat(result.matches)
             .extracting("reason", "oldNodeId.value", "newNodeId.value")
             .containsExactly(

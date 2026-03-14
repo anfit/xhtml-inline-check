@@ -33,12 +33,14 @@ data class ComponentTargetReference(
 
 data class ComponentTargetAttribute(
     val kind: ComponentTargetAttributeKind,
-    val rawValue: String,
-    val location: SourceLocation,
+    val attribute: SemanticNodeAttribute,
     val references: List<ComponentTargetReference>,
 ) {
     val attributeName: String
         get() = kind.attributeName
+
+    val location: SourceLocation
+        get() = attribute.location
 
     fun render(): String =
         buildString {
@@ -53,19 +55,14 @@ data class ComponentTargetAttribute(
 }
 
 internal object ComponentTargetReferenceParser {
-    fun parse(
-        attributeName: String,
-        rawValue: String,
-        location: SourceLocation,
-    ): ComponentTargetAttribute? {
-        val kind = ComponentTargetAttributeKind.fromAttributeName(attributeName) ?: return null
+    fun parse(attribute: SemanticNodeAttribute): ComponentTargetAttribute? {
+        val kind = ComponentTargetAttributeKind.fromAttributeName(attribute.attributeName) ?: return null
         val references =
-            tokenize(rawValue, allowsMultipleReferences = kind.allowsMultipleReferences)
+            tokenize(attribute.rawValue, allowsMultipleReferences = kind.allowsMultipleReferences)
                 .map(::toReference)
         return ComponentTargetAttribute(
             kind = kind,
-            rawValue = rawValue,
-            location = location,
+            attribute = attribute,
             references = references,
         )
     }

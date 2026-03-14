@@ -248,11 +248,7 @@ private fun LogicalAttribute.toSemanticAttribute(): SemanticNodeAttribute =
     )
 
 private fun LogicalAttribute.toComponentTargetAttribute(): ComponentTargetAttribute? =
-    ComponentTargetReferenceParser.parse(
-        attributeName = name.localName,
-        rawValue = value,
-        location = location,
-    )
+    ComponentTargetReferenceParser.parse(toSemanticAttribute())
 
 private fun LogicalElementNode.attributeNamed(localName: String): LogicalAttribute? =
     attributes.firstOrNull { it.name.localName == localName }

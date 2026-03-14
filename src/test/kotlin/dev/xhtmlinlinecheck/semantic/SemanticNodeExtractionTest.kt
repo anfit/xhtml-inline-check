@@ -36,7 +36,7 @@ class SemanticNodeExtractionTest {
             <ui:fragment xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
                          xmlns:h="http://xmlns.jcp.org/jsf/html">
               <ui:repeat var="row" varStatus="status" value="#{bean.rows}">
-                <h:panelGroup id="panel" rendered="#{row.visible}" update="msgs panel" process="@this" />
+                <h:panelGroup id="panel" rendered="#{row.visible}" update="msgs panel" render="summary" process="@this" execute="@form panel" />
                 <h:outputText id="labelOutput" value="#{label}" />
               </ui:repeat>
             </ui:fragment>
@@ -82,15 +82,18 @@ class SemanticNodeExtractionTest {
         assertThat(panelNode.renderedAttribute!!.bindingReferences.map { it.binding.origin.descriptor })
             .containsExactly("ui:repeat var=row")
         assertThat(panelNode.componentTargetAttributes)
-            .extracting("attributeName", "rawValue")
+            .extracting("attribute.attributeName", "attribute.rawValue")
             .containsExactly(
                 Tuple.tuple("update", "msgs panel"),
+                Tuple.tuple("render", "summary"),
                 Tuple.tuple("process", "@this"),
+                Tuple.tuple("execute", "@form panel"),
             )
         assertThat(panelNode.componentTargetAttributes)
             .extracting(
                 "kind",
                 "references",
+                "attribute.rawValue",
             )
             .containsExactly(
                 Tuple.tuple(
@@ -99,12 +102,29 @@ class SemanticNodeExtractionTest {
                         ComponentTargetReference("msgs", ComponentTargetReferenceKind.COMPONENT_ID),
                         ComponentTargetReference("panel", ComponentTargetReferenceKind.COMPONENT_ID),
                     ),
+                    "msgs panel",
+                ),
+                Tuple.tuple(
+                    ComponentTargetAttributeKind.RENDER,
+                    listOf(
+                        ComponentTargetReference("summary", ComponentTargetReferenceKind.COMPONENT_ID),
+                    ),
+                    "summary",
                 ),
                 Tuple.tuple(
                     ComponentTargetAttributeKind.PROCESS,
                     listOf(
                         ComponentTargetReference("@this", ComponentTargetReferenceKind.SEARCH_EXPRESSION),
                     ),
+                    "@this",
+                ),
+                Tuple.tuple(
+                    ComponentTargetAttributeKind.EXECUTE,
+                    listOf(
+                        ComponentTargetReference("@form", ComponentTargetReferenceKind.SEARCH_EXPRESSION),
+                        ComponentTargetReference("panel", ComponentTargetReferenceKind.COMPONENT_ID),
+                    ),
+                    "@form panel",
                 ),
             )
         assertThat(panelNode.structuralContext.formAncestry.map { it.nodeName }).containsExactly("h:form")
@@ -176,7 +196,7 @@ class SemanticNodeExtractionTest {
               <h:panelGroup id="details">
                 Summary #{item.name}
                 <h:outputLabel id="nameLabel" for="nameInput" rendered="#{item.visible}" />
-                <h:commandButton id="saveButton" update="msgs details" process="@form" rendered="#{item.editable}" />
+                <h:commandButton id="saveButton" update="msgs details" render="details summary" process="@form" execute="@this nameInput" rendered="#{item.editable}" />
               </h:panelGroup>
             </ui:fragment>
             """,
@@ -279,7 +299,7 @@ class SemanticNodeExtractionTest {
                     Tuple.tuple(
                         node.nodeId.value,
                         attribute.kind,
-                        attribute.rawValue,
+                        attribute.attribute.rawValue,
                         attribute.references.map(ComponentTargetReference::render),
                     )
                 }
@@ -292,7 +312,19 @@ class SemanticNodeExtractionTest {
                 "msgs details",
                 listOf("msgs", "details"),
             ),
+            Tuple.tuple(
+                "node:/0/0/0/0/2",
+                ComponentTargetAttributeKind.RENDER,
+                "details summary",
+                listOf("details", "summary"),
+            ),
             Tuple.tuple("node:/0/0/0/0/2", ComponentTargetAttributeKind.PROCESS, "@form", listOf("@form")),
+            Tuple.tuple(
+                "node:/0/0/0/0/2",
+                ComponentTargetAttributeKind.EXECUTE,
+                "@this nameInput",
+                listOf("@this", "nameInput"),
+            ),
         )
     }
 
