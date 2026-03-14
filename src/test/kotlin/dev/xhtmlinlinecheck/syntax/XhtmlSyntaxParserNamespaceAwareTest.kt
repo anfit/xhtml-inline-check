@@ -225,4 +225,80 @@ class XhtmlSyntaxParserNamespaceAwareTest {
             )
         assertThat((fragment.children.single() as LogicalElementNode).attributes.single().value).isEqualTo("second")
     }
+
+    @Test
+    fun `parser preserves namespace bindings across include expansion and local namespace rebinding`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <facelets:view xmlns:facelets="http://xmlns.jcp.org/jsf/facelets" xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <facelets:include src="/fragments/content.xhtml" />
+            </facelets:view>
+            """,
+        )
+        tree.write(
+            "fragments/content.xhtml",
+            """
+            <fragment xmlns="urn:included:default" xmlns:p="http://primefaces.org/ui">
+              <p:panel header="Orders" />
+            </fragment>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val parsedTrees = XhtmlSyntaxParser.scaffold().parse(
+            SourceLoader.scaffold().load(
+                AnalysisRequest(
+                    oldRoot = tempDir.relativize(oldRoot),
+                    newRoot = tempDir.relativize(newRoot),
+                    baseOld = tempDir,
+                    baseNew = tempDir,
+                ),
+            ),
+        )
+
+        val include = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalIncludeNode
+        val expandedRoot = include.children.single() as LogicalElementNode
+        val panel = expandedRoot.children.single() as LogicalElementNode
+
+        assertThat(parsedTrees.oldRoot.syntaxTree.root!!.name)
+            .isEqualTo(
+                LogicalName(
+                    localName = "view",
+                    namespaceUri = "http://xmlns.jcp.org/jsf/facelets",
+                    prefix = "facelets",
+                ),
+            )
+        assertThat(expandedRoot.name)
+            .isEqualTo(
+                LogicalName(
+                    localName = "fragment",
+                    namespaceUri = "urn:included:default",
+                    prefix = "",
+                ),
+            )
+        assertThat(expandedRoot.namespaceBindings)
+            .containsExactlyInAnyOrder(
+                LogicalNamespaceBinding(prefix = "", namespaceUri = "urn:included:default"),
+                LogicalNamespaceBinding(prefix = "p", namespaceUri = "http://primefaces.org/ui"),
+            )
+        assertThat(panel.name)
+            .isEqualTo(
+                LogicalName(
+                    localName = "panel",
+                    namespaceUri = "http://primefaces.org/ui",
+                    prefix = "p",
+                ),
+            )
+        assertThat(panel.namespaceBindings).isEmpty()
+        assertThat(panel.attributes.single())
+            .extracting({ it.name }, { it.value })
+            .containsExactly(LogicalName(localName = "header"), "Orders")
+    }
 }

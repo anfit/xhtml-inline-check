@@ -24,6 +24,12 @@ class SourceLoaderIncludeDiscoveryTest {
             </ui:composition>
             """,
         )
+        tree.write(
+            "fragments/table.xhtml",
+            """
+            <ui:fragment xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
         val newRoot = tree.write(
             "refactored/root.xhtml",
             """
@@ -138,6 +144,47 @@ class SourceLoaderIncludeDiscoveryTest {
     }
 
     @Test
+    fun `loader discovers facelets includes by namespace uri instead of hardcoded ui prefix`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <facelets:view xmlns:facelets="http://xmlns.jcp.org/jsf/facelets">
+              <facelets:include src="/fragments/table.xhtml" />
+            </facelets:view>
+            """,
+        )
+        tree.write(
+            "fragments/table.xhtml",
+            """
+            <facelets:fragment xmlns:facelets="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val loadedSources = SourceLoader.scaffold().load(
+            AnalysisRequest(
+                oldRoot = tempDir.relativize(oldRoot),
+                newRoot = tempDir.relativize(newRoot),
+                baseOld = tempDir,
+                baseNew = tempDir,
+            ),
+        )
+
+        val edge = loadedSources.oldRoot.sourceGraphFile.includeEdges.single()
+
+        assertThat(edge.sourcePath).isEqualTo("/fragments/table.xhtml")
+        assertThat(edge.includedDocument).isNotNull()
+        assertThat(edge.includedDocument!!.displayPath).isEqualTo("fragments/table.xhtml")
+        assertThat(edge.includedFile).isNotNull()
+    }
+
+    @Test
     fun `loader extracts direct ui params from include sites with value provenance`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(
@@ -178,7 +225,8 @@ class SourceLoaderIncludeDiscoveryTest {
         assertThat(parameters).hasSize(2)
         assertThat(parameters.map { it.name }).containsExactly("row", "mode")
         assertThat(parameters.map { it.valueExpression }).containsExactly("#{bean.row}", "compact")
-        assertThat(parameters.map { it.provenance.physicalLocation.render() }.all { it.startsWith("legacy/root.xhtml:") })
+        assertThat(parameters.map { it.provenance.physicalLocation.render() }
+            .all { it.startsWith("legacy/root.xhtml:") })
             .isTrue()
         assertThat(parameters.map { it.provenance.physicalLocation.attributeName })
             .containsOnly("value")
