@@ -1,6 +1,7 @@
 package dev.xhtmlinlinecheck.semantic
 
 import dev.xhtmlinlinecheck.domain.BindingId
+import dev.xhtmlinlinecheck.domain.BindingKind
 import dev.xhtmlinlinecheck.domain.BindingOrigin
 import dev.xhtmlinlinecheck.domain.Provenance
 import dev.xhtmlinlinecheck.domain.SourceLocation
@@ -8,8 +9,7 @@ import dev.xhtmlinlinecheck.rules.SyntaxRole
 import dev.xhtmlinlinecheck.syntax.LogicalName
 import dev.xhtmlinlinecheck.syntax.LogicalNodePath
 
-@JvmInline
-value class SemanticNodeId(
+data class SemanticNodeId(
     val value: String,
 ) {
     override fun toString(): String = value
@@ -25,11 +25,16 @@ data class SemanticNodeAttribute(
     val attributeName: String,
     val rawValue: String,
     val location: SourceLocation,
-)
+) {
+    val isStaticLiteral: Boolean
+        get() = !rawValue.contains("#{") && !rawValue.contains("\${")
+}
 
 data class SemanticNodeAncestor(
     val nodeId: SemanticNodeId,
     val nodeName: String,
+    val logicalName: LogicalName? = null,
+    val syntaxRole: SyntaxRole? = null,
     val explicitId: String? = null,
     val location: SourceLocation,
     val provenance: Provenance,
@@ -38,8 +43,11 @@ data class SemanticNodeAncestor(
 data class SemanticIterationAncestor(
     val nodeId: SemanticNodeId,
     val nodeName: String,
+    val logicalName: LogicalName? = null,
+    val syntaxRole: SyntaxRole? = null,
     val location: SourceLocation,
     val provenance: Provenance,
+    val bindingKinds: List<BindingKind>,
     val bindingIds: List<BindingId>,
     val bindingOrigins: List<BindingOrigin>,
 )

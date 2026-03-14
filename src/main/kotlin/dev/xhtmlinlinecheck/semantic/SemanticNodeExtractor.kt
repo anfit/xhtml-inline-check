@@ -211,8 +211,11 @@ private fun ScopeStackModel.iterationAncestorFor(
     return SemanticIterationAncestor(
         nodeId = semanticNode.nodeId,
         nodeName = semanticNode.nodeName,
+        logicalName = semanticNode.logicalName,
+        syntaxRole = semanticNode.syntaxRole,
         location = semanticNode.location,
         provenance = semanticNode.provenance,
+        bindingKinds = iterationBindings.map(ScopeBinding::kind),
         bindingIds = iterationBindings.map { it.id },
         bindingOrigins = iterationBindings.map(ScopeBinding::origin),
     )
@@ -222,6 +225,8 @@ private fun SemanticNode.asAncestor(): SemanticNodeAncestor =
     SemanticNodeAncestor(
         nodeId = nodeId,
         nodeName = nodeName,
+        logicalName = logicalName,
+        syntaxRole = syntaxRole,
         explicitId = explicitIdAttribute?.rawValue,
         location = location,
         provenance = provenance,

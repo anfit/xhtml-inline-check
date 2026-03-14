@@ -324,6 +324,133 @@ class SemanticNodeMatcherTest {
         assertThat(result.unmatchedNewNodeIds).isEmpty()
     }
 
+    @Test
+    fun `semantic signatures disambiguate reordered alpha-renamed siblings by local semantic facts`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:repeat var="row" value="#{bean.rows}">
+                <h:outputText value="#{row.label}" />
+                <h:outputText value="#{row.code}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:repeat var="item" value="#{bean.rows}">
+                <h:outputText value="#{item.code}" />
+                <h:outputText value="#{item.label}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+
+        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val oldOutputs = semanticModels.oldRoot.semanticNodes.filter { it.nodeName == "h:outputText" }
+        val newOutputs = semanticModels.newRoot.semanticNodes.filter { it.nodeName == "h:outputText" }
+        val oldLabel = oldOutputs.single { it.elFacts.single().rawValue == "#{row.label}" }
+        val oldCode = oldOutputs.single { it.elFacts.single().rawValue == "#{row.code}" }
+        val newLabel = newOutputs.single { it.elFacts.single().rawValue == "#{item.label}" }
+        val newCode = newOutputs.single { it.elFacts.single().rawValue == "#{item.code}" }
+
+        assertThat(semanticSignatureFor(oldLabel).localElFacts)
+            .containsExactly("ELEMENT_ATTRIBUTE:value:<none>=#{binding#1.label}")
+        assertThat(semanticSignatureFor(newLabel).localElFacts)
+            .containsExactly("ELEMENT_ATTRIBUTE:value:<none>=#{binding#1.label}")
+        assertThat(semanticSignatureFor(oldCode).localElFacts)
+            .containsExactly("ELEMENT_ATTRIBUTE:value:<none>=#{binding#1.code}")
+        assertThat(semanticSignatureFor(newCode).localElFacts)
+            .containsExactly("ELEMENT_ATTRIBUTE:value:<none>=#{binding#1.code}")
+
+        val result = SemanticNodeMatcher.matchStructuralCandidates(
+            oldNodes = semanticModels.oldRoot.semanticNodes,
+            newNodes = semanticModels.newRoot.semanticNodes,
+        )
+
+        assertThat(result.matches)
+            .extracting("reason", "oldNodeId.value", "newNodeId.value")
+            .containsExactlyInAnyOrder(
+                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, "node:/0", "node:/0"),
+                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, oldLabel.nodeId.value, newLabel.nodeId.value),
+                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, oldCode.nodeId.value, newCode.nodeId.value),
+            )
+        assertThat(result.unmatchedOldNodeIds).isEmpty()
+        assertThat(result.unmatchedNewNodeIds).isEmpty()
+    }
+
+    @Test
+    fun `semantic signatures include ancestor explicit ids so reordered forms do not scramble anonymous children`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:form id="leftForm">
+                <h:outputText value="same" />
+              </h:form>
+              <h:form id="rightForm">
+                <h:outputText value="same" />
+              </h:form>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:form id="rightForm">
+                <h:outputText value="same" />
+              </h:form>
+              <h:form id="leftForm">
+                <h:outputText value="same" />
+              </h:form>
+            </ui:composition>
+            """,
+        )
+
+        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val oldOutputs = semanticModels.oldRoot.semanticNodes.filter { it.nodeName == "h:outputText" }
+        val newOutputs = semanticModels.newRoot.semanticNodes.filter { it.nodeName == "h:outputText" }
+        val oldLeft = oldOutputs.single { it.formAncestry.single().explicitId == "leftForm" }
+        val oldRight = oldOutputs.single { it.formAncestry.single().explicitId == "rightForm" }
+        val newLeft = newOutputs.single { it.formAncestry.single().explicitId == "leftForm" }
+        val newRight = newOutputs.single { it.formAncestry.single().explicitId == "rightForm" }
+
+        assertThat(semanticSignatureFor(oldLeft).formAncestry.map { it.render() })
+            .containsExactly("http://xmlns.jcp.org/jsf/html:form@ELEMENT#leftForm")
+        assertThat(semanticSignatureFor(newLeft).formAncestry.map { it.render() })
+            .containsExactly("http://xmlns.jcp.org/jsf/html:form@ELEMENT#leftForm")
+        assertThat(semanticSignatureFor(oldRight).formAncestry.map { it.render() })
+            .containsExactly("http://xmlns.jcp.org/jsf/html:form@ELEMENT#rightForm")
+        assertThat(semanticSignatureFor(newRight).formAncestry.map { it.render() })
+            .containsExactly("http://xmlns.jcp.org/jsf/html:form@ELEMENT#rightForm")
+
+        val result = SemanticNodeMatcher.matchStructuralCandidates(
+            oldNodes = semanticModels.oldRoot.semanticNodes,
+            newNodes = semanticModels.newRoot.semanticNodes,
+        )
+
+        assertThat(result.matches)
+            .extracting("reason", "oldNodeId.value", "newNodeId.value")
+            .containsExactlyInAnyOrder(
+                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/0", "node:/1"),
+                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/1", "node:/0"),
+                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, oldLeft.nodeId.value, newLeft.nodeId.value),
+                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, oldRight.nodeId.value, newRight.nodeId.value),
+            )
+        assertThat(result.unmatchedOldNodeIds).isEmpty()
+        assertThat(result.unmatchedNewNodeIds).isEmpty()
+    }
+
     private fun semanticModelsFor(oldRoot: Path, newRoot: Path, baseDir: Path): SemanticModels =
         SemanticAnalyzer.scaffold().analyze(
             XhtmlSyntaxParser.scaffold().parse(
