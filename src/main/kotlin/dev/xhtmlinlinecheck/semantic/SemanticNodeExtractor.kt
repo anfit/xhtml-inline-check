@@ -31,9 +31,7 @@ object SemanticNodeExtractor {
         fun visit(
             node: LogicalNode,
             path: LogicalNodePath,
-            formAncestry: List<SemanticNodeAncestor>,
-            namingContainerAncestry: List<SemanticNodeAncestor>,
-            iterationAncestry: List<SemanticIterationAncestor>,
+            structuralContext: SemanticStructuralContext,
         ) {
             val nodeId = semanticNodeIdFor(path)
             val currentElFacts = elFactsByPath[path].orEmpty()
@@ -44,9 +42,7 @@ object SemanticNodeExtractor {
                             nodeId = nodeId,
                             nodePath = path,
                             elFacts = currentElFacts,
-                            formAncestry = formAncestry,
-                            namingContainerAncestry = namingContainerAncestry,
-                            iterationAncestry = iterationAncestry,
+                            structuralContext = structuralContext,
                         )
 
                     is LogicalIncludeNode ->
@@ -54,9 +50,7 @@ object SemanticNodeExtractor {
                             nodeId = nodeId,
                             nodePath = path,
                             elFacts = currentElFacts,
-                            formAncestry = formAncestry,
-                            namingContainerAncestry = namingContainerAncestry,
-                            iterationAncestry = iterationAncestry,
+                            structuralContext = structuralContext,
                         )
 
                     is LogicalTextNode ->
@@ -64,27 +58,12 @@ object SemanticNodeExtractor {
                             nodeId = nodeId,
                             nodePath = path,
                             elFacts = currentElFacts,
-                            formAncestry = formAncestry,
-                            namingContainerAncestry = namingContainerAncestry,
-                            iterationAncestry = iterationAncestry,
+                            structuralContext = structuralContext,
                         )
                 }
             nodes += semanticNode
 
-            val nextFormAncestry =
-                if (semanticNode.isForm) {
-                    formAncestry + semanticNode.asAncestor()
-                } else {
-                    formAncestry
-                }
-            val nextNamingContainerAncestry =
-                if (semanticNode.isNamingContainer) {
-                    namingContainerAncestry + semanticNode.asAncestor()
-                } else {
-                    namingContainerAncestry
-                }
-            val nextIterationAncestry =
-                scopeModel.iterationAncestorFor(path, semanticNode)?.let { iterationAncestry + it } ?: iterationAncestry
+            val nextStructuralContext = structuralContext.extend(semanticNode, scopeModel, path)
 
             when (node) {
                 is LogicalElementNode ->
@@ -92,9 +71,7 @@ object SemanticNodeExtractor {
                         visit(
                             node = child,
                             path = path.child(index),
-                            formAncestry = nextFormAncestry,
-                            namingContainerAncestry = nextNamingContainerAncestry,
-                            iterationAncestry = nextIterationAncestry,
+                            structuralContext = nextStructuralContext,
                         )
                     }
 
@@ -103,9 +80,7 @@ object SemanticNodeExtractor {
                         visit(
                             node = child,
                             path = path.child(index),
-                            formAncestry = nextFormAncestry,
-                            namingContainerAncestry = nextNamingContainerAncestry,
-                            iterationAncestry = nextIterationAncestry,
+                            structuralContext = nextStructuralContext,
                         )
                     }
 
@@ -113,7 +88,7 @@ object SemanticNodeExtractor {
             }
         }
 
-        syntaxTree.root?.let { visit(it, LogicalNodePath.root(), emptyList(), emptyList(), emptyList()) }
+        syntaxTree.root?.let { visit(it, LogicalNodePath.root(), SemanticStructuralContext()) }
         return nodes
     }
 }
@@ -122,9 +97,7 @@ private fun LogicalElementNode.toSemanticNode(
     nodeId: SemanticNodeId,
     nodePath: LogicalNodePath,
     elFacts: List<SemanticNodeElFact>,
-    formAncestry: List<SemanticNodeAncestor>,
-    namingContainerAncestry: List<SemanticNodeAncestor>,
-    iterationAncestry: List<SemanticIterationAncestor>,
+    structuralContext: SemanticStructuralContext,
 ): SemanticNode =
     SemanticNode(
         nodeId = nodeId,
@@ -145,18 +118,14 @@ private fun LogicalElementNode.toSemanticNode(
                 .filter { it.name.localName in tagRule.targetAttributeNames }
                 .map(LogicalAttribute::toSemanticAttribute),
         elFacts = elFacts,
-        formAncestry = formAncestry,
-        namingContainerAncestry = namingContainerAncestry,
-        iterationAncestry = iterationAncestry,
+        structuralContext = structuralContext,
     )
 
 private fun LogicalIncludeNode.toSemanticNode(
     nodeId: SemanticNodeId,
     nodePath: LogicalNodePath,
     elFacts: List<SemanticNodeElFact>,
-    formAncestry: List<SemanticNodeAncestor>,
-    namingContainerAncestry: List<SemanticNodeAncestor>,
-    iterationAncestry: List<SemanticIterationAncestor>,
+    structuralContext: SemanticStructuralContext,
 ): SemanticNode =
     SemanticNode(
         nodeId = nodeId,
@@ -171,18 +140,14 @@ private fun LogicalIncludeNode.toSemanticNode(
         isNamingContainer = false,
         renderedAttribute = elFacts.firstOrNull { it.attributeName == "rendered" },
         elFacts = elFacts,
-        formAncestry = formAncestry,
-        namingContainerAncestry = namingContainerAncestry,
-        iterationAncestry = iterationAncestry,
+        structuralContext = structuralContext,
     )
 
 private fun LogicalTextNode.toSemanticNode(
     nodeId: SemanticNodeId,
     nodePath: LogicalNodePath,
     elFacts: List<SemanticNodeElFact>,
-    formAncestry: List<SemanticNodeAncestor>,
-    namingContainerAncestry: List<SemanticNodeAncestor>,
-    iterationAncestry: List<SemanticIterationAncestor>,
+    structuralContext: SemanticStructuralContext,
 ): SemanticNode =
     SemanticNode(
         nodeId = nodeId,
@@ -195,10 +160,36 @@ private fun LogicalTextNode.toSemanticNode(
         isForm = false,
         isNamingContainer = false,
         elFacts = elFacts,
-        formAncestry = formAncestry,
-        namingContainerAncestry = namingContainerAncestry,
-        iterationAncestry = iterationAncestry,
+        structuralContext = structuralContext,
     )
+
+private fun SemanticStructuralContext.extend(
+    semanticNode: SemanticNode,
+    scopeModel: ScopeStackModel,
+    path: LogicalNodePath,
+): SemanticStructuralContext {
+    val nextAncestor = semanticNode.asAncestor()
+    val nextFormAncestry =
+        if (semanticNode.isForm) {
+            formAncestry + nextAncestor
+        } else {
+            formAncestry
+        }
+    val nextNamingContainerAncestry =
+        if (semanticNode.isNamingContainer) {
+            namingContainerAncestry + nextAncestor
+        } else {
+            namingContainerAncestry
+        }
+    val nextIterationAncestry =
+        scopeModel.iterationAncestorFor(path, semanticNode)?.let { iterationAncestry + it } ?: iterationAncestry
+
+    return SemanticStructuralContext(
+        formAncestry = nextFormAncestry,
+        namingContainerAncestry = nextNamingContainerAncestry,
+        iterationAncestry = nextIterationAncestry,
+    )
+}
 
 private fun ScopeStackModel.iterationAncestorFor(
     path: LogicalNodePath,

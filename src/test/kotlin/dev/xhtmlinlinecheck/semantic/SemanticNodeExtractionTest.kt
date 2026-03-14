@@ -84,12 +84,12 @@ class SemanticNodeExtractionTest {
                 Tuple.tuple("update", "msgs panel"),
                 Tuple.tuple("process", "@this"),
             )
-        assertThat(panelNode.formAncestry.map { it.nodeName }).containsExactly("h:form")
-        assertThat(panelNode.namingContainerAncestry.map { it.nodeName }).containsExactly("h:form")
-        assertThat(panelNode.iterationAncestry)
+        assertThat(panelNode.structuralContext.formAncestry.map { it.nodeName }).containsExactly("h:form")
+        assertThat(panelNode.structuralContext.namingContainerAncestry.map { it.nodeName }).containsExactly("h:form")
+        assertThat(panelNode.structuralContext.iterationAncestry)
             .extracting("nodeName")
             .containsExactly("ui:repeat")
-        assertThat(panelNode.iterationAncestry.single().bindingOrigins.map { it.descriptor })
+        assertThat(panelNode.structuralContext.iterationAncestry.single().bindingOrigins.map { it.descriptor })
             .containsExactly("ui:repeat var=row", "ui:repeat varStatus=status")
         assertThat(panelNode.provenance.physicalLocation.document.displayPath).isEqualTo("fragments/body.xhtml")
         assertThat(panelNode.provenance.logicalLocation.document.displayPath).isEqualTo("legacy/root.xhtml")
@@ -124,9 +124,9 @@ class SemanticNodeExtractionTest {
             .containsExactly(Tuple.tuple(SemanticElCarrierKind.TEXT_NODE, "Hello #{bean.user}"))
         assertThat(textNode.elFacts.single().normalizedTemplate!!.render()).isEqualTo("Hello #{global(bean).user}")
         assertThat(textNode.elFacts.single().globalReferences.map { it.writtenName }).containsExactly("bean")
-        assertThat(textNode.formAncestry).isEmpty()
-        assertThat(textNode.namingContainerAncestry).isEmpty()
-        assertThat(textNode.iterationAncestry).isEmpty()
+        assertThat(textNode.structuralContext.formAncestry).isEmpty()
+        assertThat(textNode.structuralContext.namingContainerAncestry).isEmpty()
+        assertThat(textNode.structuralContext.iterationAncestry).isEmpty()
     }
 
     @Test
@@ -294,17 +294,20 @@ class SemanticNodeExtractionTest {
         val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
         val deepOutputNode = semanticModels.oldRoot.semanticNodes.single { it.explicitIdAttribute?.rawValue == "deepOutput" }
 
-        assertThat(deepOutputNode.formAncestry.map { it.nodeName }).containsExactly("h:form")
-        assertThat(deepOutputNode.namingContainerAncestry.map { it.nodeName }).containsExactly("h:form")
-        assertThat(deepOutputNode.iterationAncestry.map { it.nodeName }).containsExactly("ui:repeat", "c:forEach")
-        assertThat(deepOutputNode.iterationAncestry.flatMap { it.bindingOrigins }.map { it.descriptor })
+        assertThat(deepOutputNode.structuralContext.formAncestry.map { it.nodeName }).containsExactly("h:form")
+        assertThat(deepOutputNode.structuralContext.namingContainerAncestry.map { it.nodeName }).containsExactly("h:form")
+        assertThat(deepOutputNode.structuralContext.iterationAncestry.map { it.nodeName }).containsExactly("ui:repeat", "c:forEach")
+        assertThat(deepOutputNode.structuralContext.iterationAncestry.flatMap { it.bindingOrigins }.map { it.descriptor })
             .containsExactly(
                 "ui:repeat var=row",
                 "ui:repeat varStatus=rowStatus",
                 "c:forEach var=child",
                 "c:forEach varStatus=childStatus",
             )
-        assertThat(deepOutputNode.formAncestry + deepOutputNode.namingContainerAncestry)
+        assertThat(
+            deepOutputNode.structuralContext.formAncestry +
+                deepOutputNode.structuralContext.namingContainerAncestry,
+        )
             .allSatisfy { ancestor ->
                 assertThat(ancestor.nodeName).isNotEqualTo("ui:composition")
                 assertThat(ancestor.nodeName).isNotEqualTo("ui:fragment")

@@ -43,6 +43,12 @@ data class SemanticIterationAncestor(
     val bindingOrigins: List<BindingOrigin>,
 )
 
+data class SemanticStructuralContext(
+    val formAncestry: List<SemanticNodeAncestor> = emptyList(),
+    val namingContainerAncestry: List<SemanticNodeAncestor> = emptyList(),
+    val iterationAncestry: List<SemanticIterationAncestor> = emptyList(),
+)
+
 data class SemanticNodeElFact(
     val carrierKind: SemanticElCarrierKind,
     val ownerName: String? = null,
@@ -75,7 +81,14 @@ data class SemanticNode(
     val renderedAttribute: SemanticNodeElFact? = null,
     val targetAttributes: List<SemanticNodeAttribute> = emptyList(),
     val elFacts: List<SemanticNodeElFact> = emptyList(),
-    val formAncestry: List<SemanticNodeAncestor> = emptyList(),
-    val namingContainerAncestry: List<SemanticNodeAncestor> = emptyList(),
-    val iterationAncestry: List<SemanticIterationAncestor> = emptyList(),
-)
+    val structuralContext: SemanticStructuralContext = SemanticStructuralContext(),
+) {
+    val formAncestry: List<SemanticNodeAncestor>
+        get() = structuralContext.formAncestry
+
+    val namingContainerAncestry: List<SemanticNodeAncestor>
+        get() = structuralContext.namingContainerAncestry
+
+    val iterationAncestry: List<SemanticIterationAncestor>
+        get() = structuralContext.iterationAncestry
+}
