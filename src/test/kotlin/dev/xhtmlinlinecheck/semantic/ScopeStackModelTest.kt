@@ -66,7 +66,7 @@ class ScopeStackModelTest {
             .containsExactly(dev.xhtmlinlinecheck.domain.BindingKind.VAR_STATUS, "ui:repeat varStatus=status")
         assertThat(scopeModel.resolve("row", nestedValuePath))
             .extracting("kind", "origin.descriptor")
-            .containsExactly(dev.xhtmlinlinecheck.domain.BindingKind.C_FOR_EACH, "c:forEach var=row")
+            .containsExactly(dev.xhtmlinlinecheck.domain.BindingKind.ITERATION_VAR, "c:forEach var=row")
         assertThat(scopeModel.resolve("loop", nestedValuePath))
             .extracting("kind", "writtenName")
             .containsExactly(dev.xhtmlinlinecheck.domain.BindingKind.VAR_STATUS, "loop")

@@ -148,7 +148,7 @@ object BuiltInTagRuleRegistry : TagRuleRegistry by StaticTagRuleRegistry(
                     bindingRules =
                         listOf(
                             BindingCreationRule(
-                                kind = BindingKind.C_FOR_EACH,
+                                kind = BindingKind.ITERATION_VAR,
                                 nameAttribute = "var",
                             ),
                             BindingCreationRule(

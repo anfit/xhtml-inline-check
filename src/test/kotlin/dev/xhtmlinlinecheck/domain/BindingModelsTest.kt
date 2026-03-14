@@ -12,7 +12,6 @@ class BindingModelsTest {
                 BindingKind.ITERATION_VAR,
                 BindingKind.VAR_STATUS,
                 BindingKind.C_SET,
-                BindingKind.C_FOR_EACH,
                 BindingKind.IMPLICIT_GLOBAL,
             )
     }

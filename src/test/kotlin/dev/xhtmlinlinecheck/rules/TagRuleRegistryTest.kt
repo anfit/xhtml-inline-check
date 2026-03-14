@@ -70,7 +70,7 @@ class TagRuleRegistryTest {
         assertThat(forEachRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
         assertThat(forEachRule.bindingRules).containsExactly(
             BindingCreationRule(
-                kind = BindingKind.C_FOR_EACH,
+                kind = BindingKind.ITERATION_VAR,
                 nameAttribute = "var",
             ),
             BindingCreationRule(
@@ -125,7 +125,7 @@ class TagRuleRegistryTest {
                                 bindingRules =
                                     listOf(
                                         BindingCreationRule(
-                                            kind = BindingKind.C_FOR_EACH,
+                                            kind = BindingKind.ITERATION_VAR,
                                             nameAttribute = "namespaceVar",
                                         ),
                                     ),
@@ -157,7 +157,7 @@ class TagRuleRegistryTest {
                 nameAttribute = "exactVar",
             ),
             BindingCreationRule(
-                kind = BindingKind.C_FOR_EACH,
+                kind = BindingKind.ITERATION_VAR,
                 nameAttribute = "namespaceVar",
             ),
             BindingCreationRule(

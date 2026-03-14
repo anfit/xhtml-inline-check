@@ -245,7 +245,6 @@ private class ScopeStackBuilder {
             BindingKind.ITERATION_VAR -> "$tagName var=$writtenName"
             BindingKind.VAR_STATUS -> "$tagName varStatus=$writtenName"
             BindingKind.C_SET -> "$tagName var=$writtenName"
-            BindingKind.C_FOR_EACH -> "$tagName var=$writtenName"
             BindingKind.IMPLICIT_GLOBAL -> "implicit global $writtenName"
         }
     }
