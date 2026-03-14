@@ -1,5 +1,3 @@
-Add registry rules for `ui:include`, `ui:param`, `ui:composition`, and `ui:fragment`, building on the parser and transparent-wrapper tasks so include-related behavior is explicit.
-Add a registry rule for `ui:repeat`, because the binding, iteration-ancestry, EL-normalization, and variable-capture comparison tasks depend on its semantics.
 Add registry rules for `c:set`, `c:forEach`, and `c:if`, extending the same registry introduced for Facelets tags so JSTL-controlled scope and guards can be modeled consistently.
 Add a registry rule for `h:form`, because the form-ancestry, target-resolution, and moved-component diagnostics tasks depend on it.
 Add generic JSF or component rules for `id`, `rendered`, `for`, `update`, `render`, `process`, and `execute`, connecting the registry work to semantic extraction and target comparison.

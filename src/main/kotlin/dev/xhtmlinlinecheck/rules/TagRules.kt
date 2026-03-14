@@ -30,6 +30,7 @@ data class BindingCreationRule(
 interface TagRule {
     val syntaxRole: SyntaxRole
     val bindingRules: List<BindingCreationRule>
+    val inheritsFallbackRule: Boolean
     val isTransparentStructureWrapper: Boolean
     val isNamingContainer: Boolean
     val elAttributeNames: Set<String>
@@ -39,6 +40,7 @@ interface TagRule {
 data class StaticTagRule(
     override val syntaxRole: SyntaxRole = SyntaxRole.ELEMENT,
     override val bindingRules: List<BindingCreationRule> = emptyList(),
+    override val inheritsFallbackRule: Boolean = true,
     override val isTransparentStructureWrapper: Boolean = false,
     override val isNamingContainer: Boolean = false,
     override val elAttributeNames: Set<String> = emptySet(),
@@ -66,19 +68,23 @@ internal class StaticTagRuleRegistry(
     private val fallbackRule: TagRule? = null,
 ) : TagRuleRegistry {
     override fun ruleFor(name: LogicalName): TagRule? {
-        var resolved = fallbackRule
         val namespaceRule = name.namespaceUri?.let(namespaceDefaults::get)
         val exactRule = exactRules[TagSelector(namespaceUri = name.namespaceUri, localName = name.localName)]
-
-        if (namespaceRule != null) {
-            resolved = resolved?.let(namespaceRule::overlay) ?: namespaceRule
-        }
+        var resolved: TagRule? = namespaceRule
 
         if (exactRule != null) {
             resolved = resolved?.let(exactRule::overlay) ?: exactRule
         }
 
-        return resolved
+        if (resolved == null) {
+            return fallbackRule
+        }
+
+        return if (resolved.inheritsFallbackRule) {
+            fallbackRule?.let { resolved.overlay(it) } ?: resolved
+        } else {
+            resolved
+        }
     }
 
     override fun resolve(name: LogicalName): TagRule = ruleFor(name) ?: DEFAULT_TAG_RULE
@@ -90,12 +96,14 @@ object BuiltInTagRuleRegistry : TagRuleRegistry by StaticTagRuleRegistry(
             TagSelector(FACELETS_NAMESPACE, "include") to
                 StaticTagRule(
                     syntaxRole = SyntaxRole.INCLUDE,
+                    inheritsFallbackRule = false,
                     isTransparentStructureWrapper = true,
                     elAttributeNames = linkedSetOf("src"),
                 ),
             TagSelector(FACELETS_NAMESPACE, "param") to
                 StaticTagRule(
                     syntaxRole = SyntaxRole.INCLUDE_PARAMETER,
+                    inheritsFallbackRule = false,
                     bindingRules =
                         listOf(
                             BindingCreationRule(
@@ -107,9 +115,15 @@ object BuiltInTagRuleRegistry : TagRuleRegistry by StaticTagRuleRegistry(
                     elAttributeNames = linkedSetOf("value"),
                 ),
             TagSelector(FACELETS_NAMESPACE, "composition") to
-                StaticTagRule(isTransparentStructureWrapper = true),
+                StaticTagRule(
+                    inheritsFallbackRule = false,
+                    isTransparentStructureWrapper = true,
+                ),
             TagSelector(FACELETS_NAMESPACE, "fragment") to
-                StaticTagRule(isTransparentStructureWrapper = true),
+                StaticTagRule(
+                    inheritsFallbackRule = false,
+                    isTransparentStructureWrapper = true,
+                ),
             TagSelector(FACELETS_NAMESPACE, "repeat") to
                 StaticTagRule(
                     bindingRules =
@@ -187,6 +201,7 @@ private fun TagRule.overlay(base: TagRule): TagRule =
     StaticTagRule(
         syntaxRole = if (syntaxRole != SyntaxRole.ELEMENT) syntaxRole else base.syntaxRole,
         bindingRules = (bindingRules + base.bindingRules).distinct(),
+        inheritsFallbackRule = inheritsFallbackRule && base.inheritsFallbackRule,
         isTransparentStructureWrapper = isTransparentStructureWrapper || base.isTransparentStructureWrapper,
         isNamingContainer = isNamingContainer || base.isNamingContainer,
         elAttributeNames = (elAttributeNames + base.elAttributeNames).toLinkedSet(),

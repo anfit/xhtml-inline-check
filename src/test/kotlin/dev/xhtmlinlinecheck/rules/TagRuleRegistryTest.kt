@@ -21,7 +21,10 @@ class TagRuleRegistryTest {
         assertThat(compositionRule).isNotNull()
         assertThat(compositionRule!!.isTransparentStructureWrapper).isTrue()
         assertThat(compositionRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(compositionRule.inheritsFallbackRule).isFalse()
         assertThat(compositionRule.bindingRules).isEmpty()
+        assertThat(compositionRule.elAttributeNames).isEmpty()
+        assertThat(compositionRule.targetAttributeNames).isEmpty()
     }
 
     @Test
@@ -82,8 +85,37 @@ class TagRuleRegistryTest {
 
         assertThat(includeRule.syntaxRole).isEqualTo(SyntaxRole.INCLUDE)
         assertThat(includeRule.isIncludeTag).isTrue()
+        assertThat(includeRule.inheritsFallbackRule).isFalse()
+        assertThat(includeRule.isTransparentStructureWrapper).isTrue()
+        assertThat(includeRule.elAttributeNames).containsExactly("src")
+        assertThat(includeRule.targetAttributeNames).isEmpty()
         assertThat(paramRule.syntaxRole).isEqualTo(SyntaxRole.INCLUDE_PARAMETER)
         assertThat(paramRule.isIncludeParameterTag).isTrue()
+        assertThat(paramRule.inheritsFallbackRule).isFalse()
+        assertThat(paramRule.bindingRules).containsExactly(
+            BindingCreationRule(
+                kind = BindingKind.INCLUDE_PARAMETER,
+                nameAttribute = "name",
+                valueAttribute = "value",
+            ),
+        )
+        assertThat(paramRule.elAttributeNames).containsExactly("value")
+        assertThat(paramRule.targetAttributeNames).isEmpty()
+    }
+
+    @Test
+    fun `transparent facelets wrappers stay explicit instead of inheriting generic component attributes`() {
+        val compositionRule = registry.resolve(LogicalName(localName = "composition", namespaceUri = FACELETS_NAMESPACE))
+        val fragmentRule = registry.resolve(LogicalName(localName = "fragment", namespaceUri = FACELETS_NAMESPACE))
+
+        assertThat(compositionRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(compositionRule.isTransparentStructureWrapper).isTrue()
+        assertThat(compositionRule.elAttributeNames).isEmpty()
+        assertThat(compositionRule.targetAttributeNames).isEmpty()
+        assertThat(fragmentRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(fragmentRule.isTransparentStructureWrapper).isTrue()
+        assertThat(fragmentRule.elAttributeNames).isEmpty()
+        assertThat(fragmentRule.targetAttributeNames).isEmpty()
     }
 
     @Test
