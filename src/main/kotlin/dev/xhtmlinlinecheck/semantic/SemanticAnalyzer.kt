@@ -21,6 +21,7 @@ fun interface SemanticAnalyzer {
                         syntaxTree = parsedTrees.oldRoot.syntaxTree,
                         tagRules = tagRules,
                         scopeModel = ScopeStackModel.fromSyntaxTree(parsedTrees.oldRoot.syntaxTree),
+                        elOccurrences = SemanticElExtractor.extract(parsedTrees.oldRoot.syntaxTree, tagRules),
                     ),
                     newRoot = SemanticModel(
                         document = parsedTrees.newRoot.document,
@@ -28,6 +29,7 @@ fun interface SemanticAnalyzer {
                         syntaxTree = parsedTrees.newRoot.syntaxTree,
                         tagRules = tagRules,
                         scopeModel = ScopeStackModel.fromSyntaxTree(parsedTrees.newRoot.syntaxTree),
+                        elOccurrences = SemanticElExtractor.extract(parsedTrees.newRoot.syntaxTree, tagRules),
                     ),
                 )
             }

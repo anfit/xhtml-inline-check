@@ -1,4 +1,3 @@
-Implement EL extraction from semantically relevant attributes first, using the tag registry as the source of truth for which attributes should feed the EL pipeline.
 Implement EL extraction from text nodes where the MVP needs it, extending the same extraction path used for attributes so mixed XHTML content is not silently ignored.
 Emit explicit unsupported diagnostics for extracted EL forms outside the MVP subset so unsupported syntax contributes to `INCONCLUSIVE` instead of degrading into silent fallback behavior.
 Implement symbolic EL normalization for local bindings to canonical ids, using the scope stack and binding-origin models so safe alpha-renames compare equal.
