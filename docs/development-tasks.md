@@ -1,4 +1,3 @@
-Implement EL tokenization and parsing for root identifiers, property chains, index access, method-call roots where required by the spec, boolean expressions, and ternaries so supported EL can be processed deterministically.
 Add unit tests for EL parsing that cover nested property access, index expressions, booleans, ternaries, and unsupported constructs so grammar boundaries are locked before semantic comparison work deepens.
 Implement EL extraction from semantically relevant attributes first, using the tag registry as the source of truth for which attributes should feed the EL pipeline.
 Implement EL extraction from text nodes where the MVP needs it, extending the same extraction path used for attributes so mixed XHTML content is not silently ignored.
