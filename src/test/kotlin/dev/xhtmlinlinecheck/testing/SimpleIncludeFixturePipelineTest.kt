@@ -156,4 +156,77 @@ class SimpleIncludeFixturePipelineTest {
             .isEqualTo("fixtures/support/missing-include/old/fragments/missing.xhtml")
         assertThat(includeNode.parameters.map { it.name }).containsExactly("label")
     }
+
+    @Test
+    fun `include cycle fixture records recursive provenance on the source graph and logical boundary`() {
+        val scenario = FixtureScenarios.scenario("support/include-cycle")
+
+        val loadedSources = SourceLoader.scaffold().load(
+            AnalysisRequest(
+                oldRoot = FixtureScenarios.repositoryRoot.relativize(scenario.oldRoot),
+                newRoot = FixtureScenarios.repositoryRoot.relativize(scenario.newRoot),
+                baseOld = FixtureScenarios.repositoryRoot,
+                baseNew = FixtureScenarios.repositoryRoot,
+            ),
+        )
+
+        val outerIncludeEdge = loadedSources.oldRoot.sourceGraphFile.includeEdges.single()
+        val outerFile = outerIncludeEdge.includedFile!!
+        val recursiveEdge = outerFile.includeEdges.single()
+
+        assertThat(outerIncludeEdge.sourcePath).isEqualTo("fragments/outer.xhtml")
+        assertThat(outerIncludeEdge.parameters.map { it.name }).containsExactly("rootLabel")
+        assertThat(outerIncludeEdge.parameters.single().provenance.logicalLocation.render())
+            .startsWith("fixtures/support/include-cycle/old/root.xhtml:3:")
+
+        assertThat(outerFile.provenance.includeStack).hasSize(1)
+        assertThat(outerFile.provenance.includeStack.single().includedDocument.displayPath)
+            .isEqualTo("fixtures/support/include-cycle/old/fragments/outer.xhtml")
+        assertThat(outerFile.provenance.includeStack.single().parameterNames).containsExactly("rootLabel")
+
+        assertThat(recursiveEdge.sourcePath).isEqualTo("../root.xhtml")
+        assertThat(recursiveEdge.includedDocument).isNotNull()
+        assertThat(recursiveEdge.includedDocument!!.displayPath)
+            .isEqualTo("fixtures/support/include-cycle/old/root.xhtml")
+        assertThat(recursiveEdge.includedFile).isNull()
+        assertThat(recursiveEdge.stackBefore.steps).hasSize(1)
+        assertThat(recursiveEdge.stackBefore.steps.single().includedDocument.displayPath)
+            .isEqualTo("fixtures/support/include-cycle/old/fragments/outer.xhtml")
+        assertThat(recursiveEdge.stackBefore.steps.single().parameterNames).containsExactly("rootLabel")
+        assertThat(recursiveEdge.parameters.map { it.name }).containsExactly("cycleLabel")
+        assertThat(recursiveEdge.parameters.single().valueExpression).isEqualTo("#{rootLabel}")
+        assertThat(recursiveEdge.includeFailure).isNotNull()
+        assertThat(recursiveEdge.includeFailure!!.cycleDocuments.map { it.displayPath })
+            .containsExactly(
+                "fixtures/support/include-cycle/old/root.xhtml",
+                "fixtures/support/include-cycle/old/fragments/outer.xhtml",
+                "fixtures/support/include-cycle/old/root.xhtml",
+            )
+
+        val parsedTrees = XhtmlSyntaxParser.scaffold().parse(loadedSources)
+        val outerInclude = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+        val outerRoot = outerInclude.children.single() as LogicalElementNode
+        val recursiveInclude = outerRoot.children.single() as LogicalIncludeNode
+
+        assertThat(recursiveInclude.sourcePath).isEqualTo("../root.xhtml")
+        assertThat(recursiveInclude.parameters.map { it.name }).containsExactly("cycleLabel")
+        assertThat(recursiveInclude.provenance.logicalLocation.render())
+            .startsWith("fixtures/support/include-cycle/old/fragments/outer.xhtml:2:")
+        assertThat(recursiveInclude.provenance.logicalLocation.attributeName).isEqualTo("src")
+        assertThat(recursiveInclude.provenance.includeStack).hasSize(1)
+        assertThat(recursiveInclude.provenance.includeStack.single().includeSite.render())
+            .startsWith("fixtures/support/include-cycle/old/root.xhtml:2:")
+        assertThat(recursiveInclude.provenance.includeStack.single().includedDocument.displayPath)
+            .isEqualTo("fixtures/support/include-cycle/old/fragments/outer.xhtml")
+        assertThat(recursiveInclude.provenance.includeStack.single().parameterNames)
+            .containsExactly("rootLabel")
+        assertThat(recursiveInclude.children).isEmpty()
+        assertThat(recursiveInclude.includeFailure).isNotNull()
+        assertThat(recursiveInclude.includeFailure!!.cycleDocuments.map { it.displayPath })
+            .containsExactly(
+                "fixtures/support/include-cycle/old/root.xhtml",
+                "fixtures/support/include-cycle/old/fragments/outer.xhtml",
+                "fixtures/support/include-cycle/old/root.xhtml",
+            )
+    }
 }

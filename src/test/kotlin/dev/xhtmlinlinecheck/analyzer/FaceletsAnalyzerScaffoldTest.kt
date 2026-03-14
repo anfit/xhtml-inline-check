@@ -212,4 +212,41 @@ class FaceletsAnalyzerScaffoldTest {
                     "fixtures/support/missing-include/old/fragments/missing.xhtml",
             )
     }
+
+    @Test
+    fun `include cycle fixture keeps dedicated diagnostic provenance stable`() {
+        val scenario = FixtureScenarios.scenario("support/include-cycle")
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = FixtureScenarios.repositoryRoot.relativize(scenario.oldRoot),
+                newRoot = FixtureScenarios.repositoryRoot.relativize(scenario.newRoot),
+                baseOld = FixtureScenarios.repositoryRoot,
+                baseNew = FixtureScenarios.repositoryRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasProblemCount(2)
+            .hasWarningCount(2)
+            .hasProblemIds(
+                "W-UNSUPPORTED-INCLUDE_CYCLE",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().summary).isEqualTo("Recursive include cycle detected")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.render())
+            .startsWith("fixtures/support/include-cycle/old/fragments/outer.xhtml:2:")
+        assertThat(report.problems.first().locations.old?.physicalLocation?.render())
+            .startsWith("fixtures/support/include-cycle/old/fragments/outer.xhtml:2:")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.attributeName).isEqualTo("src")
+        assertThat(report.problems.first().locations.old?.physicalLocation?.attributeName).isEqualTo("src")
+        assertThat(report.problems.first().locations.old?.snippet).isEqualTo("../root.xhtml")
+        assertThat(report.problems.first().explanation)
+            .contains(
+                "fixtures/support/include-cycle/old/root.xhtml -> " +
+                    "fixtures/support/include-cycle/old/fragments/outer.xhtml -> " +
+                    "fixtures/support/include-cycle/old/root.xhtml",
+            )
+    }
 }

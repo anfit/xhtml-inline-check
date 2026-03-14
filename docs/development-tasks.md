@@ -1,4 +1,3 @@
-Add fixture tests for include cycles, targeting the cycle-detection task and proving the source graph records recursive provenance correctly.
 Add fixture tests for dynamic includes causing inconclusive results, tying together the dynamic-include diagnostic task with the result-model task.
 Choose and wire a namespace-aware XML parser that can support the syntax-tree, source-location, namespace-rule, and attribute-extraction tasks that follow.
 Parse expanded XHTML into an internal syntax tree instead of using raw DOM directly downstream, building on the parser-selection and logical-tree-expansion tasks.
