@@ -6,6 +6,7 @@ import dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailureKind
 import dev.xhtmlinlinecheck.loader.SourceLoader
 import dev.xhtmlinlinecheck.syntax.LogicalElementNode
 import dev.xhtmlinlinecheck.syntax.LogicalIncludeNode
+import dev.xhtmlinlinecheck.syntax.LogicalTextNode
 import dev.xhtmlinlinecheck.syntax.XhtmlSyntaxParser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -106,7 +107,7 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(output.provenance.physicalLocation.render())
             .startsWith("fixtures/support/include-expansion-nested/old/fragments/content.xhtml:2:")
         assertThat(output.provenance.logicalLocation.render())
-            .startsWith("fixtures/support/include-expansion-nested/old/fragments/layout.xhtml:4:")
+            .startsWith("fixtures/support/include-expansion-nested/old/fragments/layout.xhtml:3:")
         assertThat(output.provenance.includeStack.map { it.includedDocument.displayPath })
             .containsExactly(
                 "fixtures/support/include-expansion-nested/old/fragments/layout.xhtml",
@@ -119,6 +120,70 @@ class SimpleIncludeFixturePipelineTest {
             )
         assertThat(output.attributes.single { it.name.localName == "styleClass" }.value).isEqualTo("#{wrapperClass}")
         assertThat(output.attributes.single { it.name.localName == "value" }.value).isEqualTo("#{resolvedLabel}")
+    }
+
+    @Test
+    fun `include provenance fixture keeps include-site logical provenance on expanded syntax nodes`() {
+        val scenario = FixtureScenarios.scenario("support/include-provenance-syntax")
+
+        val loadedSources = SourceLoader.scaffold().load(
+            AnalysisRequest(
+                oldRoot = FixtureScenarios.repositoryRoot.relativize(scenario.oldRoot),
+                newRoot = FixtureScenarios.repositoryRoot.relativize(scenario.newRoot),
+                baseOld = FixtureScenarios.repositoryRoot,
+                baseNew = FixtureScenarios.repositoryRoot,
+            ),
+        )
+
+        val includeEdge = loadedSources.oldRoot.sourceGraphFile.includeEdges.single()
+
+        assertThat(includeEdge.sourcePath).isEqualTo("/fragments/card.xhtml")
+        assertThat(includeEdge.includeSite.render())
+            .startsWith("fixtures/support/include-provenance-syntax/old/root.xhtml:3:")
+        assertThat(includeEdge.parameters.map { it.name }).containsExactly("title")
+        assertThat(includeEdge.parameters.single().provenance.logicalLocation.render())
+            .startsWith("fixtures/support/include-provenance-syntax/old/root.xhtml:4:")
+
+        val parsedTrees = XhtmlSyntaxParser.scaffold().parse(loadedSources)
+        val host = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalElementNode
+        val includeNode = host.children.single() as LogicalIncludeNode
+        val fragmentRoot = includeNode.children.single() as LogicalElementNode
+        val card = fragmentRoot.children.single() as LogicalElementNode
+        val introText = card.children.first() as LogicalTextNode
+        val output = card.children.last() as LogicalElementNode
+
+        assertThat(includeNode.provenance.logicalLocation.render())
+            .startsWith("fixtures/support/include-provenance-syntax/old/root.xhtml:3:")
+        assertThat(includeNode.provenance.includeStack).isEmpty()
+
+        assertThat(card.location.render())
+            .startsWith("fixtures/support/include-provenance-syntax/old/fragments/card.xhtml:2:")
+        assertThat(card.provenance.physicalLocation.render())
+            .startsWith("fixtures/support/include-provenance-syntax/old/fragments/card.xhtml:2:")
+        assertThat(card.provenance.logicalLocation.render())
+            .startsWith("fixtures/support/include-provenance-syntax/old/root.xhtml:3:")
+        assertThat(card.provenance.includeStack.single().includeSite.render())
+            .startsWith("fixtures/support/include-provenance-syntax/old/root.xhtml:3:")
+        assertThat(card.provenance.includeStack.single().includedDocument.displayPath)
+            .isEqualTo("fixtures/support/include-provenance-syntax/old/fragments/card.xhtml")
+        assertThat(card.provenance.includeStack.single().parameterNames).containsExactly("title")
+
+        assertThat(introText.text.trim()).isEqualTo("Intro")
+        assertThat(introText.location.render())
+            .startsWith("fixtures/support/include-provenance-syntax/old/fragments/card.xhtml:2:")
+        assertThat(introText.provenance.physicalLocation.render())
+            .startsWith("fixtures/support/include-provenance-syntax/old/fragments/card.xhtml:2:")
+        assertThat(introText.provenance.logicalLocation.render())
+            .startsWith("fixtures/support/include-provenance-syntax/old/root.xhtml:3:")
+        assertThat(introText.provenance.includeStack.single().parameterNames).containsExactly("title")
+
+        assertThat(output.location.render())
+            .startsWith("fixtures/support/include-provenance-syntax/old/fragments/card.xhtml:4:")
+        assertThat(output.provenance.physicalLocation.render())
+            .startsWith("fixtures/support/include-provenance-syntax/old/fragments/card.xhtml:4:")
+        assertThat(output.provenance.logicalLocation.render())
+            .startsWith("fixtures/support/include-provenance-syntax/old/root.xhtml:3:")
+        assertThat(output.attributes.single { it.name.localName == "value" }.value).isEqualTo("#{title}")
     }
 
     @Test
@@ -143,7 +208,7 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(includeEdge.includeSite.attributeLocationPrecision).isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
         assertThat(includeEdge.includedDocument).isNotNull()
         assertThat(includeEdge.includedDocument!!.displayPath)
-            .isEqualTo("fixtures/support/missing-include/old/fragments/missing.xhtml")
+            .isEqualTo("fragments/missing.xhtml")
         assertThat(includeEdge.includedFile).isNull()
         assertThat(includeEdge.includeFailure).isNotNull()
         assertThat(includeEdge.includeFailure!!.missingDocument).isEqualTo(includeEdge.includedDocument)
@@ -166,7 +231,7 @@ class SimpleIncludeFixturePipelineTest {
             .isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
         assertThat(includeNode.includeFailure).isNotNull()
         assertThat(includeNode.includeFailure!!.missingDocument!!.displayPath)
-            .isEqualTo("fixtures/support/missing-include/old/fragments/missing.xhtml")
+            .isEqualTo("fragments/missing.xhtml")
         assertThat(includeNode.parameters.map { it.name }).containsExactly("label")
     }
 
