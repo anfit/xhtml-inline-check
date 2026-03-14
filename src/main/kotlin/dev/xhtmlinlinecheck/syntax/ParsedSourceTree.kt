@@ -8,7 +8,7 @@ data class ParsedSourceTree(
     val document: SourceDocument,
     val provenance: Provenance,
     val sourceGraphFile: SourceGraphFile,
-    val rootNode: LogicalElementNode?,
+    val syntaxTree: XhtmlSyntaxTree,
 ) {
     init {
         require(sourceGraphFile.document == document) {

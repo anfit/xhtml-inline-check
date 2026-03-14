@@ -44,7 +44,7 @@ class XhtmlSyntaxParserNamespaceAwareTest {
             ),
         )
 
-        val root = parsedTrees.oldRoot.rootNode!!
+        val root = parsedTrees.oldRoot.syntaxTree.root!!
         val panel = root.children.single() as LogicalElementNode
 
         assertThat(root.name.prefix).isEqualTo("ui")
@@ -95,7 +95,7 @@ class XhtmlSyntaxParserNamespaceAwareTest {
             ),
         )
 
-        val output = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalElementNode
+        val output = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalElementNode
         val valueAttribute = output.attributes.single { it.name.localName == "value" }
 
         assertThat(output.provenance.logicalLocation.render()).startsWith("legacy/root.xhtml:2:")

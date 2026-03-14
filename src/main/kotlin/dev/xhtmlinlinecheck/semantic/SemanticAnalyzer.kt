@@ -17,14 +17,12 @@ fun interface SemanticAnalyzer {
                     oldRoot = SemanticModel(
                         document = parsedTrees.oldRoot.document,
                         provenance = parsedTrees.oldRoot.provenance,
-                        sourceGraphFile = parsedTrees.oldRoot.sourceGraphFile,
-                        rootNode = parsedTrees.oldRoot.rootNode,
+                        syntaxTree = parsedTrees.oldRoot.syntaxTree,
                     ),
                     newRoot = SemanticModel(
                         document = parsedTrees.newRoot.document,
                         provenance = parsedTrees.newRoot.provenance,
-                        sourceGraphFile = parsedTrees.newRoot.sourceGraphFile,
-                        rootNode = parsedTrees.newRoot.rootNode,
+                        syntaxTree = parsedTrees.newRoot.syntaxTree,
                     ),
                 )
             }

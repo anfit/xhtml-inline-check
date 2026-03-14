@@ -51,7 +51,7 @@ class XhtmlSyntaxParserIncludeExpansionTest {
             ),
         )
 
-        val includeNode = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+        val includeNode = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalIncludeNode
         val expandedRoot = includeNode.children.single() as LogicalElementNode
         val output = expandedRoot.children.single() as LogicalElementNode
 
@@ -96,7 +96,7 @@ class XhtmlSyntaxParserIncludeExpansionTest {
             ),
         )
 
-        val includeNode = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+        val includeNode = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalIncludeNode
 
         assertThat(includeNode.sourcePath).isEqualTo("#{bean.fragmentPath}")
         assertThat(includeNode.expandedFile).isNull()
@@ -152,7 +152,7 @@ class XhtmlSyntaxParserIncludeExpansionTest {
             ),
         )
 
-        val outerInclude = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+        val outerInclude = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalIncludeNode
         val outerRoot = outerInclude.children.single() as LogicalElementNode
         val innerInclude = outerRoot.children.single() as LogicalIncludeNode
         val innerRoot = innerInclude.children.single() as LogicalElementNode
@@ -201,7 +201,7 @@ class XhtmlSyntaxParserIncludeExpansionTest {
             ),
         )
 
-        val outerInclude = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+        val outerInclude = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalIncludeNode
         val outerRoot = outerInclude.children.single() as LogicalElementNode
         val recursiveInclude = outerRoot.children.single() as LogicalIncludeNode
 
@@ -242,7 +242,7 @@ class XhtmlSyntaxParserIncludeExpansionTest {
             ),
         )
 
-        val includeNode = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+        val includeNode = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalIncludeNode
 
         assertThat(includeNode.sourcePath).isEqualTo("/fragments/missing.xhtml")
         assertThat(includeNode.expandedFile).isNull()

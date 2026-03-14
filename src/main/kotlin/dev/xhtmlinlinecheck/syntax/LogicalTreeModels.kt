@@ -27,6 +27,10 @@ sealed interface LogicalNode {
     val provenance: Provenance
 }
 
+data class XhtmlSyntaxTree(
+    val root: LogicalElementNode?,
+)
+
 data class LogicalElementNode(
     val name: LogicalName,
     val attributes: List<LogicalAttribute>,
@@ -49,3 +53,16 @@ data class LogicalIncludeNode(
     val children: List<LogicalNode> = emptyList(),
     override val provenance: Provenance,
 ) : LogicalNode
+
+fun XhtmlSyntaxTree.walkDepthFirst(visitor: (LogicalNode) -> Unit) {
+    fun visit(node: LogicalNode) {
+        visitor(node)
+        when (node) {
+            is LogicalElementNode -> node.children.forEach(::visit)
+            is LogicalIncludeNode -> node.children.forEach(::visit)
+            is LogicalTextNode -> Unit
+        }
+    }
+
+    root?.let(::visit)
+}

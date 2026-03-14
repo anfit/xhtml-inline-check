@@ -1,4 +1,3 @@
-Parse expanded XHTML into an internal syntax tree instead of using raw DOM directly downstream, building on the parser-selection and logical-tree-expansion tasks.
 Preserve element names, namespaces, attributes, and child ordering in the syntax tree so the rule-registry, semantic-extraction, and comparator tasks have stable raw material.
 Preserve source locations for elements in the syntax tree, reusing the shared location model so later diagnostics can point to real files.
 Preserve attribute-level location where the chosen parser can support it, or explicitly attach element-plus-attribute fallback metadata so EL, target, and reporter tasks can still be precise.

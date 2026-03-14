@@ -40,7 +40,7 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(includeEdge.parameters.single().valueExpression).isEqualTo("#{bean.label}")
 
         val parsedTrees = XhtmlSyntaxParser.scaffold().parse(loadedSources)
-        val includeNode = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+        val includeNode = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalIncludeNode
         val expandedRoot = includeNode.children.single() as LogicalElementNode
         val output = expandedRoot.children.single() as LogicalElementNode
 
@@ -90,7 +90,7 @@ class SimpleIncludeFixturePipelineTest {
             .startsWith("fixtures/support/include-expansion-nested/old/fragments/layout.xhtml:5:")
 
         val parsedTrees = XhtmlSyntaxParser.scaffold().parse(loadedSources)
-        val outerInclude = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+        val outerInclude = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalIncludeNode
         val layoutRoot = outerInclude.children.single() as LogicalElementNode
         val layoutPanel = layoutRoot.children.single() as LogicalElementNode
         val innerInclude = layoutPanel.children.single() as LogicalIncludeNode
@@ -145,7 +145,7 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(includeEdge.parameters.single().provenance.logicalLocation.attributeName).isEqualTo("value")
 
         val parsedTrees = XhtmlSyntaxParser.scaffold().parse(loadedSources)
-        val includeNode = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+        val includeNode = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalIncludeNode
 
         assertThat(includeNode.sourcePath).isEqualTo("/fragments/missing.xhtml")
         assertThat(includeNode.children).isEmpty()
@@ -205,7 +205,7 @@ class SimpleIncludeFixturePipelineTest {
             )
 
         val parsedTrees = XhtmlSyntaxParser.scaffold().parse(loadedSources)
-        val outerInclude = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+        val outerInclude = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalIncludeNode
         val outerRoot = outerInclude.children.single() as LogicalElementNode
         val recursiveInclude = outerRoot.children.single() as LogicalIncludeNode
 
@@ -259,7 +259,7 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(includeEdge.parameters.single().valueExpression).isEqualTo("#{bean.label}")
 
         val parsedTrees = XhtmlSyntaxParser.scaffold().parse(loadedSources)
-        val includeNode = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+        val includeNode = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalIncludeNode
 
         assertThat(includeNode.sourcePath).isEqualTo("#{bean.fragmentPath}")
         assertThat(includeNode.children).isEmpty()

@@ -33,7 +33,7 @@ fun interface XhtmlSyntaxParser {
                 document = document,
                 provenance = provenance,
                 sourceGraphFile = sourceGraphFile,
-                rootNode = LogicalTreeBuilder.parse(sourceGraphFile),
+                syntaxTree = XhtmlSyntaxTree(root = LogicalTreeBuilder.parse(sourceGraphFile)),
             )
     }
 }

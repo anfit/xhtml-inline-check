@@ -18,9 +18,9 @@ import dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailureKind
 import dev.xhtmlinlinecheck.domain.WarningIds
 import dev.xhtmlinlinecheck.domain.WarningTotals
 import dev.xhtmlinlinecheck.semantic.SemanticModels
-import dev.xhtmlinlinecheck.syntax.LogicalElementNode
 import dev.xhtmlinlinecheck.syntax.LogicalIncludeNode
-import dev.xhtmlinlinecheck.syntax.LogicalNode
+import dev.xhtmlinlinecheck.syntax.XhtmlSyntaxTree
+import dev.xhtmlinlinecheck.syntax.walkDepthFirst
 
 fun interface EquivalenceComparator {
     fun compare(semanticModels: SemanticModels): AnalysisReport
@@ -30,8 +30,8 @@ fun interface EquivalenceComparator {
             EquivalenceComparator { semanticModels ->
                 val includeProblems =
                     buildList {
-                        addAll(semanticModels.oldRoot.rootNode.collectIncludeProblems())
-                        addAll(semanticModels.newRoot.rootNode.collectIncludeProblems())
+                        addAll(semanticModels.oldRoot.syntaxTree.collectIncludeProblems())
+                        addAll(semanticModels.newRoot.syntaxTree.collectIncludeProblems())
                     }
                 val problems =
                     includeProblems +
@@ -85,27 +85,15 @@ fun interface EquivalenceComparator {
     }
 }
 
-private fun LogicalElementNode?.collectIncludeProblems(): List<Problem> {
-    if (this == null) {
-        return emptyList()
-    }
-
+private fun XhtmlSyntaxTree.collectIncludeProblems(): List<Problem> {
     val problems = mutableListOf<Problem>()
-
-    fun visit(node: LogicalNode) {
-        when (node) {
-            is LogicalElementNode -> node.children.forEach(::visit)
-            is LogicalIncludeNode -> {
-                node.includeFailure?.let { includeFailure ->
-                    problems += includeProblemFor(node, includeFailure)
-                }
-                node.children.forEach(::visit)
+    walkDepthFirst { node ->
+        if (node is LogicalIncludeNode) {
+            node.includeFailure?.let { includeFailure ->
+                problems += includeProblemFor(node, includeFailure)
             }
-            else -> Unit
         }
     }
-
-    visit(this)
     return problems
 }
 
