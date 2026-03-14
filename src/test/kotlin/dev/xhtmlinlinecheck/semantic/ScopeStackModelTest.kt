@@ -210,6 +210,51 @@ class ScopeStackModelTest {
             .containsExactly(dev.xhtmlinlinecheck.domain.BindingKind.C_SET, "#{bean.outer}")
     }
 
+    @Test
+    fun `resolve prefers the innermost visible binding when names are shadowed`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:c="http://java.sun.com/jsp/jstl/core"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <c:set var="item" value="#{bean.outer}" />
+              <h:panelGroup id="branch">
+                <c:set var="item" value="#{bean.inner}" />
+                <ui:repeat var="item" value="#{bean.items}">
+                  <h:outputText id="deepOutput" value="#{item}" />
+                </ui:repeat>
+              </h:panelGroup>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val scopeModel = semanticModels.oldRoot.scopeModel
+        val deepOutputPath = findPathById(semanticModels.oldRoot.syntaxTree, "deepOutput")
+
+        assertThat(scopeModel.resolve("item", deepOutputPath))
+            .extracting("kind", "origin.descriptor", "valueExpression")
+            .containsExactly(
+                dev.xhtmlinlinecheck.domain.BindingKind.ITERATION_VAR,
+                "ui:repeat var=item",
+                "#{bean.items}",
+            )
+        assertThat(scopeModel.visibleBindingsAt(deepOutputPath).map { it.origin.descriptor })
+            .containsExactly(
+                "ui:repeat var=item",
+                "c:set var=item",
+                "c:set var=item",
+            )
+    }
+
     private fun semanticModelsFor(oldRoot: Path, newRoot: Path, baseDir: Path): SemanticModels =
         SemanticAnalyzer.scaffold().analyze(
             XhtmlSyntaxParser.scaffold().parse(

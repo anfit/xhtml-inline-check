@@ -1,4 +1,3 @@
-Implement local-shadowing behavior so the scope stack resolves inner bindings over outer ones, because the variable-capture and alpha-renaming tasks depend on correct shadowing.
 Implement symbolic origin descriptors for bindings, reusing the provenance model so comparison diagnostics can explain where a binding came from.
 Add unit tests for nested scopes, validating the scope-stack, push-pop, and binding-creation tasks together.
 Add unit tests for shadowing, targeting the local-shadowing task and ensuring later EL comparison catches capture regressions correctly.

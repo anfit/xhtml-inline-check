@@ -68,7 +68,7 @@ data class ScopeStackModel(
         path: LogicalNodePath,
         position: ScopeLookupPosition = ScopeLookupPosition.NODE,
     ): ScopeBinding? =
-        visibleBindingsAt(path, position).firstOrNull { it.writtenName == name }
+        resolveNearestBinding(name, scopeIdAt(path, position))
 
     private fun scopeIdAt(path: LogicalNodePath, position: ScopeLookupPosition): ScopeId {
         val snapshot = snapshotAt(path)
@@ -90,6 +90,20 @@ data class ScopeStackModel(
             currentScopeId = scope.parentScopeId
         }
         return visible
+    }
+
+    private fun resolveNearestBinding(name: String, scopeId: ScopeId): ScopeBinding? {
+        var currentScopeId: ScopeId? = scopeId
+        while (currentScopeId != null) {
+            val scope = requireNotNull(scopes[currentScopeId]) { "unknown scope id ${currentScopeId.value}" }
+            scope.bindingIds
+                .asReversed()
+                .map(bindingsById::getValue)
+                .firstOrNull { it.writtenName == name }
+                ?.let { return it }
+            currentScopeId = scope.parentScopeId
+        }
+        return null
     }
 
     companion object {
