@@ -91,6 +91,8 @@ Reusable JUnit 5 test support now lives under `src/test/kotlin/dev/xhtmlinlinech
 
 A Gradle wrapper has not been generated yet in this environment, so use a local Gradle installation until the wrapper task lands.
 
+For a single local baseline check that matches the current Gradle app, entrypoint, and smoke-test infrastructure, run `scripts/verify-baseline.bash`. It executes `gradle test`, `gradle installDist`, and `gradle runFaceletsVerify` against `fixtures/support/smoke/`.
+
 ## Near-Term Roadmap
 
 1. Bootstrap the Kotlin/Gradle CLI shell.

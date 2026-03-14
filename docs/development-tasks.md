@@ -1,4 +1,3 @@
-Add a minimal CI workflow or local verification script placeholder that runs the baseline checks established by the Gradle, entrypoint, and test-infrastructure tasks.
 Add a smoke test proving the CLI starts and returns a stable exit code, using the entrypoint and baseline test infrastructure tasks as prerequisites.
 Define the top-level result model for `EQUIVALENT`, `NOT_EQUIVALENT`, and `INCONCLUSIVE`, because the comparison, reporting, and CLI exit-code tasks all depend on a stable outcome vocabulary.
 Define shared location and provenance models that can be reused by the loader, syntax-tree, semantic-node, diagnostic, and reporter tasks.
