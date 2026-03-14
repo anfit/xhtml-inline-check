@@ -2,6 +2,7 @@ package dev.xhtmlinlinecheck.syntax
 
 import dev.xhtmlinlinecheck.domain.Provenance
 import dev.xhtmlinlinecheck.domain.SourceGraphFile
+import dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailure
 import dev.xhtmlinlinecheck.domain.SourceGraphParameter
 import dev.xhtmlinlinecheck.domain.SourceLocation
 
@@ -38,6 +39,7 @@ data class LogicalIncludeNode(
     val sourcePath: String?,
     val parameters: List<SourceGraphParameter>,
     val expandedFile: SourceGraphFile? = null,
+    val includeFailure: SourceGraphIncludeFailure? = null,
     val children: List<LogicalNode> = emptyList(),
     override val provenance: Provenance,
 ) : LogicalNode

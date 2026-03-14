@@ -97,4 +97,34 @@ class SourceGraphModelsTest {
         assertThat(edge.parameters).isEmpty()
         assertThat(edge.isResolved).isFalse()
     }
+
+    @Test
+    fun `include cycle failures keep the ordered recursive document chain`() {
+        val rootDocument = SourceDocument.fromPath(
+            side = AnalysisSide.OLD,
+            path = Path.of("legacy", "root.xhtml"),
+        )
+        val outerDocument = SourceDocument.fromPath(
+            side = AnalysisSide.OLD,
+            path = Path.of("legacy", "fragments", "outer.xhtml"),
+        )
+
+        val edge = SourceGraphEdge.resolved(
+            includeSite = SourceLocation(
+                document = outerDocument,
+                span = SourceSpan(SourcePosition(line = 3, column = 7)),
+                attributeName = "src",
+            ),
+            includedDocument = rootDocument,
+            sourcePath = "/legacy/root.xhtml",
+            includeFailure = SourceGraphIncludeFailure.includeCycle(
+                listOf(rootDocument, outerDocument, rootDocument),
+            ),
+        )
+
+        assertThat(edge.includeFailure).isNotNull()
+        assertThat(edge.includeFailure!!.kind).isEqualTo(SourceGraphIncludeFailureKind.INCLUDE_CYCLE)
+        assertThat(edge.includeFailure!!.cycleDocuments.map { it.displayPath })
+            .containsExactly("legacy/root.xhtml", "legacy/fragments/outer.xhtml", "legacy/root.xhtml")
+    }
 }

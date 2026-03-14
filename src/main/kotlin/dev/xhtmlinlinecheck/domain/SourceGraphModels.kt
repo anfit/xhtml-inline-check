@@ -16,11 +16,35 @@ data class SourceGraphStack(
     }
 }
 
+enum class SourceGraphIncludeFailureKind {
+    INCLUDE_CYCLE,
+}
+
+data class SourceGraphIncludeFailure(
+    val kind: SourceGraphIncludeFailureKind,
+    val cycleDocuments: List<SourceDocument> = emptyList(),
+) {
+    init {
+        require(kind != SourceGraphIncludeFailureKind.INCLUDE_CYCLE || cycleDocuments.size >= 2) {
+            "include cycles must record the ordered document chain"
+        }
+    }
+
+    companion object {
+        fun includeCycle(documents: List<SourceDocument>): SourceGraphIncludeFailure =
+            SourceGraphIncludeFailure(
+                kind = SourceGraphIncludeFailureKind.INCLUDE_CYCLE,
+                cycleDocuments = documents,
+            )
+    }
+}
+
 data class SourceGraphEdge(
     val includeSite: SourceLocation,
     val sourcePath: String? = null,
     val includedDocument: SourceDocument? = null,
     val includedFile: SourceGraphFile? = null,
+    val includeFailure: SourceGraphIncludeFailure? = null,
     val parameters: List<SourceGraphParameter> = emptyList(),
     val stackBefore: SourceGraphStack = SourceGraphStack.root(),
 ) {
@@ -30,6 +54,9 @@ data class SourceGraphEdge(
         }
         require(includedFile == null || includedFile.document == includedDocument) {
             "included source graph file must match the resolved included document"
+        }
+        require(includedFile == null || includeFailure == null) {
+            "include failures cannot also carry expanded source graph files"
         }
     }
 
@@ -65,6 +92,7 @@ data class SourceGraphEdge(
             includeSite: SourceLocation,
             sourcePath: String?,
             includedFile: SourceGraphFile? = null,
+            includeFailure: SourceGraphIncludeFailure? = null,
             parameters: List<SourceGraphParameter> = emptyList(),
             stackBefore: SourceGraphStack = SourceGraphStack.root(),
         ): SourceGraphEdge =
@@ -72,6 +100,7 @@ data class SourceGraphEdge(
                 includeSite = includeSite,
                 sourcePath = sourcePath,
                 includedFile = includedFile,
+                includeFailure = includeFailure,
                 parameters = parameters,
                 stackBefore = stackBefore,
             )
@@ -81,6 +110,7 @@ data class SourceGraphEdge(
             includedDocument: SourceDocument,
             sourcePath: String? = null,
             includedFile: SourceGraphFile? = null,
+            includeFailure: SourceGraphIncludeFailure? = null,
             parameters: List<SourceGraphParameter> = emptyList(),
             stackBefore: SourceGraphStack = SourceGraphStack.root(),
         ): SourceGraphEdge =
@@ -89,6 +119,7 @@ data class SourceGraphEdge(
                 sourcePath = sourcePath,
                 includedDocument = includedDocument,
                 includedFile = includedFile,
+                includeFailure = includeFailure,
                 parameters = parameters,
                 stackBefore = stackBefore,
             )

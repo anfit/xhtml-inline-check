@@ -224,4 +224,50 @@ class SourceLoaderIncludeDiscoveryTest {
         assertThat(parameter.provenance.physicalLocation.render()).startsWith("legacy/root.xhtml:")
         assertThat(parameter.provenance.physicalLocation.attributeName).isEqualTo("name")
     }
+
+    @Test
+    fun `loader records recursive include cycles without recursing forever`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+              <ui:include src="/fragments/outer.xhtml" />
+            </ui:composition>
+            """,
+        )
+        tree.write(
+            "fragments/outer.xhtml",
+            """
+            <ui:fragment xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+              <ui:include src="/legacy/root.xhtml" />
+            </ui:fragment>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val loadedSources = SourceLoader.scaffold().load(
+            AnalysisRequest(
+                oldRoot = tempDir.relativize(oldRoot),
+                newRoot = tempDir.relativize(newRoot),
+                baseOld = tempDir,
+                baseNew = tempDir,
+            ),
+        )
+
+        val outerFile = loadedSources.oldRoot.sourceGraphFile.includeEdges.single().includedFile
+        val recursiveEdge = outerFile!!.includeEdges.single()
+
+        assertThat(recursiveEdge.includedDocument).isNotNull()
+        assertThat(recursiveEdge.includedDocument!!.displayPath).isEqualTo("legacy/root.xhtml")
+        assertThat(recursiveEdge.includedFile).isNull()
+        assertThat(recursiveEdge.includeFailure).isNotNull()
+        assertThat(recursiveEdge.includeFailure!!.cycleDocuments.map { it.displayPath })
+            .containsExactly("legacy/root.xhtml", "fragments/outer.xhtml", "legacy/root.xhtml")
+    }
 }

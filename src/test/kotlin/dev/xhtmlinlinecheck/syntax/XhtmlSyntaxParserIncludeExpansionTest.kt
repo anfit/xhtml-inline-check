@@ -160,4 +160,53 @@ class XhtmlSyntaxParserIncludeExpansionTest {
         assertThat(panel.provenance.includeStack.map { it.includedDocument.displayPath })
             .containsExactly("fragments/outer.xhtml", "fragments/inner.xhtml")
     }
+
+    @Test
+    fun `parser keeps include cycle failures on logical boundaries without expanding the recursive branch`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+              <ui:include src="/fragments/outer.xhtml" />
+            </ui:composition>
+            """,
+        )
+        tree.write(
+            "fragments/outer.xhtml",
+            """
+            <ui:fragment xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+              <ui:include src="/legacy/root.xhtml" />
+            </ui:fragment>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val parsedTrees = XhtmlSyntaxParser.scaffold().parse(
+            SourceLoader.scaffold().load(
+                AnalysisRequest(
+                    oldRoot = tempDir.relativize(oldRoot),
+                    newRoot = tempDir.relativize(newRoot),
+                    baseOld = tempDir,
+                    baseNew = tempDir,
+                ),
+            ),
+        )
+
+        val outerInclude = parsedTrees.oldRoot.rootNode!!.children.single() as LogicalIncludeNode
+        val outerRoot = outerInclude.children.single() as LogicalElementNode
+        val recursiveInclude = outerRoot.children.single() as LogicalIncludeNode
+
+        assertThat(recursiveInclude.sourcePath).isEqualTo("/legacy/root.xhtml")
+        assertThat(recursiveInclude.expandedFile).isNull()
+        assertThat(recursiveInclude.children).isEmpty()
+        assertThat(recursiveInclude.includeFailure).isNotNull()
+        assertThat(recursiveInclude.includeFailure!!.cycleDocuments.map { it.displayPath })
+            .containsExactly("legacy/root.xhtml", "fragments/outer.xhtml", "legacy/root.xhtml")
+    }
 }

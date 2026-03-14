@@ -44,4 +44,53 @@ class FaceletsAnalyzerScaffoldTest {
         assertThat(report.problems.single().locations.old?.logicalLocation?.render()).isEqualTo("old/root.xhtml")
         assertThat(report.problems.single().locations.new?.logicalLocation?.render()).isEqualTo("new/root.xhtml")
     }
+
+    @Test
+    fun `scaffold analyzer emits a dedicated warning for include cycles before the generic scaffold warning`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+              <ui:include src="/fragments/outer.xhtml" />
+            </ui:composition>
+            """,
+        )
+        tree.write(
+            "fragments/outer.xhtml",
+            """
+            <ui:fragment xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+              <ui:include src="/legacy/root.xhtml" />
+            </ui:fragment>
+            """,
+        )
+        val newRoot = tree.write(
+            "new/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = tempDir.relativize(oldRoot),
+                newRoot = tempDir.relativize(newRoot),
+                baseOld = tempDir,
+                baseNew = tempDir,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasProblemCount(2)
+            .hasWarningCount(2)
+            .hasProblemIds(
+                "W-UNSUPPORTED-INCLUDE_CYCLE",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().summary).isEqualTo("Recursive include cycle detected")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("fragments/outer.xhtml:2:")
+        assertThat(report.problems.first().explanation)
+            .contains("legacy/root.xhtml -> fragments/outer.xhtml -> legacy/root.xhtml")
+    }
 }

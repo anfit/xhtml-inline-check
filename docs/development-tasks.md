@@ -1,4 +1,3 @@
-Implement cycle detection for recursive includes, integrating with the source graph and include-expansion tasks so the analyzer fails predictably instead of looping.
 Implement missing-file diagnostics for unresolved includes, reusing the problem, location, and include-resolution tasks so these failures are actionable.
 Implement unsupported diagnostics for dynamic include paths, building on the result-model and problem-model tasks so unsupported constructs can later produce `INCONCLUSIVE`.
 Add fixture tests for simple include expansion, validating the root-path, file-reading, `ui:include`-detection, include-resolution, and logical-expansion tasks together.

@@ -5,6 +5,7 @@ import dev.xhtmlinlinecheck.domain.AnalysisSide
 import dev.xhtmlinlinecheck.domain.SourceDocument
 import dev.xhtmlinlinecheck.domain.SourceGraphEdge
 import dev.xhtmlinlinecheck.domain.SourceGraphFile
+import dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailure
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
@@ -63,7 +64,7 @@ fun interface SourceLoader {
         private fun loadGraph(
             document: SourceDocument,
             parentEdge: SourceGraphEdge? = null,
-            ancestry: Set<Path> = setOf(document.absolutePath),
+            ancestry: List<SourceDocument> = listOf(document),
         ): SourceGraphFile {
             val contents = readContents(document)
             val graphFile =
@@ -77,13 +78,29 @@ fun interface SourceLoader {
                     stackBefore = graphFile.stack,
                 ).map { discoveredEdge ->
                     val includedDocument = discoveredEdge.sourcePath?.let(document::resolveIncludeSource)
+                    val includeFailure =
+                        includedDocument
+                            ?.takeIf { included -> ancestry.any { it.absolutePath == included.absolutePath } }
+                            ?.let { included ->
+                                SourceGraphIncludeFailure.includeCycle(
+                                    ancestry
+                                        .dropWhile { it.absolutePath != included.absolutePath } + included,
+                                )
+                            }
                     val includedFile =
                         includedDocument
-                            ?.takeIf { Files.exists(it.absolutePath) && it.absolutePath !in ancestry }
-                            ?.let { loadGraph(it, parentEdge = discoveredEdge.copy(includedDocument = it), ancestry = ancestry + it.absolutePath) }
+                            ?.takeIf { Files.exists(it.absolutePath) && includeFailure == null }
+                            ?.let {
+                                loadGraph(
+                                    document = it,
+                                    parentEdge = discoveredEdge.copy(includedDocument = it),
+                                    ancestry = ancestry + it,
+                                )
+                            }
                     discoveredEdge.copy(
                         includedDocument = includedDocument,
                         includedFile = includedFile,
+                        includeFailure = includeFailure,
                     )
                 }
             return graphFile.copy(includeEdges = includeEdges)

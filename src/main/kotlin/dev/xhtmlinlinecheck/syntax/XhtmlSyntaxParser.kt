@@ -120,6 +120,7 @@ private object LogicalTreeBuilder {
             sourcePath = edge.sourcePath,
             parameters = edge.parameters,
             expandedFile = edge.includedFile,
+            includeFailure = edge.includeFailure,
             children =
                 edge.includedFile
                     ?.let(::parse)
