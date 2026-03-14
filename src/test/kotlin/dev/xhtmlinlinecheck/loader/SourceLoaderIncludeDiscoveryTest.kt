@@ -49,6 +49,7 @@ class SourceLoaderIncludeDiscoveryTest {
         assertThat(edge.includeSite.attributeName).isEqualTo("src")
         assertThat(edge.includeSite.span?.start?.line).isEqualTo(2)
         assertThat(edge.includeSite.span?.start?.column).isGreaterThan(0)
+        assertThat(edge.parameters).isEmpty()
         assertThat(loadedSources.newRoot.sourceGraphFile.includeEdges).isEmpty()
     }
 
@@ -124,5 +125,99 @@ class SourceLoaderIncludeDiscoveryTest {
         assertThat(edge.sourcePath).isEqualTo("#{bean.fragmentPath}")
         assertThat(edge.includeSite.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(edge.includeSite.render()).endsWith(" @src")
+    }
+
+    @Test
+    fun `loader extracts direct ui params from include sites with value provenance`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+              <ui:include src="/fragments/table.xhtml">
+                <ui:param name="row" value="#{bean.row}" />
+                <ui:param name="mode" value="compact" />
+              </ui:include>
+            </ui:composition>
+            """,
+        )
+        tree.write(
+            "fragments/table.xhtml",
+            """
+            <ui:fragment xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val loadedSources = SourceLoader.scaffold().load(
+            AnalysisRequest(
+                oldRoot = tempDir.relativize(oldRoot),
+                newRoot = tempDir.relativize(newRoot),
+                baseOld = tempDir,
+                baseNew = tempDir,
+            ),
+        )
+
+        val parameters = loadedSources.oldRoot.sourceGraphFile.includeEdges.single().parameters
+
+        assertThat(parameters).hasSize(2)
+        assertThat(parameters.map { it.name }).containsExactly("row", "mode")
+        assertThat(parameters.map { it.valueExpression }).containsExactly("#{bean.row}", "compact")
+        assertThat(parameters.map { it.provenance.physicalLocation.render() }.all { it.startsWith("legacy/root.xhtml:") })
+            .isTrue()
+        assertThat(parameters.map { it.provenance.physicalLocation.attributeName })
+            .containsOnly("value")
+    }
+
+    @Test
+    fun `loader ignores nested or malformed ui params outside direct include parameter slots`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets">
+              <ui:include src="/fragments/table.xhtml">
+                <ui:fragment>
+                  <ui:param name="nested" value="#{bean.nested}" />
+                </ui:fragment>
+                <ui:param value="#{bean.missingName}" />
+                <ui:param name="direct" />
+              </ui:include>
+            </ui:composition>
+            """,
+        )
+        tree.write(
+            "fragments/table.xhtml",
+            """
+            <ui:fragment xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val loadedSources = SourceLoader.scaffold().load(
+            AnalysisRequest(
+                oldRoot = tempDir.relativize(oldRoot),
+                newRoot = tempDir.relativize(newRoot),
+                baseOld = tempDir,
+                baseNew = tempDir,
+            ),
+        )
+
+        val parameter = loadedSources.oldRoot.sourceGraphFile.includeEdges.single().parameters.single()
+
+        assertThat(parameter.name).isEqualTo("direct")
+        assertThat(parameter.valueExpression).isNull()
+        assertThat(parameter.provenance.physicalLocation.render()).startsWith("legacy/root.xhtml:")
+        assertThat(parameter.provenance.physicalLocation.attributeName).isEqualTo("name")
     }
 }

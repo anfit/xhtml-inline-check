@@ -2,6 +2,8 @@ package dev.xhtmlinlinecheck.loader
 
 import dev.xhtmlinlinecheck.domain.SourceDocument
 import dev.xhtmlinlinecheck.domain.SourceGraphEdge
+import dev.xhtmlinlinecheck.domain.SourceGraphParameter
+import dev.xhtmlinlinecheck.domain.Provenance
 import dev.xhtmlinlinecheck.domain.SourceLocation
 import dev.xhtmlinlinecheck.domain.SourcePosition
 import dev.xhtmlinlinecheck.domain.SourceSpan
@@ -12,7 +14,10 @@ import javax.xml.stream.XMLStreamConstants
 internal object SourceGraphIncludeDiscovery {
     private const val FACELETS_NAMESPACE = "http://xmlns.jcp.org/jsf/facelets"
     private const val INCLUDE_LOCAL_NAME = "include"
+    private const val PARAM_LOCAL_NAME = "param"
+    private const val NAME_ATTRIBUTE = "name"
     private const val SRC_ATTRIBUTE = "src"
+    private const val VALUE_ATTRIBUTE = "value"
 
     fun discover(document: SourceDocument, contents: String): List<SourceGraphEdge> {
         val reader = xmlInputFactory().createXMLStreamReader(document.displayPath, StringReader(contents))
@@ -31,6 +36,7 @@ internal object SourceGraphIncludeDiscovery {
                 edges += SourceGraphEdge.discovered(
                     includeSite = reader.toSourceLocation(document, if (sourcePath != null) SRC_ATTRIBUTE else null),
                     sourcePath = sourcePath,
+                    parameters = reader.readIncludeParameters(document),
                 )
             }
             return edges
@@ -50,6 +56,42 @@ internal object SourceGraphIncludeDiscovery {
             }
         }
         return null
+    }
+
+    private fun javax.xml.stream.XMLStreamReader.readIncludeParameters(document: SourceDocument): List<SourceGraphParameter> {
+        val parameters = mutableListOf<SourceGraphParameter>()
+        var depth = 1
+        while (hasNext() && depth > 0) {
+            when (next()) {
+                XMLStreamConstants.START_ELEMENT -> {
+                    if (depth == 1 && namespaceURI == FACELETS_NAMESPACE && localName == PARAM_LOCAL_NAME) {
+                        toIncludeParameter(document)?.let(parameters::add)
+                    }
+                    depth += 1
+                }
+
+                XMLStreamConstants.END_ELEMENT -> depth -= 1
+            }
+        }
+
+        return parameters
+    }
+
+    private fun javax.xml.stream.XMLStreamReader.toIncludeParameter(document: SourceDocument): SourceGraphParameter? {
+        val name = readAttributeValue(NAME_ATTRIBUTE)?.takeUnless(String::isBlank) ?: return null
+        val valueExpression = readAttributeValue(VALUE_ATTRIBUTE)
+        val locationAttribute =
+            when {
+                valueExpression != null -> VALUE_ATTRIBUTE
+                readAttributeValue(NAME_ATTRIBUTE) != null -> NAME_ATTRIBUTE
+                else -> null
+            }
+        val location = toSourceLocation(document, locationAttribute)
+        return SourceGraphParameter(
+            name = name,
+            valueExpression = valueExpression,
+            provenance = Provenance(physicalLocation = location, logicalLocation = location),
+        )
     }
 
     private fun javax.xml.stream.XMLStreamReader.toSourceLocation(
