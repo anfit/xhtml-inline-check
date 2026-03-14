@@ -13,9 +13,15 @@ The fixture corpus should:
 - make expected outcomes obvious to reviewers
 - support unit, comparison, and CLI golden testing
 
+The repository already includes one realistic sample tree under `dummy/`. Treat that directory as a reference corpus for carving out future fixtures and smoke tests, not as a canonical expected-outcome fixture on its own. `dummy/report.xhtml` is the original page and `dummy/report-flattened.xhtml` is a refactored counterpart whose semantic equivalence has not been verified yet.
+
 ## Recommended Layout
 
 ```text
+dummy/
+  report.xhtml
+  report-flattened.xhtml
+  ...
 fixtures/
   equivalent/
     safe-include-inline/
@@ -36,6 +42,12 @@ fixtures/
       new/
       expected.json
 ```
+
+Recommended usage split:
+
+- keep `dummy/` intact as a representative sample page tree
+- derive minimized canonical fixtures under `fixtures/` from focused slices of that sample when a semantic rule needs a deterministic expected outcome
+- keep any direct tests over `dummy/` at smoke or parser/analyzer-coverage level unless and until the pair has been manually classified
 
 ## Fixture Contents
 
@@ -81,6 +93,16 @@ The implementation can evolve the exact schema later, but the fixture contract s
 - changed `for` target resolution
 - changed AJAX target resolution
 - unsupported dynamic include
+
+## Realistic Sample Baseline
+
+Use the checked-in `dummy/` report page as the first realism baseline when:
+
+- validating that loader and parser changes still handle include-heavy pages with many shared fragments
+- choosing future canonical fixture scenarios for scope, ancestry, and target-resolution work
+- reviewing whether a new rule or diagnostic still matches the kind of XHTML the project is meant to analyze
+
+Until the old/new pair is explicitly reviewed, do not place it under `fixtures/equivalent/` or `fixtures/not-equivalent/`, and do not assign it an `expected.json` contract that would imply a trusted semantic verdict.
 
 ## Fixture Review Standard
 

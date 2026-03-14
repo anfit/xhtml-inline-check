@@ -13,6 +13,7 @@ What exists today:
 - the product specification
 - an execution plan
 - architecture and fixture-planning docs
+- an unverified realistic sample page tree under `dummy/` for fixture design and parser/analyzer smoke coverage
 - repository conventions for future implementation
 - a single-module Gradle Kotlin CLI scaffold with placeholder pipeline stages, baseline tests, and application packaging for `facelets-verify`
 - loader-driven include discovery and expansion
@@ -21,7 +22,7 @@ What exists today:
 What does not exist yet:
 
 - semantic equivalence analysis beyond the current scaffold
-- fixture corpus contents
+- a verified canonical comparison corpus beyond the early support and sample fixtures already checked in
 - CI automation
 
 ## Planned Outcome
@@ -74,6 +75,7 @@ The repo now includes the initial Kotlin CLI layout and is being prepared for fi
 
 ```text
 docs/         product and engineering documentation
+dummy/        realistic sample XHTML tree used to shape fixtures and smoke coverage
 fixtures/     comparison fixtures used by tests
 src/          Kotlin source sets for the CLI and analyzer
 build.gradle.kts

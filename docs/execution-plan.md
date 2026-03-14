@@ -208,6 +208,8 @@ Desired operator experience:
 
 Real XHTML may be messy even if formally valid. Parser and loader code should be validated against representative project samples early, not just toy fixtures.
 
+The repository's `dummy/` tree is now the first such representative sample. Use it to smoke-test loader, parser, provenance, and future semantic work, while keeping canonical expected-outcome assertions in minimized fixtures under `fixtures/`.
+
 ### EL Complexity Risk
 
 Trying to perfectly parse all EL forms too early will slow the project down. The safer path is a deliberately scoped symbolic parser plus explicit unsupported diagnostics.
