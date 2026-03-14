@@ -14,11 +14,11 @@ What exists today:
 - an execution plan
 - architecture and fixture-planning docs
 - repository conventions for future implementation
+- a single-module Gradle Kotlin CLI scaffold with placeholder pipeline stages and baseline tests
 
 What does not exist yet:
 
-- a build
-- parser and analyzer code
+- real parser and analyzer behavior
 - fixture corpus contents
 - CI automation
 
@@ -68,13 +68,19 @@ facelets-verify legacy/order.xhtml refactored/order.xhtml --base-old legacy --ba
 
 ## Expected Repository Shape
 
-The repo is being prepared for a fixture-driven Kotlin CLI implementation. The intended top-level layout is:
+The repo now includes the initial Kotlin CLI layout and is being prepared for fixture-driven implementation. The top-level layout is:
 
 ```text
 docs/         product and engineering documentation
 fixtures/     comparison fixtures used by tests
-src/          future Kotlin source sets
+src/          Kotlin source sets for the CLI and analyzer
+build.gradle.kts
+settings.gradle.kts
 ```
+
+## Development
+
+The current scaffold defines a single JVM application with a placeholder analyzer pipeline and smoke tests. A Gradle wrapper has not been generated yet in this environment, so use a local Gradle installation if you want to run the build before the wrapper task lands.
 
 ## Near-Term Roadmap
 

@@ -1,4 +1,3 @@
-Create a Gradle-based Kotlin CLI project layout that establishes the directory structure needed by the entrypoint, domain models, analyzer pipeline, reporters, and tests used by all later tasks.
 Add the Kotlin JVM plugin and application packaging setup so the project created in the Gradle bootstrap task can compile, run, and eventually package `facelets-verify`.
 Configure the executable entrypoint for `facelets-verify`, building directly on the Gradle and Kotlin setup tasks so later CLI integration work has a stable process boundary.
 Add core dependencies for CLI parsing, XML parsing, JSON output, and testing, choosing libraries that fit the parser, reporter, and fixture tasks defined later in this file.
