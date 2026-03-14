@@ -50,6 +50,43 @@ class TagRuleRegistryTest {
     }
 
     @Test
+    fun `jstl core rules expose scope and guard semantics through the shared registry`() {
+        val setRule = registry.resolve(LogicalName(localName = "set", namespaceUri = JSTL_CORE_NAMESPACE))
+        val forEachRule = registry.resolve(LogicalName(localName = "forEach", namespaceUri = JSTL_CORE_NAMESPACE))
+        val ifRule = registry.resolve(LogicalName(localName = "if", namespaceUri = JSTL_CORE_NAMESPACE))
+
+        assertThat(setRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(setRule.bindingRules).containsExactly(
+            BindingCreationRule(
+                kind = BindingKind.SET_VAR,
+                nameAttribute = "var",
+                valueAttribute = "value",
+            ),
+        )
+        assertThat(setRule.elAttributeNames).containsExactly("value", "target", "rendered")
+        assertThat(setRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
+
+        assertThat(forEachRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(forEachRule.bindingRules).containsExactly(
+            BindingCreationRule(
+                kind = BindingKind.FOR_EACH_VAR,
+                nameAttribute = "var",
+            ),
+            BindingCreationRule(
+                kind = BindingKind.FOR_EACH_STATUS,
+                nameAttribute = "varStatus",
+            ),
+        )
+        assertThat(forEachRule.elAttributeNames).containsExactly("items", "begin", "end", "step", "rendered")
+        assertThat(forEachRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
+
+        assertThat(ifRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(ifRule.bindingRules).isEmpty()
+        assertThat(ifRule.elAttributeNames).containsExactly("test", "rendered")
+        assertThat(ifRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
+    }
+
+    @Test
     fun `namespace defaults merge with exact tag rules deterministically`() {
         val formRule = registry.ruleFor(LogicalName(localName = "form", namespaceUri = JSF_HTML_NAMESPACE))
 
