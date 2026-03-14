@@ -79,7 +79,7 @@ data class SemanticNode(
     val isNamingContainer: Boolean,
     val explicitIdAttribute: SemanticNodeAttribute? = null,
     val renderedAttribute: SemanticNodeElFact? = null,
-    val targetAttributes: List<SemanticNodeAttribute> = emptyList(),
+    val componentTargetAttributes: List<ComponentTargetAttribute> = emptyList(),
     val elFacts: List<SemanticNodeElFact> = emptyList(),
     val structuralContext: SemanticStructuralContext = SemanticStructuralContext(),
 ) {

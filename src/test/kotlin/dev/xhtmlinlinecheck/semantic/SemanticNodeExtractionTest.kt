@@ -81,11 +81,31 @@ class SemanticNodeExtractionTest {
         assertThat(panelNode.renderedAttribute!!.normalizedTemplate!!.render()).isEqualTo("#{binding#2.visible}")
         assertThat(panelNode.renderedAttribute!!.bindingReferences.map { it.binding.origin.descriptor })
             .containsExactly("ui:repeat var=row")
-        assertThat(panelNode.targetAttributes)
+        assertThat(panelNode.componentTargetAttributes)
             .extracting("attributeName", "rawValue")
             .containsExactly(
                 Tuple.tuple("update", "msgs panel"),
                 Tuple.tuple("process", "@this"),
+            )
+        assertThat(panelNode.componentTargetAttributes)
+            .extracting(
+                "kind",
+                "references",
+            )
+            .containsExactly(
+                Tuple.tuple(
+                    ComponentTargetAttributeKind.UPDATE,
+                    listOf(
+                        ComponentTargetReference("msgs", ComponentTargetReferenceKind.COMPONENT_ID),
+                        ComponentTargetReference("panel", ComponentTargetReferenceKind.COMPONENT_ID),
+                    ),
+                ),
+                Tuple.tuple(
+                    ComponentTargetAttributeKind.PROCESS,
+                    listOf(
+                        ComponentTargetReference("@this", ComponentTargetReferenceKind.SEARCH_EXPRESSION),
+                    ),
+                ),
             )
         assertThat(panelNode.structuralContext.formAncestry.map { it.nodeName }).containsExactly("h:form")
         assertThat(panelNode.structuralContext.namingContainerAncestry.map { it.nodeName }).containsExactly("h:form")
@@ -255,14 +275,24 @@ class SemanticNodeExtractionTest {
 
         assertThat(
             semanticNodes.flatMap { node ->
-                node.targetAttributes.map { attribute ->
-                    Tuple.tuple(node.nodeId.value, attribute.attributeName, attribute.rawValue)
+                node.componentTargetAttributes.map { attribute ->
+                    Tuple.tuple(
+                        node.nodeId.value,
+                        attribute.kind,
+                        attribute.rawValue,
+                        attribute.references.map(ComponentTargetReference::render),
+                    )
                 }
             },
         ).containsExactly(
-            Tuple.tuple("node:/0/0/0/0/1", "for", "nameInput"),
-            Tuple.tuple("node:/0/0/0/0/2", "update", "msgs details"),
-            Tuple.tuple("node:/0/0/0/0/2", "process", "@form"),
+            Tuple.tuple("node:/0/0/0/0/1", ComponentTargetAttributeKind.FOR, "nameInput", listOf("nameInput")),
+            Tuple.tuple(
+                "node:/0/0/0/0/2",
+                ComponentTargetAttributeKind.UPDATE,
+                "msgs details",
+                listOf("msgs", "details"),
+            ),
+            Tuple.tuple("node:/0/0/0/0/2", ComponentTargetAttributeKind.PROCESS, "@form", listOf("@form")),
         )
     }
 

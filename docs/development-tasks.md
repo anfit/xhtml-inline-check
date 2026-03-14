@@ -1,4 +1,3 @@
-Define the shared internal model for component-target references so semantic extraction, resolution, comparison, and diagnostics all use one representation for `for`, `update`, `render`, `process`, and `execute`.
 Implement extraction of tokenized target lists from `for`, `update`, `render`, `process`, and `execute`, building on semantic-node attribute capture so target-bearing attributes stop being raw strings.
 Implement target resolution against semantic nodes and add diagnostics plus tests for same-form target resolution and broken target resolution after refactors so target meaning is available before matching leans on it.
 Define semantic signatures for matching by combining tag identity, ancestry, iteration context, rendered guards, and other stable semantic facts needed when explicit anchors are missing.

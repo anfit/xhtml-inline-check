@@ -2,6 +2,7 @@ package dev.xhtmlinlinecheck.compare
 
 import dev.xhtmlinlinecheck.semantic.SemanticNode
 import dev.xhtmlinlinecheck.semantic.SemanticNodeId
+import dev.xhtmlinlinecheck.semantic.ComponentTargetAttribute
 
 data class SemanticNodeMatch(
     val oldNodeId: SemanticNodeId,
@@ -86,7 +87,7 @@ object SemanticNodeMatcher {
 private data class StructuralSignature(
     val nodeName: String,
     val rendered: String?,
-    val targetAttributes: List<Pair<String, String>>,
+    val componentTargetAttributes: List<String>,
     val formAncestry: List<String>,
     val namingContainerAncestry: List<String>,
     val iterationAncestry: List<String>,
@@ -97,7 +98,7 @@ private data class StructuralSignature(
             append("|rendered=")
             append(rendered ?: "<none>")
             append("|targets=")
-            append(targetAttributes.joinToString(",") { (name, value) -> "$name=$value" })
+            append(componentTargetAttributes.joinToString(","))
             append("|forms=")
             append(formAncestry.joinToString(">"))
             append("|naming=")
@@ -114,7 +115,7 @@ private fun structuralSignatureFor(node: SemanticNode): StructuralSignature =
     StructuralSignature(
         nodeName = node.nodeName,
         rendered = node.renderedAttribute?.normalizedTemplate?.render() ?: node.renderedAttribute?.rawValue,
-        targetAttributes = node.targetAttributes.map { it.attributeName to it.rawValue },
+        componentTargetAttributes = node.componentTargetAttributes.map(ComponentTargetAttribute::render),
         formAncestry = node.formAncestry.map { it.nodeName },
         namingContainerAncestry = node.namingContainerAncestry.map { it.nodeName },
         iterationAncestry = node.iterationAncestry.map { it.nodeName },

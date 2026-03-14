@@ -113,10 +113,10 @@ private fun LogicalElementNode.toSemanticNode(
         isNamingContainer = tagRule.isNamingContainer,
         explicitIdAttribute = attributeNamed("id")?.toSemanticAttribute(),
         renderedAttribute = elFacts.firstOrNull { it.attributeName == "rendered" },
-        targetAttributes =
+        componentTargetAttributes =
             attributes
                 .filter { it.name.localName in tagRule.targetAttributeNames }
-                .map(LogicalAttribute::toSemanticAttribute),
+                .mapNotNull(LogicalAttribute::toComponentTargetAttribute),
         elFacts = elFacts,
         structuralContext = structuralContext,
     )
@@ -242,6 +242,13 @@ private fun SemanticElOccurrence.toSemanticFact(normalizedOccurrence: Normalized
 
 private fun LogicalAttribute.toSemanticAttribute(): SemanticNodeAttribute =
     SemanticNodeAttribute(
+        attributeName = name.localName,
+        rawValue = value,
+        location = location,
+    )
+
+private fun LogicalAttribute.toComponentTargetAttribute(): ComponentTargetAttribute? =
+    ComponentTargetReferenceParser.parse(
         attributeName = name.localName,
         rawValue = value,
         location = location,

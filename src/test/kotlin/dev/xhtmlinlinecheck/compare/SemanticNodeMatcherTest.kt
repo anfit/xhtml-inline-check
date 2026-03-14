@@ -118,6 +118,50 @@ class SemanticNodeMatcherTest {
     }
 
     @Test
+    fun `structural signatures use normalized component target references instead of raw attribute spacing`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:commandButton update="msgs   panel" process="@this   @form" />
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:commandButton update="msgs panel" process="@this @form" />
+            </ui:composition>
+            """,
+        )
+
+        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val result = SemanticNodeMatcher.matchStructuralCandidates(
+            oldNodes = semanticModels.oldRoot.semanticNodes,
+            newNodes = semanticModels.newRoot.semanticNodes,
+        )
+
+        val oldButton = semanticModels.oldRoot.semanticNodes.single { it.nodeName == "h:commandButton" }
+        val newButton = semanticModels.newRoot.semanticNodes.single { it.nodeName == "h:commandButton" }
+
+        assertThat(oldButton.componentTargetAttributes.map { it.render() })
+            .containsExactly("update=msgs panel", "process=@this @form")
+        assertThat(newButton.componentTargetAttributes.map { it.render() })
+            .containsExactly("update=msgs panel", "process=@this @form")
+        assertThat(result.matches)
+            .extracting("reason", "oldNodeId.value", "newNodeId.value")
+            .containsExactly(
+                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, "node:/0", "node:/0"),
+            )
+        assertThat(result.unmatchedOldNodeIds).isEmpty()
+        assertThat(result.unmatchedNewNodeIds).isEmpty()
+    }
+
+    @Test
     fun `structural matching relies on the combined structural context contract`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(
