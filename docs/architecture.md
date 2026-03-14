@@ -120,6 +120,8 @@ Owns binding stacks, scope transitions, and local-root resolution.
 
 Owns EL tokenization, parsing, and symbolic normalization.
 
+The EL layer should accept only the MVP subset defined in [docs/el-grammar-subset.md](docs/el-grammar-subset.md). It must parse EL containers within literal templates, normalize supported expressions symbolically, and hand unsupported forms back to `semantic` and `compare` as explicit unknowns rather than partial best-effort matches.
+
 ### `semantic`
 
 Owns extraction of structural facts and normalized node facts from syntax trees.

@@ -281,7 +281,39 @@ Examples:
 
 `global(bean).map[index(binding#12.code)]`
 
-### 11.1 Attribute-Level Precision
+### 11.1 MVP EL Grammar Subset
+
+The MVP EL parser is intentionally a subset parser, not a full Jakarta EL implementation. Its exact contract is defined in [docs/el-grammar-subset.md](docs/el-grammar-subset.md).
+
+The supported subset must cover the forms required by scope comparison, semantic extraction, and structural checks:
+
+- deferred and immediate EL containers embedded in literal templates
+- root identifiers
+- dotted property chains
+- bracket index access
+- method-call shape with recursively parsed arguments
+- boolean and emptiness guards
+- equality and relational operators
+- ternary expressions
+- parentheses and scalar literals needed to preserve expression shape
+
+Within that subset, the analyzer must preserve symbolic structure rather than evaluate runtime values. Unsupported EL must never be treated as equivalent by fallback.
+
+The following EL forms are explicitly out of MVP scope and must contribute to explicit unsupported handling:
+
+- namespaced EL functions such as `fn:length(...)`
+- collection or map literals
+- lambda expressions
+- assignment or mutation forms
+- arithmetic or concatenation operators beyond unary minus
+- semicolon-separated expressions
+- selection, projection, or other advanced collection operators
+- type or static-member references
+- parser-invalid or unterminated EL containers
+
+If one of those unsupported forms appears in an extracted EL occurrence relevant to scope, semantic extraction, or structural comparison, the analyzer must surface a file-linked unsupported diagnostic and treat the affected comparison fact as unknown, contributing to `INCONCLUSIVE` unless a mismatch was already proven.
+
+### 11.2 Attribute-Level Precision
 
 Attribute-level line and column should be captured where practical. If the initial parser can only report the owning element location plus attribute name, that fallback is acceptable for MVP, but the limitation must be explicit in diagnostics and documentation.
 

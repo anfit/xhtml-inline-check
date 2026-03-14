@@ -87,6 +87,8 @@ Important design choice:
 
 Do not attempt a full Jakarta EL implementation in the first pass. Parse only the syntax needed to preserve root references, property/index access, method-call roots, boolean structure, and ternary shape. Everything else should either normalize conservatively or be marked unsupported.
 
+Use [docs/el-grammar-subset.md](docs/el-grammar-subset.md) as the source of truth for that boundary. If extracted EL falls outside that grammar, the semantic layer should emit an explicit unsupported diagnostic and let the final result derive `INCONCLUSIVE` rather than guessing.
+
 This keeps the MVP tractable while still catching the most dangerous refactor regressions:
 
 - alpha-renaming mistakes

@@ -1,4 +1,3 @@
-Define the MVP EL grammar subset for the analyzer, explicitly covering the supported forms required by scope comparison, semantic extraction, and structural checks while naming unsupported forms that must contribute to explicit inconclusive handling.
 Implement EL tokenization and parsing for root identifiers, property chains, index access, method-call roots where required by the spec, boolean expressions, and ternaries so supported EL can be processed deterministically.
 Add unit tests for EL parsing that cover nested property access, index expressions, booleans, ternaries, and unsupported constructs so grammar boundaries are locked before semantic comparison work deepens.
 Implement EL extraction from semantically relevant attributes first, using the tag registry as the source of truth for which attributes should feed the EL pipeline.
