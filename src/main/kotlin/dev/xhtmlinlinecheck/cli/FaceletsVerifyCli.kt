@@ -14,6 +14,8 @@ enum class OutputFormat {
 data class CliArguments(
     val oldRoot: Path,
     val newRoot: Path,
+    val baseOld: Path?,
+    val baseNew: Path?,
     val format: OutputFormat,
 )
 
@@ -33,6 +35,8 @@ class FaceletsVerifyCli(
             AnalysisRequest(
                 oldRoot = parsed.oldRoot,
                 newRoot = parsed.newRoot,
+                baseOld = parsed.baseOld,
+                baseNew = parsed.baseNew,
             ),
         )
 
@@ -52,6 +56,8 @@ class FaceletsVerifyCli(
 
         val roots = mutableListOf<String>()
         var format = OutputFormat.TEXT
+        var baseOld: Path? = null
+        var baseNew: Path? = null
         var index = 0
         while (index < args.size) {
             when (args[index]) {
@@ -62,6 +68,18 @@ class FaceletsVerifyCli(
                         "json" -> OutputFormat.JSON
                         else -> return null
                     }
+                    index += 2
+                }
+
+                "--base-old" -> {
+                    val value = args.getOrNull(index + 1) ?: return null
+                    baseOld = Path.of(value)
+                    index += 2
+                }
+
+                "--base-new" -> {
+                    val value = args.getOrNull(index + 1) ?: return null
+                    baseNew = Path.of(value)
                     index += 2
                 }
 
@@ -79,12 +97,14 @@ class FaceletsVerifyCli(
         return CliArguments(
             oldRoot = Path.of(roots[0]),
             newRoot = Path.of(roots[1]),
+            baseOld = baseOld,
+            baseNew = baseNew,
             format = format,
         )
     }
 
     private fun usage(): String =
-        "Usage: facelets-verify <oldRoot.xhtml> <newRoot.xhtml> [--format text|json]"
+        "Usage: facelets-verify <oldRoot.xhtml> <newRoot.xhtml> [--base-old <dir>] [--base-new <dir>] [--format text|json]"
 
     private fun writeLine(output: Appendable, value: String) {
         output.append(value).append(System.lineSeparator())

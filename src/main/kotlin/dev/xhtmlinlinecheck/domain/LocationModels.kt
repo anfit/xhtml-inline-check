@@ -11,17 +11,46 @@ enum class AnalysisSide {
 data class SourceDocument(
     val side: AnalysisSide,
     val absolutePath: Path,
+    val rootDirectory: Path,
     val displayPath: String = absolutePath.invariantSeparatorsPathString,
 ) {
     companion object {
-        fun fromPath(side: AnalysisSide, path: Path): SourceDocument {
-            val normalizedPath = path.normalize()
+        fun fromPath(side: AnalysisSide, path: Path, rootDirectory: Path? = null): SourceDocument {
+            val normalizedRootDirectory = normalizeAbsolute(rootDirectory ?: defaultRootDirectory(path))
+            val normalizedPath = resolveAbsolute(path, normalizedRootDirectory)
+            val displayPath = normalizedPath.relativeTo(normalizedRootDirectory)
             return SourceDocument(
                 side = side,
                 absolutePath = normalizedPath,
-                displayPath = normalizedPath.invariantSeparatorsPathString,
+                rootDirectory = normalizedRootDirectory,
+                displayPath = displayPath,
             )
         }
+
+        private fun defaultRootDirectory(path: Path): Path =
+            if (path.isAbsolute) {
+                path.parent ?: path.root ?: path
+            } else {
+                Path.of("").toAbsolutePath()
+            }
+
+        private fun resolveAbsolute(path: Path, rootDirectory: Path): Path =
+            normalizeAbsolute(
+                if (path.isAbsolute) {
+                    path
+                } else {
+                    rootDirectory.resolve(path)
+                },
+            )
+
+        private fun normalizeAbsolute(path: Path): Path = path.toAbsolutePath().normalize()
+
+        private fun Path.relativeTo(rootDirectory: Path): String =
+            if (startsWith(rootDirectory)) {
+                rootDirectory.relativize(this).invariantSeparatorsPathString
+            } else {
+                invariantSeparatorsPathString
+            }
     }
 }
 

@@ -1,4 +1,3 @@
-Implement root-path resolution for old and new XHTML trees so the loader pipeline can anchor all include-expansion and provenance tasks on trustworthy input locations.
 Implement file reading with normalized path handling, building on the root-path-resolution task so include expansion and missing-file diagnostics behave consistently across platforms.
 Define source-graph objects for files, include edges, include parameters, and include stacks, reusing the shared provenance model so loader and parser tasks can preserve origin details.
 Implement static detection of `ui:include` in source files, using the source-graph task as the discovery mechanism for later include-resolution and expansion tasks.

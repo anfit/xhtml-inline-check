@@ -13,8 +13,25 @@ class LocationModelsTest {
         )
 
         assertThat(document.side).isEqualTo(AnalysisSide.OLD)
-        assertThat(document.absolutePath).isEqualTo(Path.of("legacy", "page.xhtml"))
+        assertThat(document.absolutePath).isAbsolute()
+        assertThat(document.absolutePath.fileName.toString()).isEqualTo("page.xhtml")
+        assertThat(document.rootDirectory).isEqualTo(Path.of("").toAbsolutePath().normalize())
         assertThat(document.displayPath).isEqualTo("legacy/page.xhtml")
+    }
+
+    @Test
+    fun `anchors display path to provided root directory when resolving relative roots`() {
+        val rootDirectory = Path.of("fixtures", "legacy")
+        val document = SourceDocument.fromPath(
+            side = AnalysisSide.OLD,
+            path = Path.of("pages", ".", "order.xhtml"),
+            rootDirectory = rootDirectory,
+        )
+
+        assertThat(document.rootDirectory).isEqualTo(rootDirectory.toAbsolutePath().normalize())
+        assertThat(document.absolutePath)
+            .isEqualTo(rootDirectory.toAbsolutePath().normalize().resolve("pages/order.xhtml"))
+        assertThat(document.displayPath).isEqualTo("pages/order.xhtml")
     }
 
     @Test

@@ -20,12 +20,14 @@ fun interface SourceLoader {
                         document = SourceDocument.fromPath(
                             side = AnalysisSide.OLD,
                             path = request.oldRoot,
+                            rootDirectory = request.baseOld,
                         ),
                     ),
                     newRoot = LoadedSource(
                         document = SourceDocument.fromPath(
                             side = AnalysisSide.NEW,
                             path = request.newRoot,
+                            rootDirectory = request.baseNew,
                         ),
                     ),
                 )

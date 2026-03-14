@@ -54,6 +54,42 @@ class FaceletsVerifyCliTest {
         assertThat(output.toString()).contains("\"result\": \"INCONCLUSIVE\"")
     }
 
+    @Test
+    fun `accepts base directory options and anchors reported root paths to those bases`() {
+        val tree = TemporaryProjectTree(tempDir)
+        tree.write(
+            "workspace/legacy/views/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+        tree.write(
+            "workspace/refactored/pages/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+        val output = StringBuilder()
+
+        val exitCode = FaceletsVerifyCli().run(
+            listOf(
+                "views/root.xhtml",
+                "pages/root.xhtml",
+                "--base-old",
+                tree.path("workspace/legacy").toString(),
+                "--base-new",
+                tree.path("workspace/refactored").toString(),
+            ),
+            output,
+        )
+
+        assertThat(exitCode).isEqualTo(2)
+        assertThat(output.toString()).contains("views/root.xhtml")
+        assertThat(output.toString()).contains("pages/root.xhtml")
+        assertThat(output.toString()).doesNotContain(tree.path("workspace/legacy").toString())
+        assertThat(output.toString()).doesNotContain(tree.path("workspace/refactored").toString())
+    }
+
     private fun smokeArgs(): List<String> {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(
