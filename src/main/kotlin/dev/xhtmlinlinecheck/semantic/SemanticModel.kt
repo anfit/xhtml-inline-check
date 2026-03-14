@@ -12,6 +12,7 @@ data class SemanticModel(
     val tagRules: TagRuleRegistry,
     val scopeModel: ScopeStackModel,
     val elOccurrences: List<SemanticElOccurrence>,
+    val normalizedElOccurrences: List<NormalizedSemanticElOccurrence>,
 ) {
     init {
         require(provenance.physicalLocation.document == document) {

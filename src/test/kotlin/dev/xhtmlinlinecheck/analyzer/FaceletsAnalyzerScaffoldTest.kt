@@ -257,6 +257,97 @@ class FaceletsAnalyzerScaffoldTest {
     }
 
     @Test
+    fun `scaffold analyzer treats safe alpha-renamed local bindings as equal under normalized EL`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:repeat var="row" value="#{bean.items}">
+                <h:outputText id="value" value="#{row.label}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:repeat var="item" value="#{bean.items}">
+                <h:outputText id="value" value="#{item.label}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasProblemCount(1)
+            .hasWarningCount(1)
+            .hasProblemIds("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
+        assertThat(report.summary.headline).contains("Local-binding EL normalization matched")
+    }
+
+    @Test
+    fun `scaffold analyzer emits scope binding mismatches when identical EL text resolves to different local origins`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:c="http://java.sun.com/jsp/jstl/core"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <c:set var="row" value="#{bean.outer}" />
+              <ui:repeat var="row" value="#{bean.items}">
+                <h:outputText id="value" value="#{row.label}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:c="http://java.sun.com/jsp/jstl/core"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <c:set var="row" value="#{bean.outer}" />
+              <h:outputText id="value" value="#{row.label}" />
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.NOT_EQUIVALENT)
+            .hasProblemCount(2)
+            .hasWarningCount(1)
+            .hasProblemIds(
+                "P-SCOPE-BINDING_MISMATCH",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().summary).isEqualTo("Local variable resolves to different binding")
+        assertThat(report.problems.first().locations.old?.bindingOrigin?.descriptor).isEqualTo("ui:repeat var=row")
+        assertThat(report.problems.first().locations.new?.bindingOrigin?.descriptor).isEqualTo("c:set var=row")
+        assertThat(report.problems.first().explanation).contains("Old: #{binding#2.label}")
+        assertThat(report.problems.first().explanation).contains("New: #{binding#1.label}")
+    }
+
+    @Test
     fun `scaffold analyzer emits a dedicated warning for missing include files before the generic scaffold warning`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(
