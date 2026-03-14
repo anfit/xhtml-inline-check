@@ -3,7 +3,10 @@ package dev.xhtmlinlinecheck.report
 import dev.xhtmlinlinecheck.domain.AnalysisReport
 import dev.xhtmlinlinecheck.domain.AnalysisSide
 import dev.xhtmlinlinecheck.domain.AnalysisResult
+import dev.xhtmlinlinecheck.domain.AnalysisSummary
 import dev.xhtmlinlinecheck.domain.AnalysisStats
+import dev.xhtmlinlinecheck.domain.AggregateCounts
+import dev.xhtmlinlinecheck.domain.AggregateCoverage
 import dev.xhtmlinlinecheck.domain.Problem
 import dev.xhtmlinlinecheck.domain.ProblemCategory
 import dev.xhtmlinlinecheck.domain.ProblemLocation
@@ -11,6 +14,7 @@ import dev.xhtmlinlinecheck.domain.ProblemLocations
 import dev.xhtmlinlinecheck.domain.Provenance
 import dev.xhtmlinlinecheck.domain.Severity
 import dev.xhtmlinlinecheck.domain.SourceDocument
+import dev.xhtmlinlinecheck.domain.WarningTotals
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
@@ -25,7 +29,22 @@ class ReportRenderersBaselineTest {
     ) {
         val report = AnalysisReport(
             result = AnalysisResult.NOT_EQUIVALENT,
-            summary = "Found one mismatch",
+            summary = AnalysisSummary(
+                headline = "Found one mismatch",
+                counts = AggregateCounts(
+                    checked = 4,
+                    matched = 3,
+                    mismatched = 1,
+                ),
+                coverage = AggregateCoverage(
+                    covered = 4,
+                    total = 4,
+                ),
+                warnings = WarningTotals(
+                    total = 0,
+                    blocking = 0,
+                ),
+            ),
             problems = listOf(
                 Problem(
                     id = "P01",
@@ -57,10 +76,19 @@ class ReportRenderersBaselineTest {
                 ),
             ),
             stats = AnalysisStats(
-                checkedFacts = 4,
-                matchedFacts = 3,
-                problemCount = 1,
-                warningCount = 0,
+                counts = AggregateCounts(
+                    checked = 4,
+                    matched = 3,
+                    mismatched = 1,
+                ),
+                coverage = AggregateCoverage(
+                    covered = 4,
+                    total = 4,
+                ),
+                warnings = WarningTotals(
+                    total = 0,
+                    blocking = 0,
+                ),
             ),
         )
 
@@ -76,6 +104,18 @@ class ReportRenderersBaselineTest {
         assertThat(rendered).contains("legacy/order.xhtml")
         assertThat(rendered).contains("refactored/order.xhtml")
         assertThat(rendered).contains("Component moved outside form")
+        when (rendererName) {
+            "text" -> {
+                assertThat(rendered).contains("Counts: checked=4, matched=3, mismatched=1")
+                assertThat(rendered).contains("Warnings: total=0, blocking=0")
+            }
+
+            "json" -> {
+                assertThat(rendered).contains("\"counts\"")
+                assertThat(rendered).contains("\"warnings\"")
+                assertThat(rendered).contains("\"mismatched\": 1")
+            }
+        }
     }
 
     companion object {

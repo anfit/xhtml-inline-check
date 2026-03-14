@@ -15,7 +15,7 @@ class AnalysisReportAssert(actual: AnalysisReport) :
 
     fun hasSummaryContaining(expected: String): AnalysisReportAssert {
         isNotNull
-        assertThat(actual.summary).contains(expected)
+        assertThat(actual.summary.headline).contains(expected)
         return this
     }
 
@@ -27,7 +27,7 @@ class AnalysisReportAssert(actual: AnalysisReport) :
 
     fun hasWarningCount(expected: Int): AnalysisReportAssert {
         isNotNull
-        assertThat(actual.stats.warningCount).isEqualTo(expected)
+        assertThat(actual.stats.warnings.total).isEqualTo(expected)
         return this
     }
 

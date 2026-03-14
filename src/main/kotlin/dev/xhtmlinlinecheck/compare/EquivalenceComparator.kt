@@ -2,12 +2,16 @@ package dev.xhtmlinlinecheck.compare
 
 import dev.xhtmlinlinecheck.domain.AnalysisReport
 import dev.xhtmlinlinecheck.domain.AnalysisResult
+import dev.xhtmlinlinecheck.domain.AnalysisSummary
 import dev.xhtmlinlinecheck.domain.AnalysisStats
+import dev.xhtmlinlinecheck.domain.AggregateCounts
+import dev.xhtmlinlinecheck.domain.AggregateCoverage
 import dev.xhtmlinlinecheck.domain.Problem
 import dev.xhtmlinlinecheck.domain.ProblemCategory
 import dev.xhtmlinlinecheck.domain.ProblemLocation
 import dev.xhtmlinlinecheck.domain.ProblemLocations
 import dev.xhtmlinlinecheck.domain.Severity
+import dev.xhtmlinlinecheck.domain.WarningTotals
 import dev.xhtmlinlinecheck.semantic.SemanticModels
 
 fun interface EquivalenceComparator {
@@ -21,7 +25,22 @@ fun interface EquivalenceComparator {
                         hasMismatch = false,
                         blocksEquivalenceClaim = true,
                     ),
-                    summary = "Scaffolded analyzer pipeline only; semantic comparison is not implemented yet.",
+                    summary = AnalysisSummary(
+                        headline = "Scaffolded analyzer pipeline only; semantic comparison is not implemented yet.",
+                        counts = AggregateCounts(
+                            checked = 0,
+                            matched = 0,
+                            mismatched = 0,
+                        ),
+                        coverage = AggregateCoverage(
+                            covered = 0,
+                            total = 0,
+                        ),
+                        warnings = WarningTotals(
+                            total = 1,
+                            blocking = 1,
+                        ),
+                    ),
                     problems = listOf(
                         Problem(
                             id = "W00",
@@ -37,10 +56,19 @@ fun interface EquivalenceComparator {
                         ),
                     ),
                     stats = AnalysisStats(
-                        checkedFacts = 0,
-                        matchedFacts = 0,
-                        problemCount = 0,
-                        warningCount = 1,
+                        counts = AggregateCounts(
+                            checked = 0,
+                            matched = 0,
+                            mismatched = 0,
+                        ),
+                        coverage = AggregateCoverage(
+                            covered = 0,
+                            total = 0,
+                        ),
+                        warnings = WarningTotals(
+                            total = 1,
+                            blocking = 1,
+                        ),
                     ),
                 )
             }
