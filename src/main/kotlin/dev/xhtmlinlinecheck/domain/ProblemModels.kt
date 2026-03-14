@@ -17,6 +17,7 @@ enum class ProblemCategory {
 data class ProblemLocation(
     val provenance: Provenance,
     val snippet: String? = null,
+    val bindingOrigin: BindingOrigin? = null,
 ) {
     val physicalLocation: SourceLocation
         get() = provenance.physicalLocation

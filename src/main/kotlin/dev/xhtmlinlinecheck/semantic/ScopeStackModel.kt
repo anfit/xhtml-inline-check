@@ -230,7 +230,11 @@ private class ScopeStackBuilder {
             kind = rule.kind,
             location = nameAttribute.location,
             provenance = node.provenance.atBindingLocation(nameAttribute.location),
-            origin = BindingOrigin(descriptor = describeRuleOrigin(node, rule.kind, writtenName)),
+            origin =
+                BindingOrigin(
+                    descriptor = describeRuleOrigin(node, rule.kind, writtenName),
+                    provenance = node.provenance.atBindingLocation(nameAttribute.location),
+                ),
             valueExpression = valueExpression,
         )
     }
@@ -244,7 +248,7 @@ private class ScopeStackBuilder {
             kind = BindingKind.UI_PARAM,
             location = parameter.provenance.physicalLocation,
             provenance = parameter.provenance,
-            origin = BindingOrigin(descriptor = "ui:param name=${parameter.name}"),
+            origin = BindingOrigin(descriptor = "ui:param name=${parameter.name}", provenance = parameter.provenance),
             valueExpression = parameter.valueExpression,
         )
 

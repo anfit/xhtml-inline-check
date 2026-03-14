@@ -107,6 +107,7 @@ $problemEntries
           "physicalLocation": "${escape(location.physicalLocation.render())}",
           "physicalLocationDetails": ${renderSourceLocationDetails(location.physicalLocation)},
           "snippet": ${renderNullableString(location.snippet)},
+          "bindingOrigin": ${renderBindingOrigin(location.bindingOrigin)},
           "includeStack": [
 $includeStack
           ]
@@ -135,6 +136,19 @@ $includeStack
           "parameterNames": [${step.parameterNames.joinToString(", ") { "\"${escape(it)}\"" }}]
         }
         """.trimIndent()
+
+    private fun renderBindingOrigin(origin: dev.xhtmlinlinecheck.domain.BindingOrigin?): String {
+        if (origin == null) {
+            return "null"
+        }
+        return """
+        {
+          "descriptor": "${escape(origin.descriptor)}",
+          "rendered": "${escape(origin.render())}",
+          "location": ${origin.provenance?.logicalLocation?.let(::renderSourceLocationDetails) ?: "null"}
+        }
+        """.trimIndent()
+    }
 
     private fun renderNullableString(value: String?): String =
         value?.let { "\"${escape(it)}\"" } ?: "null"

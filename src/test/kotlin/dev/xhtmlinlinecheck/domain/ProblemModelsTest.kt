@@ -50,6 +50,7 @@ class ProblemModelsTest {
         assertThat(problemLocation.physicalLocation.render()).isEqualTo("legacy/fragment.xhtml")
         assertThat(problemLocation.render()).isEqualTo("legacy/root.xhtml:4:7 @src (element fallback)")
         assertThat(problemLocation.snippet).isEqualTo("#{row.total}")
+        assertThat(problemLocation.bindingOrigin).isNull()
     }
 
     @Test
@@ -91,5 +92,25 @@ class ProblemModelsTest {
         assertThat(problem.locations.new).isEqualTo(newLocation)
         assertThat(problem.locations.old?.snippet).isEqualTo("#{row.label}")
         assertThat(problem.locations.new?.snippet).isEqualTo("#{item.label}")
+    }
+
+    @Test
+    fun `problem locations can carry binding origins with provenance-backed descriptors`() {
+        val document = SourceDocument.fromPath(
+            side = AnalysisSide.OLD,
+            path = Path.of("legacy", "table.xhtml"),
+        )
+        val bindingOrigin = BindingOrigin(
+            descriptor = "ui:repeat var=row",
+            provenance = Provenance.forRoot(document),
+        )
+        val problemLocation = ProblemLocation(
+            provenance = Provenance.forRoot(document),
+            snippet = "#{row.label}",
+            bindingOrigin = bindingOrigin,
+        )
+
+        assertThat(problemLocation.bindingOrigin).isEqualTo(bindingOrigin)
+        assertThat(problemLocation.bindingOrigin?.render()).isEqualTo("ui:repeat var=row from legacy/table.xhtml")
     }
 }

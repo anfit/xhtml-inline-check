@@ -20,4 +20,7 @@ value class ScopeId(
 
 data class BindingOrigin(
     val descriptor: String,
-)
+    val provenance: Provenance? = null,
+) {
+    fun render(): String = provenance?.logicalLocation?.render()?.let { "$descriptor from $it" } ?: descriptor
+}

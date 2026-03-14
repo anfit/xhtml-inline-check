@@ -7,6 +7,7 @@ import dev.xhtmlinlinecheck.domain.AnalysisSummary
 import dev.xhtmlinlinecheck.domain.AggregateCounts
 import dev.xhtmlinlinecheck.domain.AggregateCoverage
 import dev.xhtmlinlinecheck.domain.AttributeLocationPrecision
+import dev.xhtmlinlinecheck.domain.BindingOrigin
 import dev.xhtmlinlinecheck.domain.Problem
 import dev.xhtmlinlinecheck.domain.ProblemCategory
 import dev.xhtmlinlinecheck.domain.ProblemIds
@@ -56,6 +57,12 @@ class JsonReportRendererOrderingTest {
             "\"locations\"",
             "\"explanation\"",
             "\"hint\"",
+        )
+        assertContainsInOrder(
+            rendered,
+            "\"snippet\"",
+            "\"bindingOrigin\"",
+            "\"includeStack\"",
         )
         assertThat(rendered).contains("\"logicalLocationDetails\"")
         assertThat(rendered).contains("\"physicalLocationDetails\"")
@@ -156,6 +163,11 @@ class JsonReportRendererOrderingTest {
             ProblemLocation(
                 provenance = Provenance(physicalLocation = location, logicalLocation = location),
                 snippet = snippet,
+                bindingOrigin =
+                    BindingOrigin(
+                        descriptor = "ui:repeat var=row",
+                        provenance = Provenance(physicalLocation = location, logicalLocation = location),
+                    ),
             )
         }
 

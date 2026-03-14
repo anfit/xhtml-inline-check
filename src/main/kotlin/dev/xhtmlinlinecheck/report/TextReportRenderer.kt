@@ -50,5 +50,8 @@ class TextReportRenderer {
         location.snippet?.let { snippet ->
             append(" -> ").append(snippet)
         }
+        location.bindingOrigin?.let { origin ->
+            append(" [binding: ").append(origin.render()).append("]")
+        }
     }
 }

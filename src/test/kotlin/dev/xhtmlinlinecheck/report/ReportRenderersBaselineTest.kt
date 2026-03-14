@@ -8,6 +8,7 @@ import dev.xhtmlinlinecheck.domain.AnalysisStats
 import dev.xhtmlinlinecheck.domain.AggregateCounts
 import dev.xhtmlinlinecheck.domain.AggregateCoverage
 import dev.xhtmlinlinecheck.domain.AttributeLocationPrecision
+import dev.xhtmlinlinecheck.domain.BindingOrigin
 import dev.xhtmlinlinecheck.domain.ProblemIds
 import dev.xhtmlinlinecheck.domain.Problem
 import dev.xhtmlinlinecheck.domain.ProblemCategory
@@ -69,6 +70,63 @@ class ReportRenderersBaselineTest {
 
         assertThat(TextReportRenderer().render(report)).contains("@rendered (element fallback)")
         assertThat(JsonReportRenderer().render(report)).contains("\"attributeLocationPrecision\": \"ELEMENT_FALLBACK\"")
+    }
+
+    @Test
+    fun `renderers surface binding origins when a comparison diagnostic explains a resolved binding`() {
+        val oldDocument = SourceDocument.fromPath(AnalysisSide.OLD, Path.of("legacy", "order.xhtml"))
+        val newDocument = SourceDocument.fromPath(AnalysisSide.NEW, Path.of("refactored", "order.xhtml"))
+        val report =
+            AnalysisReport(
+                result = AnalysisResult.NOT_EQUIVALENT,
+                summary = AnalysisSummary(
+                    headline = "Binding mismatch",
+                    counts = AggregateCounts(checked = 1, matched = 0, mismatched = 1),
+                    coverage = AggregateCoverage(covered = 1, total = 1),
+                    warnings = WarningTotals(total = 0, blocking = 0),
+                ),
+                problems = listOf(
+                    Problem(
+                        id = ProblemIds.SCOPE_BINDING_MISMATCH,
+                        severity = Severity.ERROR,
+                        category = ProblemCategory.SCOPE,
+                        summary = "Local variable resolves to different binding",
+                        locations = ProblemLocations(
+                            old =
+                                ProblemLocation(
+                                    provenance = Provenance.forRoot(oldDocument),
+                                    snippet = "#{row.label}",
+                                    bindingOrigin =
+                                        BindingOrigin(
+                                            descriptor = "ui:repeat var=row",
+                                            provenance = Provenance.forRoot(oldDocument),
+                                        ),
+                                ),
+                            new =
+                                ProblemLocation(
+                                    provenance = Provenance.forRoot(newDocument),
+                                    snippet = "#{item.label}",
+                                    bindingOrigin =
+                                        BindingOrigin(
+                                            descriptor = "ui:repeat var=item",
+                                            provenance = Provenance.forRoot(newDocument),
+                                        ),
+                                ),
+                        ),
+                        explanation = "The expression now resolves against a different iterator binding.",
+                    ),
+                ),
+                stats = AnalysisStats(
+                    counts = AggregateCounts(checked = 1, matched = 0, mismatched = 1),
+                    coverage = AggregateCoverage(covered = 1, total = 1),
+                    warnings = WarningTotals(total = 0, blocking = 0),
+                ),
+            )
+
+        assertThat(TextReportRenderer().render(report)).contains("[binding: ui:repeat var=row from legacy/order.xhtml]")
+        assertThat(JsonReportRenderer().render(report)).contains("\"bindingOrigin\"")
+        assertThat(JsonReportRenderer().render(report)).contains("\"descriptor\": \"ui:repeat var=item\"")
+        assertThat(JsonReportRenderer().render(report)).contains("\"rendered\": \"ui:repeat var=item from refactored/order.xhtml\"")
     }
 
     @ParameterizedTest(name = "{0}")
