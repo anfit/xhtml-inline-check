@@ -295,8 +295,25 @@ class SemanticNodeExtractionTest {
         )
 
         val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val semanticNodes = semanticModels.oldRoot.semanticNodes
+        val repeatNode = semanticNodes.single { it.nodeName == "ui:repeat" }
+        val forEachNode = semanticNodes.single { it.nodeName == "c:forEach" }
         val deepOutputNode = semanticModels.oldRoot.semanticNodes.single { it.explicitIdAttribute?.rawValue == "deepOutput" }
 
+        assertThat(
+            listOf(repeatNode, forEachNode, deepOutputNode).map { node ->
+                Tuple.tuple(
+                    node.nodeName,
+                    node.structuralContext.formAncestry.map { it.nodeName },
+                    node.structuralContext.namingContainerAncestry.map { it.nodeName },
+                    node.structuralContext.iterationAncestry.map { it.nodeName },
+                )
+            },
+        ).containsExactly(
+            Tuple.tuple("ui:repeat", listOf("h:form"), listOf("h:form"), emptyList<String>()),
+            Tuple.tuple("c:forEach", listOf("h:form"), listOf("h:form"), listOf("ui:repeat")),
+            Tuple.tuple("h:outputText", listOf("h:form"), listOf("h:form"), listOf("ui:repeat", "c:forEach")),
+        )
         assertThat(deepOutputNode.structuralContext.formAncestry.map { it.nodeName }).containsExactly("h:form")
         assertThat(deepOutputNode.structuralContext.namingContainerAncestry.map { it.nodeName }).containsExactly("h:form")
         assertThat(deepOutputNode.structuralContext.iterationAncestry.map { it.nodeName }).containsExactly("ui:repeat", "c:forEach")

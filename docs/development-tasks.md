@@ -1,4 +1,3 @@
-Add combined ancestry tests that validate form ancestry, naming-container ancestry, and iteration ancestry in one pass so later matcher/comparator work relies on one stable structural-context contract.
 Add fixture coverage for `ui:param` visibility across include expansion before deeper comparison work, so include-parameter scope behavior remains locked as semantic-node and EL work evolves.
 Define the shared internal model for component-target references so semantic extraction, resolution, comparison, and diagnostics all use one representation for `for`, `update`, `render`, `process`, and `execute`.
 Implement extraction of tokenized target lists from `for`, `update`, `render`, `process`, and `execute`, building on semantic-node attribute capture so target-bearing attributes stop being raw strings.
