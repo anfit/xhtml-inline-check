@@ -1,6 +1,7 @@
 package dev.xhtmlinlinecheck.loader
 
 import dev.xhtmlinlinecheck.analyzer.AnalysisRequest
+import dev.xhtmlinlinecheck.domain.AttributeLocationPrecision
 import dev.xhtmlinlinecheck.testing.TemporaryProjectTree
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -49,6 +50,7 @@ class SourceLoaderIncludeDiscoveryTest {
         assertThat(edge.includedFile!!.contents).contains("<ui:fragment")
         assertThat(edge.includeSite.document).isEqualTo(loadedSources.oldRoot.document)
         assertThat(edge.includeSite.attributeName).isEqualTo("src")
+        assertThat(edge.includeSite.attributeLocationPrecision).isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
         assertThat(edge.includeSite.span?.start?.line).isEqualTo(2)
         assertThat(edge.includeSite.span?.start?.column).isGreaterThan(0)
         assertThat(edge.parameters).isEmpty()
@@ -127,7 +129,7 @@ class SourceLoaderIncludeDiscoveryTest {
 
         assertThat(edge.sourcePath).isEqualTo("#{bean.fragmentPath}")
         assertThat(edge.includeSite.render()).startsWith("legacy/root.xhtml:2:")
-        assertThat(edge.includeSite.render()).endsWith(" @src")
+        assertThat(edge.includeSite.render()).endsWith(" @src (element fallback)")
         assertThat(edge.includeFailure).isNotNull()
         assertThat(edge.includeFailure!!.kind).isEqualTo(dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailureKind.DYNAMIC_PATH)
         assertThat(edge.includeFailure!!.dynamicSourcePath).isEqualTo("#{bean.fragmentPath}")
@@ -180,6 +182,8 @@ class SourceLoaderIncludeDiscoveryTest {
             .isTrue()
         assertThat(parameters.map { it.provenance.physicalLocation.attributeName })
             .containsOnly("value")
+        assertThat(parameters.map { it.provenance.physicalLocation.attributeLocationPrecision })
+            .containsOnly(AttributeLocationPrecision.ELEMENT_FALLBACK)
     }
 
     @Test
@@ -227,6 +231,8 @@ class SourceLoaderIncludeDiscoveryTest {
         assertThat(parameter.valueExpression).isNull()
         assertThat(parameter.provenance.physicalLocation.render()).startsWith("legacy/root.xhtml:")
         assertThat(parameter.provenance.physicalLocation.attributeName).isEqualTo("name")
+        assertThat(parameter.provenance.physicalLocation.attributeLocationPrecision)
+            .isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
     }
 
     @Test

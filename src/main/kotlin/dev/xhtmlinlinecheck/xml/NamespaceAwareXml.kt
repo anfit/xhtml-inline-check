@@ -1,5 +1,6 @@
 package dev.xhtmlinlinecheck.xml
 
+import dev.xhtmlinlinecheck.domain.AttributeLocationPrecision
 import com.ctc.wstx.stax.WstxInputFactory
 import dev.xhtmlinlinecheck.domain.SourceDocument
 import dev.xhtmlinlinecheck.domain.SourceLocation
@@ -34,6 +35,8 @@ internal fun XMLStreamReader.readAttributeValue(attributeName: String): String? 
 internal fun XMLStreamReader.toSourceLocation(
     document: SourceDocument,
     attributeName: String? = null,
+    attributeLocationPrecision: AttributeLocationPrecision? =
+        attributeName?.let { AttributeLocationPrecision.ELEMENT_FALLBACK },
 ): SourceLocation =
     SourceLocation(
         document = document,
@@ -46,6 +49,7 @@ internal fun XMLStreamReader.toSourceLocation(
                     ),
             ),
         attributeName = attributeName,
+        attributeLocationPrecision = attributeLocationPrecision,
     )
 
 internal inline fun <T : AutoCloseable?, R> T.useAndClose(block: (T) -> R): R =

@@ -1,6 +1,7 @@
 package dev.xhtmlinlinecheck.testing
 
 import dev.xhtmlinlinecheck.analyzer.AnalysisRequest
+import dev.xhtmlinlinecheck.domain.AttributeLocationPrecision
 import dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailureKind
 import dev.xhtmlinlinecheck.loader.SourceLoader
 import dev.xhtmlinlinecheck.syntax.LogicalElementNode
@@ -133,6 +134,7 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(includeEdge.includeSite.render())
             .startsWith("fixtures/support/missing-include/old/root.xhtml:2:")
         assertThat(includeEdge.includeSite.attributeName).isEqualTo("src")
+        assertThat(includeEdge.includeSite.attributeLocationPrecision).isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
         assertThat(includeEdge.includedDocument).isNotNull()
         assertThat(includeEdge.includedDocument!!.displayPath)
             .isEqualTo("fixtures/support/missing-include/old/fragments/missing.xhtml")
@@ -143,6 +145,8 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(includeEdge.parameters.single().provenance.logicalLocation.render())
             .startsWith("fixtures/support/missing-include/old/root.xhtml:3:")
         assertThat(includeEdge.parameters.single().provenance.logicalLocation.attributeName).isEqualTo("value")
+        assertThat(includeEdge.parameters.single().provenance.logicalLocation.attributeLocationPrecision)
+            .isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
 
         val parsedTrees = XhtmlSyntaxParser.scaffold().parse(loadedSources)
         val includeNode = parsedTrees.oldRoot.syntaxTree.root!!.children.single() as LogicalIncludeNode
@@ -152,6 +156,8 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(includeNode.provenance.logicalLocation.render())
             .startsWith("fixtures/support/missing-include/old/root.xhtml:2:")
         assertThat(includeNode.provenance.logicalLocation.attributeName).isEqualTo("src")
+        assertThat(includeNode.provenance.logicalLocation.attributeLocationPrecision)
+            .isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
         assertThat(includeNode.includeFailure).isNotNull()
         assertThat(includeNode.includeFailure!!.missingDocument!!.displayPath)
             .isEqualTo("fixtures/support/missing-include/old/fragments/missing.xhtml")
@@ -214,6 +220,8 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(recursiveInclude.provenance.logicalLocation.render())
             .startsWith("fixtures/support/include-cycle/old/fragments/outer.xhtml:2:")
         assertThat(recursiveInclude.provenance.logicalLocation.attributeName).isEqualTo("src")
+        assertThat(recursiveInclude.provenance.logicalLocation.attributeLocationPrecision)
+            .isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
         assertThat(recursiveInclude.provenance.includeStack).hasSize(1)
         assertThat(recursiveInclude.provenance.includeStack.single().includeSite.render())
             .startsWith("fixtures/support/include-cycle/old/root.xhtml:2:")
@@ -250,6 +258,7 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(includeEdge.includeSite.render())
             .startsWith("fixtures/inconclusive/dynamic-include/old/root.xhtml:2:")
         assertThat(includeEdge.includeSite.attributeName).isEqualTo("src")
+        assertThat(includeEdge.includeSite.attributeLocationPrecision).isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
         assertThat(includeEdge.includedDocument).isNull()
         assertThat(includeEdge.includedFile).isNull()
         assertThat(includeEdge.includeFailure).isNotNull()
@@ -266,6 +275,8 @@ class SimpleIncludeFixturePipelineTest {
         assertThat(includeNode.provenance.logicalLocation.render())
             .startsWith("fixtures/inconclusive/dynamic-include/old/root.xhtml:2:")
         assertThat(includeNode.provenance.logicalLocation.attributeName).isEqualTo("src")
+        assertThat(includeNode.provenance.logicalLocation.attributeLocationPrecision)
+            .isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
         assertThat(includeNode.includeFailure).isNotNull()
         assertThat(includeNode.includeFailure!!.kind).isEqualTo(SourceGraphIncludeFailureKind.DYNAMIC_PATH)
         assertThat(includeNode.includeFailure!!.dynamicSourcePath).isEqualTo("#{bean.fragmentPath}")

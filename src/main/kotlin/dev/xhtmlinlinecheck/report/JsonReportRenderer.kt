@@ -6,6 +6,7 @@ import dev.xhtmlinlinecheck.domain.AggregateCoverage
 import dev.xhtmlinlinecheck.domain.IncludeProvenanceStep
 import dev.xhtmlinlinecheck.domain.Problem
 import dev.xhtmlinlinecheck.domain.ProblemLocation
+import dev.xhtmlinlinecheck.domain.SourceLocation
 import dev.xhtmlinlinecheck.domain.WarningTotals
 import java.util.Locale
 
@@ -102,11 +103,26 @@ $problemEntries
         return """
         {
           "logicalLocation": "${escape(location.logicalLocation.render())}",
+          "logicalLocationDetails": ${renderSourceLocationDetails(location.logicalLocation)},
           "physicalLocation": "${escape(location.physicalLocation.render())}",
+          "physicalLocationDetails": ${renderSourceLocationDetails(location.physicalLocation)},
           "snippet": ${renderNullableString(location.snippet)},
           "includeStack": [
 $includeStack
           ]
+        }
+        """.trimIndent()
+    }
+
+    private fun renderSourceLocationDetails(location: SourceLocation): String {
+        val start = location.span?.start
+        return """
+        {
+          "document": "${escape(location.document.displayPath)}",
+          "line": ${start?.line ?: "null"},
+          "column": ${start?.column ?: "null"},
+          "attributeName": ${renderNullableString(location.attributeName)},
+          "attributeLocationPrecision": ${location.attributeLocationPrecision?.let { "\"${it.name}\"" } ?: "null"}
         }
         """.trimIndent()
     }

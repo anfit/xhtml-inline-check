@@ -1,6 +1,7 @@
 package dev.xhtmlinlinecheck.syntax
 
 import dev.xhtmlinlinecheck.analyzer.AnalysisRequest
+import dev.xhtmlinlinecheck.domain.AttributeLocationPrecision
 import dev.xhtmlinlinecheck.loader.SourceLoader
 import dev.xhtmlinlinecheck.testing.TemporaryProjectTree
 import org.assertj.core.api.Assertions.assertThat
@@ -101,8 +102,9 @@ class XhtmlSyntaxParserNamespaceAwareTest {
         assertThat(output.location.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(output.provenance.logicalLocation.render()).startsWith("legacy/root.xhtml:2:")
         assertThat(valueAttribute.value).isEqualTo("#{bean.message}")
-        assertThat(valueAttribute.location.render()).startsWith("legacy/root.xhtml:2:")
+        assertThat(valueAttribute.location.render()).contains("@value (element fallback)")
         assertThat(valueAttribute.location.attributeName).isEqualTo("value")
+        assertThat(valueAttribute.location.attributeLocationPrecision).isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
     }
 
     @Test

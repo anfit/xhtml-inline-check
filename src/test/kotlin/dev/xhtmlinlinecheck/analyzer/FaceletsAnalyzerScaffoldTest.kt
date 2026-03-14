@@ -1,5 +1,6 @@
 package dev.xhtmlinlinecheck.analyzer
 
+import dev.xhtmlinlinecheck.domain.AttributeLocationPrecision
 import dev.xhtmlinlinecheck.domain.AnalysisResult
 import dev.xhtmlinlinecheck.testing.FixtureExpectations
 import dev.xhtmlinlinecheck.testing.FixtureScenarios
@@ -163,6 +164,10 @@ class FaceletsAnalyzerScaffoldTest {
             .startsWith("fixtures/inconclusive/dynamic-include/old/root.xhtml:2:")
         assertThat(report.problems.first().locations.old?.logicalLocation?.attributeName).isEqualTo("src")
         assertThat(report.problems.first().locations.old?.physicalLocation?.attributeName).isEqualTo("src")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.attributeLocationPrecision)
+            .isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
+        assertThat(report.problems.first().locations.old?.physicalLocation?.attributeLocationPrecision)
+            .isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
         assertThat(report.problems.first().locations.old?.snippet).isEqualTo("#{bean.fragmentPath}")
         assertThat(report.problems.first().explanation).contains("comparison beneath this node is not trustworthy")
         assertThat(report.summary.headline).contains("Scaffolded analyzer pipeline only")
@@ -237,6 +242,10 @@ class FaceletsAnalyzerScaffoldTest {
             .startsWith("fixtures/support/missing-include/old/root.xhtml:2:")
         assertThat(report.problems.first().locations.old?.logicalLocation?.attributeName).isEqualTo("src")
         assertThat(report.problems.first().locations.old?.physicalLocation?.attributeName).isEqualTo("src")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.attributeLocationPrecision)
+            .isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
+        assertThat(report.problems.first().locations.old?.physicalLocation?.attributeLocationPrecision)
+            .isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
         assertThat(report.problems.first().locations.old?.snippet).isEqualTo("/fragments/missing.xhtml")
         assertThat(report.problems.first().explanation)
             .contains(
@@ -273,6 +282,10 @@ class FaceletsAnalyzerScaffoldTest {
             .startsWith("fixtures/support/include-cycle/old/fragments/outer.xhtml:2:")
         assertThat(report.problems.first().locations.old?.logicalLocation?.attributeName).isEqualTo("src")
         assertThat(report.problems.first().locations.old?.physicalLocation?.attributeName).isEqualTo("src")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.attributeLocationPrecision)
+            .isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
+        assertThat(report.problems.first().locations.old?.physicalLocation?.attributeLocationPrecision)
+            .isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
         assertThat(report.problems.first().locations.old?.snippet).isEqualTo("../root.xhtml")
         assertThat(report.problems.first().explanation)
             .contains(

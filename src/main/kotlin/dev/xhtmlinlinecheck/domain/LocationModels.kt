@@ -112,15 +112,32 @@ data class SourceSpan(
     val end: SourcePosition? = null,
 )
 
+enum class AttributeLocationPrecision {
+    EXACT,
+    ELEMENT_FALLBACK,
+}
+
 data class SourceLocation(
     val document: SourceDocument,
     val span: SourceSpan? = null,
     val attributeName: String? = null,
+    val attributeLocationPrecision: AttributeLocationPrecision? = null,
 ) {
+    init {
+        require((attributeName == null) == (attributeLocationPrecision == null)) {
+            "attribute name and precision must either both be present or both be absent"
+        }
+    }
+
     fun render(): String = buildString {
         append(document.displayPath)
         span?.let { append(":${it.start.line}:${it.start.column}") }
-        attributeName?.let { append(" @").append(it) }
+        attributeName?.let {
+            append(" @").append(it)
+            if (attributeLocationPrecision == AttributeLocationPrecision.ELEMENT_FALLBACK) {
+                append(" (element fallback)")
+            }
+        }
     }
 }
 

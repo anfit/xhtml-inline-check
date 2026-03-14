@@ -36,11 +36,13 @@ class SourceGraphModelsTest {
                 document = rootDocument,
                 span = SourceSpan(SourcePosition(line = 7, column = 9)),
                 attributeName = "value",
+                attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
             ),
             logicalLocation = SourceLocation(
                 document = rootDocument,
                 span = SourceSpan(SourcePosition(line = 7, column = 9)),
                 attributeName = "value",
+                attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
             ),
         )
         val edge = SourceGraphEdge(
@@ -48,6 +50,7 @@ class SourceGraphModelsTest {
                 document = rootDocument,
                 span = SourceSpan(SourcePosition(line = 5, column = 5)),
                 attributeName = "src",
+                attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
             ),
             sourcePath = "/fragments/table.xhtml",
             includedDocument = includedDocument,
@@ -67,7 +70,7 @@ class SourceGraphModelsTest {
         assertThat(edge.isResolved).isTrue()
         assertThat(edge.parameters.single().valueExpression).isEqualTo("#{bean.row}")
         assertThat(edge.parameters.single().provenance.physicalLocation.render())
-            .isEqualTo("legacy/root.xhtml:7:9 @value")
+            .isEqualTo("legacy/root.xhtml:7:9 @value (element fallback)")
         assertThat(edge.stackAfter.steps).containsExactly(edge.asIncludeStep())
         assertThat(includedFile.stack.steps).containsExactly(edge.asIncludeStep())
         assertThat(includedFile.provenance.includeStack).containsExactly(edge.asIncludeStep())
@@ -87,6 +90,7 @@ class SourceGraphModelsTest {
                 document = rootDocument,
                 span = SourceSpan(SourcePosition(line = 9, column = 13)),
                 attributeName = "src",
+                attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
             ),
             sourcePath = "#{bean.fragmentPath}",
         )
@@ -110,6 +114,7 @@ class SourceGraphModelsTest {
                 document = rootDocument,
                 span = SourceSpan(SourcePosition(line = 9, column = 13)),
                 attributeName = "src",
+                attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
             ),
             sourcePath = "#{bean.fragmentPath}",
             includeFailure = SourceGraphIncludeFailure.dynamicPath("#{bean.fragmentPath}"),
@@ -138,6 +143,7 @@ class SourceGraphModelsTest {
                 document = outerDocument,
                 span = SourceSpan(SourcePosition(line = 3, column = 7)),
                 attributeName = "src",
+                attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
             ),
             includedDocument = rootDocument,
             sourcePath = "/legacy/root.xhtml",
@@ -168,6 +174,7 @@ class SourceGraphModelsTest {
                 document = rootDocument,
                 span = SourceSpan(SourcePosition(line = 4, column = 11)),
                 attributeName = "src",
+                attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
             ),
             includedDocument = missingDocument,
             sourcePath = "/fragments/missing.xhtml",

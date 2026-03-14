@@ -7,6 +7,7 @@ import dev.xhtmlinlinecheck.domain.AnalysisSummary
 import dev.xhtmlinlinecheck.domain.AnalysisStats
 import dev.xhtmlinlinecheck.domain.AggregateCounts
 import dev.xhtmlinlinecheck.domain.AggregateCoverage
+import dev.xhtmlinlinecheck.domain.AttributeLocationPrecision
 import dev.xhtmlinlinecheck.domain.ProblemIds
 import dev.xhtmlinlinecheck.domain.Problem
 import dev.xhtmlinlinecheck.domain.ProblemCategory
@@ -15,14 +16,61 @@ import dev.xhtmlinlinecheck.domain.ProblemLocations
 import dev.xhtmlinlinecheck.domain.Provenance
 import dev.xhtmlinlinecheck.domain.Severity
 import dev.xhtmlinlinecheck.domain.SourceDocument
+import dev.xhtmlinlinecheck.domain.SourceLocation
+import dev.xhtmlinlinecheck.domain.SourcePosition
+import dev.xhtmlinlinecheck.domain.SourceSpan
 import dev.xhtmlinlinecheck.domain.WarningTotals
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import java.nio.file.Path
 import java.util.stream.Stream
 
 class ReportRenderersBaselineTest {
+    @Test
+    fun `renderers surface attribute fallback metadata when only element coordinates are available`() {
+        val document = SourceDocument.fromPath(
+            side = AnalysisSide.OLD,
+            path = Path.of("legacy", "order.xhtml"),
+        )
+        val location =
+            SourceLocation(
+                document = document,
+                span = SourceSpan(SourcePosition(line = 12, column = 7)),
+                attributeName = "rendered",
+                attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
+            )
+        val report =
+            AnalysisReport(
+                result = AnalysisResult.INCONCLUSIVE,
+                summary = AnalysisSummary(
+                    headline = "Fallback metadata check",
+                    counts = AggregateCounts(checked = 0, matched = 0, mismatched = 0),
+                    coverage = AggregateCoverage(covered = 0, total = 0),
+                    warnings = WarningTotals(total = 1, blocking = 1),
+                ),
+                problems = listOf(
+                    Problem(
+                        id = ProblemIds.SCOPE_BINDING_MISMATCH,
+                        severity = Severity.ERROR,
+                        category = ProblemCategory.SCOPE,
+                        summary = "Attribute location stays explicit",
+                        locations = ProblemLocations(old = ProblemLocation(Provenance(location, location), "#{bean.flag}")),
+                        explanation = "Reporter should preserve fallback metadata.",
+                    ),
+                ),
+                stats = AnalysisStats(
+                    counts = AggregateCounts(checked = 0, matched = 0, mismatched = 0),
+                    coverage = AggregateCoverage(covered = 0, total = 0),
+                    warnings = WarningTotals(total = 1, blocking = 1),
+                ),
+            )
+
+        assertThat(TextReportRenderer().render(report)).contains("@rendered (element fallback)")
+        assertThat(JsonReportRenderer().render(report)).contains("\"attributeLocationPrecision\": \"ELEMENT_FALLBACK\"")
+    }
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("renderers")
     fun `renders baseline report fields deterministically`(

@@ -1,4 +1,3 @@
-Preserve attribute-level location where the chosen parser can support it, or explicitly attach element-plus-attribute fallback metadata so EL, target, and reporter tasks can still be precise.
 Attach include provenance to syntax nodes created from expanded content, combining the logical-expansion and syntax-tree tasks so diagnostics can show physical and logical origin.
 Normalize transparent-wrapper handling in the syntax model where appropriate so later semantic and matching tasks do not treat include inlining itself as a structural change.
 Add unit tests for namespace preservation, validating the parser-selection and syntax-tree construction tasks before rule-registry logic depends on them.

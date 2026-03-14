@@ -6,6 +6,7 @@ import dev.xhtmlinlinecheck.domain.AnalysisSide
 import dev.xhtmlinlinecheck.domain.AnalysisSummary
 import dev.xhtmlinlinecheck.domain.AggregateCounts
 import dev.xhtmlinlinecheck.domain.AggregateCoverage
+import dev.xhtmlinlinecheck.domain.AttributeLocationPrecision
 import dev.xhtmlinlinecheck.domain.Problem
 import dev.xhtmlinlinecheck.domain.ProblemCategory
 import dev.xhtmlinlinecheck.domain.ProblemIds
@@ -14,6 +15,9 @@ import dev.xhtmlinlinecheck.domain.ProblemLocations
 import dev.xhtmlinlinecheck.domain.Provenance
 import dev.xhtmlinlinecheck.domain.Severity
 import dev.xhtmlinlinecheck.domain.SourceDocument
+import dev.xhtmlinlinecheck.domain.SourceLocation
+import dev.xhtmlinlinecheck.domain.SourcePosition
+import dev.xhtmlinlinecheck.domain.SourceSpan
 import dev.xhtmlinlinecheck.domain.WarningIds
 import dev.xhtmlinlinecheck.domain.WarningTotals
 import org.assertj.core.api.Assertions.assertThat
@@ -53,6 +57,9 @@ class JsonReportRendererOrderingTest {
             "\"explanation\"",
             "\"hint\"",
         )
+        assertThat(rendered).contains("\"logicalLocationDetails\"")
+        assertThat(rendered).contains("\"physicalLocationDetails\"")
+        assertThat(rendered).contains("\"attributeLocationPrecision\": \"ELEMENT_FALLBACK\"")
     }
 
     @Test
@@ -96,6 +103,7 @@ class JsonReportRendererOrderingTest {
                             side = AnalysisSide.OLD,
                             path = Path.of("legacy", "order.xhtml"),
                             snippet = "#{row.label}",
+                            attributeName = "value",
                         ),
                         new = location(
                             side = AnalysisSide.NEW,
@@ -128,16 +136,28 @@ class JsonReportRendererOrderingTest {
         side: AnalysisSide,
         path: Path,
         snippet: String,
+        attributeName: String? = null,
     ): ProblemLocation =
-        ProblemLocation(
-            provenance = Provenance.forRoot(
-                SourceDocument.fromPath(
-                    side = side,
-                    path = path,
-                ),
-            ),
-            snippet = snippet,
-        )
+        SourceDocument.fromPath(
+            side = side,
+            path = path,
+        ).let { document ->
+            val location =
+                if (attributeName == null) {
+                    SourceLocation(document = document)
+                } else {
+                    SourceLocation(
+                        document = document,
+                        span = SourceSpan(SourcePosition(line = 8, column = 17)),
+                        attributeName = attributeName,
+                        attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
+                    )
+                }
+            ProblemLocation(
+                provenance = Provenance(physicalLocation = location, logicalLocation = location),
+                snippet = snippet,
+            )
+        }
 
     private fun assertContainsInOrder(
         actual: String,

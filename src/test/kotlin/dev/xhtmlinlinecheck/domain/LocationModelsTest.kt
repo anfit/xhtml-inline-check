@@ -90,9 +90,11 @@ class LocationModelsTest {
                 start = SourcePosition(line = 12, column = 7),
             ),
             attributeName = "rendered",
+            attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
         )
 
-        assertThat(location.render()).isEqualTo("refactored/page.xhtml:12:7 @rendered")
+        assertThat(location.render()).isEqualTo("refactored/page.xhtml:12:7 @rendered (element fallback)")
+        assertThat(location.attributeLocationPrecision).isEqualTo(AttributeLocationPrecision.ELEMENT_FALLBACK)
     }
 
     @Test
