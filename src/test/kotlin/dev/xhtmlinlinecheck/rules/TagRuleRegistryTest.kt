@@ -99,6 +99,77 @@ class TagRuleRegistryTest {
     }
 
     @Test
+    fun `synthetic registry overlay order stays deterministic across exact namespace and fallback layers`() {
+        val customRegistry =
+            syntheticRegistry(
+                exactRules =
+                    mapOf(
+                        "panel" to
+                            StaticTagRule(
+                                bindingRules =
+                                    listOf(
+                                        BindingCreationRule(
+                                            kind = BindingKind.SET_VAR,
+                                            nameAttribute = "exactVar",
+                                        ),
+                                    ),
+                                elAttributeNames = linkedSetOf("exactOnly", "shared"),
+                                targetAttributeNames = linkedSetOf("exactTarget", "sharedTarget"),
+                            ),
+                    ),
+                namespaceDefaults =
+                    mapOf(
+                        "urn:test" to
+                            StaticTagRule(
+                                bindingRules =
+                                    listOf(
+                                        BindingCreationRule(
+                                            kind = BindingKind.FOR_EACH_VAR,
+                                            nameAttribute = "namespaceVar",
+                                        ),
+                                    ),
+                                elAttributeNames = linkedSetOf("namespaceOnly", "shared"),
+                                targetAttributeNames = linkedSetOf("namespaceTarget", "sharedTarget"),
+                            ),
+                    ),
+                fallbackRule =
+                    StaticTagRule(
+                        bindingRules =
+                            listOf(
+                                BindingCreationRule(
+                                    kind = BindingKind.ITERATION_VAR,
+                                    nameAttribute = "fallbackVar",
+                                ),
+                            ),
+                        elAttributeNames = linkedSetOf("fallbackOnly", "shared"),
+                        targetAttributeNames = linkedSetOf("fallbackTarget", "sharedTarget"),
+                    ),
+            )
+
+        val firstLookup = customRegistry.resolve(LogicalName(localName = "panel", namespaceUri = "urn:test", prefix = "a"))
+        val secondLookup = customRegistry.resolve(LogicalName(localName = "panel", namespaceUri = "urn:test", prefix = "b"))
+
+        assertThat(firstLookup).isEqualTo(secondLookup)
+        assertThat(firstLookup.bindingRules).containsExactly(
+            BindingCreationRule(
+                kind = BindingKind.SET_VAR,
+                nameAttribute = "exactVar",
+            ),
+            BindingCreationRule(
+                kind = BindingKind.FOR_EACH_VAR,
+                nameAttribute = "namespaceVar",
+            ),
+            BindingCreationRule(
+                kind = BindingKind.ITERATION_VAR,
+                nameAttribute = "fallbackVar",
+            ),
+        )
+        assertThat(firstLookup.elAttributeNames).containsExactly("exactOnly", "shared", "namespaceOnly", "fallbackOnly")
+        assertThat(firstLookup.targetAttributeNames)
+            .containsExactly("exactTarget", "sharedTarget", "namespaceTarget", "fallbackTarget")
+    }
+
+    @Test
     fun `h form stays an explicit built in rule for form ancestry dependent tasks`() {
         val prefixedFormRule =
             registry.resolve(
@@ -133,6 +204,20 @@ class TagRuleRegistryTest {
         assertThat(genericRule.isNamingContainer).isFalse()
         assertThat(genericRule.elAttributeNames).containsExactly("rendered")
         assertThat(genericRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
+    }
+
+    @Test
+    fun `same local name in another namespace does not inherit facelets include semantics`() {
+        val faceletsInclude = registry.resolve(LogicalName(localName = "include", namespaceUri = FACELETS_NAMESPACE, prefix = "ui"))
+        val genericInclude = registry.resolve(LogicalName(localName = "include", namespaceUri = null))
+
+        assertThat(faceletsInclude.syntaxRole).isEqualTo(SyntaxRole.INCLUDE)
+        assertThat(faceletsInclude.elAttributeNames).containsExactly("src")
+        assertThat(faceletsInclude.targetAttributeNames).isEmpty()
+        assertThat(genericInclude.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(genericInclude.isIncludeTag).isFalse()
+        assertThat(genericInclude.elAttributeNames).containsExactly("rendered")
+        assertThat(genericInclude.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
     }
 
     @Test
@@ -187,5 +272,24 @@ class TagRuleRegistryTest {
 
         assertThat(unknownRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
         assertThat(unknownRule.bindingRules).isEmpty()
+    }
+
+    private fun syntheticRegistry(
+        exactRules: Map<String, TagRule>,
+        namespaceDefaults: Map<String, TagRule>,
+        fallbackRule: TagRule,
+    ): TagRuleRegistry {
+        val selectorClass = Class.forName("dev.xhtmlinlinecheck.rules.TagSelector")
+        val selectorConstructor = selectorClass.getDeclaredConstructor(String::class.java, String::class.java)
+        selectorConstructor.isAccessible = true
+        val exactRuleMap =
+            exactRules.mapKeys { (localName, _) ->
+                selectorConstructor.newInstance("urn:test", localName)
+            }
+        val registryClass = Class.forName("dev.xhtmlinlinecheck.rules.StaticTagRuleRegistry")
+        val registryConstructor =
+            registryClass.getDeclaredConstructor(Map::class.java, Map::class.java, TagRule::class.java)
+        registryConstructor.isAccessible = true
+        return registryConstructor.newInstance(exactRuleMap, namespaceDefaults, fallbackRule) as TagRuleRegistry
     }
 }
