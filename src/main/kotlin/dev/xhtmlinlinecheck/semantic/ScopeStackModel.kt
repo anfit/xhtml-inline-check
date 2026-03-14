@@ -258,17 +258,22 @@ private data class ScopeTransition(
     val nodeScopeId: ScopeId,
     val descendantScopeId: ScopeId,
     val introducedBindings: List<ScopeBinding>,
-)
+) {
+    val persistsIntoLaterSiblings: Boolean
+        get() = introducedBindings.any(ScopeBinding::persistsIntoLaterSiblings)
+}
 
 private fun LogicalElementNode.exitScopeId(
     transition: ScopeTransition,
     childScopeId: ScopeId,
 ): ScopeId =
-    if (transition.introducedBindings.any { it.kind == BindingKind.C_SET }) {
+    if (transition.persistsIntoLaterSiblings) {
         childScopeId
     } else {
         transition.nodeScopeId
     }
+
+private fun ScopeBinding.persistsIntoLaterSiblings(): Boolean = kind == BindingKind.C_SET
 
 private fun Provenance.atBindingLocation(location: SourceLocation): Provenance =
     if (includeStack.isEmpty()) {

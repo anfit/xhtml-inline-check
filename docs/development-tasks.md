@@ -1,4 +1,3 @@
-Implement binding creation for `c:set`, using the JSTL rule-registry task and scope-walker task.
 Implement binding creation for `c:forEach`, using the JSTL rule-registry task and scope-walker task to mirror iterator semantics outside Facelets.
 Implement local-shadowing behavior so the scope stack resolves inner bindings over outer ones, because the variable-capture and alpha-renaming tasks depend on correct shadowing.
 Implement symbolic origin descriptors for bindings, reusing the provenance model so comparison diagnostics can explain where a binding came from.
