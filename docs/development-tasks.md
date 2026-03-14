@@ -1,4 +1,3 @@
-Add unit tests for shadowing, targeting the local-shadowing task and ensuring later EL comparison catches capture regressions correctly.
 Add fixture tests for `ui:param` visibility across include expansion, connecting the include-parameter, include-expansion, and binding-creation tasks.
 Define the supported EL grammar subset for MVP, explicitly covering the forms required by the binding, semantic-node, and comparison tasks while identifying unsupported syntax for inconclusive handling.
 Implement EL extraction from relevant attributes, using the rule-registry and syntax-tree tasks so only semantically meaningful attributes are parsed.

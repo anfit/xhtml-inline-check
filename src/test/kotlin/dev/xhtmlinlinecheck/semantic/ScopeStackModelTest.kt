@@ -202,9 +202,15 @@ class ScopeStackModelTest {
 
         assertThat(bindingNamesForScope(scopeModel, includeSnapshot.nodeScopeId)).containsExactly("outer")
         assertThat(bindingNamesForScope(scopeModel, includeSnapshot.descendantScopeId)).containsExactly("panelLabel")
-        assertThat(bindingNamesForScope(scopeModel, repeatSnapshot.descendantScopeId)).containsExactly("row", "rowStatus")
+        assertThat(bindingNamesForScope(scopeModel, repeatSnapshot.descendantScopeId)).containsExactly(
+            "row",
+            "rowStatus"
+        )
         assertThat(bindingNamesForScope(scopeModel, setSnapshot.descendantScopeId)).containsExactly("selected")
-        assertThat(bindingNamesForScope(scopeModel, forEachSnapshot.descendantScopeId)).containsExactly("child", "childStatus")
+        assertThat(bindingNamesForScope(scopeModel, forEachSnapshot.descendantScopeId)).containsExactly(
+            "child",
+            "childStatus"
+        )
 
         assertThat(scopeModel.resolve("panelLabel", deepOutputPath))
             .extracting("kind", "origin.descriptor")
@@ -345,7 +351,7 @@ class ScopeStackModelTest {
             .containsExactly(
                 dev.xhtmlinlinecheck.domain.BindingKind.ITERATION_VAR,
                 "ui:repeat var=item",
-                "#{bean.items}",
+                null,
             )
         assertThat(scopeModel.visibleBindingsAt(deepOutputPath).map { it.origin.descriptor })
             .containsExactly(
@@ -353,6 +359,112 @@ class ScopeStackModelTest {
                 "c:set var=item",
                 "c:set var=item",
             )
+    }
+
+    @Test
+    fun `preserved local shadowing keeps EL roots bound to the innermost iterator across both sides`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:c="http://java.sun.com/jsp/jstl/core"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <c:set var="row" value="#{bean.outer}" />
+              <ui:repeat var="row" value="#{bean.items}">
+                <h:outputText id="capturedValue" value="#{row.label}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:c="http://java.sun.com/jsp/jstl/core"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <c:set var="outerRow" value="#{bean.outer}" />
+              <ui:repeat var="row" value="#{bean.items}">
+                <h:outputText id="capturedValue" value="#{row.label}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+
+        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val oldPath = findPathById(semanticModels.oldRoot.syntaxTree, "capturedValue")
+        val newPath = findPathById(semanticModels.newRoot.syntaxTree, "capturedValue")
+
+        assertThat(semanticModels.oldRoot.scopeModel.resolve("row", oldPath))
+            .extracting("kind", "origin.descriptor", "valueExpression")
+            .containsExactly(
+                dev.xhtmlinlinecheck.domain.BindingKind.ITERATION_VAR,
+                "ui:repeat var=row",
+                null,
+            )
+        assertThat(semanticModels.newRoot.scopeModel.resolve("row", newPath))
+            .extracting("kind", "origin.descriptor", "valueExpression")
+            .containsExactly(
+                dev.xhtmlinlinecheck.domain.BindingKind.ITERATION_VAR,
+                "ui:repeat var=row",
+                null,
+            )
+        assertThat(semanticModels.oldRoot.scopeModel.visibleBindingsAt(oldPath).map { it.origin.descriptor })
+            .containsExactly("ui:repeat var=row", "c:set var=row")
+        assertThat(semanticModels.newRoot.scopeModel.visibleBindingsAt(newPath).map { it.origin.descriptor })
+            .containsExactly("ui:repeat var=row", "c:set var=outerRow")
+    }
+
+    @Test
+    fun `flattening that removes inner shadowing changes which binding identical EL text resolves to`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:c="http://java.sun.com/jsp/jstl/core"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <c:set var="row" value="#{bean.outer}" />
+              <ui:repeat var="row" value="#{bean.items}">
+                <h:outputText id="capturedValue" value="#{row.label}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:c="http://java.sun.com/jsp/jstl/core"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <c:set var="row" value="#{bean.outer}" />
+              <h:outputText id="capturedValue" value="#{row.label}" />
+            </ui:composition>
+            """,
+        )
+
+        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val oldPath = findPathById(semanticModels.oldRoot.syntaxTree, "capturedValue")
+        val newPath = findPathById(semanticModels.newRoot.syntaxTree, "capturedValue")
+
+        assertThat(semanticModels.oldRoot.scopeModel.resolve("row", oldPath))
+            .extracting("kind", "origin.descriptor", "valueExpression")
+            .containsExactly(
+                dev.xhtmlinlinecheck.domain.BindingKind.ITERATION_VAR,
+                "ui:repeat var=row",
+                null,
+            )
+        assertThat(semanticModels.newRoot.scopeModel.resolve("row", newPath))
+            .extracting("kind", "origin.descriptor", "valueExpression")
+            .containsExactly(
+                dev.xhtmlinlinecheck.domain.BindingKind.C_SET,
+                "c:set var=row",
+                "#{bean.outer}",
+            )
+        assertThat(semanticModels.oldRoot.scopeModel.visibleBindingsAt(oldPath).map { it.origin.descriptor })
+            .containsExactly("ui:repeat var=row", "c:set var=row")
+        assertThat(semanticModels.newRoot.scopeModel.visibleBindingsAt(newPath).map { it.origin.descriptor })
+            .containsExactly("c:set var=row")
     }
 
     private fun semanticModelsFor(oldRoot: Path, newRoot: Path, baseDir: Path): SemanticModels =
@@ -406,7 +518,8 @@ class ScopeStackModelTest {
         var foundPath: LogicalNodePath? = null
         syntaxTree.walkDepthFirstWithPath { path, node ->
             if (node is LogicalElementNode) {
-                val matchingAttribute = node.attributes.firstOrNull { it.name.localName == attributeName && it.value == attributeValue }
+                val matchingAttribute =
+                    node.attributes.firstOrNull { it.name.localName == attributeName && it.value == attributeValue }
                 if (matchingAttribute != null) {
                     foundPath = path
                 }
