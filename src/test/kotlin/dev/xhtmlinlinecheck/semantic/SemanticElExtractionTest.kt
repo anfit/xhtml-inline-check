@@ -133,6 +133,77 @@ class SemanticElExtractionTest {
         assertThat(occurrence.parseFailure!!.message).contains("Unexpected token ':'")
     }
 
+    @Test
+    fun `mixed text nodes with EL feed the same semantic EL pipeline while plain text stays out`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup id="wrapper">Hello #{bean.user}, status ${'$'}{bean.status}<h:outputText value="#{bean.message}" />plain trailing text</h:panelGroup>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+
+        assertThat(semanticModels.oldRoot.elOccurrences)
+            .extracting("carrierKind", "ownerTagName", "attributeName", "rawValue")
+            .containsExactly(
+                org.assertj.core.groups.Tuple.tuple(
+                    SemanticElCarrierKind.TEXT_NODE,
+                    "h:panelGroup",
+                    null,
+                    "Hello #{bean.user}, status \${bean.status}",
+                ),
+                org.assertj.core.groups.Tuple.tuple(
+                    SemanticElCarrierKind.ELEMENT_ATTRIBUTE,
+                    "h:outputText",
+                    "value",
+                    "#{bean.message}",
+                ),
+            )
+        assertThat(semanticModels.oldRoot.elOccurrences.first().location.attributeName).isNull()
+        assertThat(semanticModels.oldRoot.elOccurrences.first().isSupported).isTrue()
+    }
+
+    @Test
+    fun `unsupported EL in a text node is captured as a semantic parse failure instead of being ignored`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup>#{fn:length(bean.items)}</h:panelGroup>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val occurrence = semanticModels.oldRoot.elOccurrences.single()
+
+        assertThat(occurrence.carrierKind).isEqualTo(SemanticElCarrierKind.TEXT_NODE)
+        assertThat(occurrence.ownerTagName).isEqualTo("h:panelGroup")
+        assertThat(occurrence.attributeName).isNull()
+        assertThat(occurrence.rawValue).isEqualTo("#{fn:length(bean.items)}")
+        assertThat(occurrence.isSupported).isFalse()
+        assertThat(occurrence.parseFailure!!.message).contains("Unexpected token ':'")
+    }
+
     private fun semanticModelsFor(oldRoot: Path, newRoot: Path, baseDir: Path): SemanticModels =
         SemanticAnalyzer.scaffold().analyze(
             XhtmlSyntaxParser.scaffold().parse(

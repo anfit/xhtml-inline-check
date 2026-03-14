@@ -7,6 +7,7 @@ import dev.xhtmlinlinecheck.syntax.LogicalNodePath
 
 enum class SemanticElCarrierKind {
     ELEMENT_ATTRIBUTE,
+    TEXT_NODE,
     INCLUDE_ATTRIBUTE,
     INCLUDE_PARAMETER,
 }
@@ -21,7 +22,7 @@ data class SemanticElOccurrence(
     val nodePath: LogicalNodePath,
     val ownerTagName: String,
     val ownerName: String? = null,
-    val attributeName: String,
+    val attributeName: String? = null,
     val rawValue: String,
     val location: SourceLocation,
     val provenance: Provenance,

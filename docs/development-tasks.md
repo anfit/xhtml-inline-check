@@ -1,4 +1,3 @@
-Implement EL extraction from text nodes where the MVP needs it, extending the same extraction path used for attributes so mixed XHTML content is not silently ignored.
 Emit explicit unsupported diagnostics for extracted EL forms outside the MVP subset so unsupported syntax contributes to `INCONCLUSIVE` instead of degrading into silent fallback behavior.
 Implement symbolic EL normalization for local bindings to canonical ids, using the scope stack and binding-origin models so safe alpha-renames compare equal.
 Implement symbolic handling of unresolved global roots so the EL layer can distinguish local-binding equivalence from bean-level uncertainty without pretending unresolved globals are local matches.

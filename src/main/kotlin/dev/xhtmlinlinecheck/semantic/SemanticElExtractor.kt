@@ -11,6 +11,7 @@ import dev.xhtmlinlinecheck.syntax.LogicalElementNode
 import dev.xhtmlinlinecheck.syntax.LogicalIncludeNode
 import dev.xhtmlinlinecheck.syntax.LogicalName
 import dev.xhtmlinlinecheck.syntax.LogicalNodePath
+import dev.xhtmlinlinecheck.syntax.LogicalTextNode
 import dev.xhtmlinlinecheck.syntax.walkDepthFirstWithPath
 import dev.xhtmlinlinecheck.syntax.XhtmlSyntaxTree
 
@@ -25,10 +26,17 @@ internal object SemanticElExtractor {
         val occurrences = mutableListOf<SemanticElOccurrence>()
         val includeRule = tagRules.resolve(includeName)
         val includeParameterRule = tagRules.resolve(includeParameterName)
+        val ownerTagNamesByPath = mutableMapOf<LogicalNodePath, String>()
 
         syntaxTree.walkDepthFirstWithPath { path, node ->
             when (node) {
-                is LogicalElementNode -> occurrences += extractElementOccurrences(path, node)
+                is LogicalElementNode -> {
+                    ownerTagNamesByPath[path] = node.renderedTagName()
+                    occurrences += extractElementOccurrences(path, node)
+                }
+                is LogicalTextNode -> {
+                    occurrences += extractTextOccurrences(path, node, ownerTagName = ownerTagNamesByPath[path.parent()])
+                }
                 is LogicalIncludeNode -> {
                     occurrences += extractIncludeOccurrences(path, node, includeRule.elAttributeNames)
                     occurrences += extractIncludeParameterOccurrences(path, node, includeParameterRule.elAttributeNames)
@@ -57,6 +65,27 @@ internal object SemanticElExtractor {
                     provenance = node.provenance.atLocation(attribute.location),
                 )
             }
+
+    private fun extractTextOccurrences(
+        path: LogicalNodePath,
+        node: LogicalTextNode,
+        ownerTagName: String?,
+    ): List<SemanticElOccurrence> {
+        if (!node.text.containsElContainer()) {
+            return emptyList()
+        }
+
+        return listOf(
+            occurrence(
+                carrierKind = SemanticElCarrierKind.TEXT_NODE,
+                nodePath = path,
+                ownerTagName = ownerTagName ?: "#text",
+                rawValue = node.text,
+                location = node.location,
+                provenance = node.provenance.atLocation(node.location),
+            ),
+        )
+    }
 
     private fun extractIncludeOccurrences(
         path: LogicalNodePath,
@@ -109,10 +138,10 @@ internal object SemanticElExtractor {
         carrierKind: SemanticElCarrierKind,
         nodePath: LogicalNodePath,
         ownerTagName: String,
-        attributeName: String,
         rawValue: String,
         location: SourceLocation,
         provenance: Provenance,
+        attributeName: String? = null,
         ownerName: String? = null,
     ): SemanticElOccurrence =
         try {
@@ -143,6 +172,15 @@ internal object SemanticElExtractor {
 
     private fun LogicalElementNode.renderedTagName(): String =
         name.prefix?.let { "$it:${name.localName}" } ?: name.localName
+
+    private fun String.containsElContainer(): Boolean = contains("#{") || contains("\${")
+
+    private fun LogicalNodePath.parent(): LogicalNodePath? =
+        if (segments.isEmpty()) {
+            null
+        } else {
+            LogicalNodePath(segments.dropLast(1))
+        }
 
     private fun Provenance.atLocation(location: SourceLocation): Provenance =
         if (includeStack.isEmpty()) {
