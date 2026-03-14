@@ -80,7 +80,7 @@ settings.gradle.kts
 
 ## Development
 
-The current scaffold defines a single JVM application with a placeholder analyzer pipeline and smoke tests. The Gradle application setup is configured around the `facelets-verify` entrypoint, so a local Gradle installation can:
+The current scaffold defines a single JVM application with a placeholder analyzer pipeline and smoke tests. The Gradle application setup is configured around the `facelets-verify` entrypoint, so an installed Gradle can:
 
 - compile and test with `gradle test`
 - run the CLI with `gradle runFaceletsVerify --args="legacy.xhtml refactored.xhtml"`
@@ -89,9 +89,16 @@ The current scaffold defines a single JVM application with a placeholder analyze
 
 Reusable JUnit 5 test support now lives under `src/test/kotlin/dev/xhtmlinlinecheck/testing`. New tasks should prefer those helpers for temporary XHTML trees, fixture-path resolution under `fixtures/`, and AssertJ-based `AnalysisReport` assertions instead of duplicating setup in each package.
 
-A Gradle wrapper has not been generated yet in this environment, so use a local Gradle installation until the wrapper task lands.
+A Gradle wrapper has not been generated yet, so repository verification currently assumes a system Gradle installation.
 
-For a single local baseline check that matches the current Gradle app, entrypoint, and smoke-test infrastructure, run `scripts/verify-baseline.bash`. It executes `gradle test`, `gradle installDist`, and `gradle runFaceletsVerify` against `fixtures/support/smoke/`.
+For a single baseline check that matches the current Gradle app, entrypoint, and smoke-test infrastructure:
+
+- on Unix-like shells, run `scripts/verify-baseline.bash`
+- on Windows PowerShell, run `scripts/verify-baseline.ps1`
+
+Both scripts execute `gradle test`, `gradle installDist`, and `gradle runFaceletsVerify` against `fixtures/support/smoke/`.
+
+On Windows, the PowerShell helper pins `GRADLE_USER_HOME`, `TEMP`, and `TMP` inside the repository before invoking Gradle. That avoids failures caused by inaccessible profile or temp directories in restricted environments while still using the installed Gradle executable. The first run still needs network access or a pre-populated Gradle cache so the Kotlin plugin and dependencies can be resolved.
 
 ## Near-Term Roadmap
 
