@@ -268,6 +268,62 @@ class SemanticNodeMatcherTest {
         assertThat(result.unmatchedNewNodeIds).isEmpty()
     }
 
+    @Test
+    fun `resolved same-form target meaning disambiguates otherwise identical buttons when forms reorder`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:form id="leftForm">
+                <h:panelGroup id="panel" />
+                <h:commandButton update="panel" />
+              </h:form>
+              <h:form id="rightForm">
+                <h:panelGroup id="panel" />
+                <h:commandButton update="panel" />
+              </h:form>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:form id="rightForm">
+                <h:panelGroup id="panel" />
+                <h:commandButton update="panel" />
+              </h:form>
+              <h:form id="leftForm">
+                <h:panelGroup id="panel" />
+                <h:commandButton update="panel" />
+              </h:form>
+            </ui:composition>
+            """,
+        )
+
+        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val result = SemanticNodeMatcher.matchStructuralCandidates(
+            oldNodes = semanticModels.oldRoot.semanticNodes,
+            newNodes = semanticModels.newRoot.semanticNodes,
+        )
+
+        assertThat(result.matches)
+            .extracting("reason", "oldNodeId.value", "newNodeId.value")
+            .containsExactlyInAnyOrder(
+                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/0", "node:/1"),
+                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/0/0", "node:/1/0"),
+                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, "node:/0/1", "node:/1/1"),
+                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/1", "node:/0"),
+                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/1/0", "node:/0/0"),
+                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, "node:/1/1", "node:/0/1"),
+            )
+        assertThat(result.unmatchedOldNodeIds).isEmpty()
+        assertThat(result.unmatchedNewNodeIds).isEmpty()
+    }
+
     private fun semanticModelsFor(oldRoot: Path, newRoot: Path, baseDir: Path): SemanticModels =
         SemanticAnalyzer.scaffold().analyze(
             XhtmlSyntaxParser.scaffold().parse(

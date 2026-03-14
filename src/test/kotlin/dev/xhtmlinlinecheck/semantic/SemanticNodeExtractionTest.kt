@@ -127,6 +127,60 @@ class SemanticNodeExtractionTest {
                     "@form panel",
                 ),
             )
+        assertThat(panelNode.componentTargetAttributes)
+            .extracting("kind", "resolvedReferences")
+            .containsExactly(
+                Tuple.tuple(
+                    ComponentTargetAttributeKind.UPDATE,
+                    listOf(
+                        ResolvedComponentTargetReference(
+                            ComponentTargetReference("msgs", ComponentTargetReferenceKind.COMPONENT_ID),
+                            ComponentTargetResolutionKind.UNRESOLVED,
+                            detail = "No component with id='msgs' is visible to the source node.",
+                        ),
+                        ResolvedComponentTargetReference(
+                            ComponentTargetReference("panel", ComponentTargetReferenceKind.COMPONENT_ID),
+                            ComponentTargetResolutionKind.COMPONENT,
+                            ResolvedComponentTargetNode("h:panelGroup", "panel", "mainForm"),
+                        ),
+                    ),
+                ),
+                Tuple.tuple(
+                    ComponentTargetAttributeKind.RENDER,
+                    listOf(
+                        ResolvedComponentTargetReference(
+                            ComponentTargetReference("summary", ComponentTargetReferenceKind.COMPONENT_ID),
+                            ComponentTargetResolutionKind.UNRESOLVED,
+                            detail = "No component with id='summary' is visible to the source node.",
+                        ),
+                    ),
+                ),
+                Tuple.tuple(
+                    ComponentTargetAttributeKind.PROCESS,
+                    listOf(
+                        ResolvedComponentTargetReference(
+                            ComponentTargetReference("@this", ComponentTargetReferenceKind.SEARCH_EXPRESSION),
+                            ComponentTargetResolutionKind.SOURCE_NODE,
+                            ResolvedComponentTargetNode("h:panelGroup", "panel", "mainForm"),
+                        ),
+                    ),
+                ),
+                Tuple.tuple(
+                    ComponentTargetAttributeKind.EXECUTE,
+                    listOf(
+                        ResolvedComponentTargetReference(
+                            ComponentTargetReference("@form", ComponentTargetReferenceKind.SEARCH_EXPRESSION),
+                            ComponentTargetResolutionKind.FORM,
+                            ResolvedComponentTargetNode("h:form", "mainForm", "mainForm"),
+                        ),
+                        ResolvedComponentTargetReference(
+                            ComponentTargetReference("panel", ComponentTargetReferenceKind.COMPONENT_ID),
+                            ComponentTargetResolutionKind.COMPONENT,
+                            ResolvedComponentTargetNode("h:panelGroup", "panel", "mainForm"),
+                        ),
+                    ),
+                ),
+            )
         assertThat(panelNode.structuralContext.formAncestry.map { it.nodeName }).containsExactly("h:form")
         assertThat(panelNode.structuralContext.namingContainerAncestry.map { it.nodeName }).containsExactly("h:form")
         assertThat(panelNode.structuralContext.iterationAncestry)
@@ -360,7 +414,8 @@ class SemanticNodeExtractionTest {
         val semanticNodes = semanticModels.oldRoot.semanticNodes
         val repeatNode = semanticNodes.single { it.nodeName == "ui:repeat" }
         val forEachNode = semanticNodes.single { it.nodeName == "c:forEach" }
-        val deepOutputNode = semanticModels.oldRoot.semanticNodes.single { it.explicitIdAttribute?.rawValue == "deepOutput" }
+        val deepOutputNode =
+            semanticModels.oldRoot.semanticNodes.single { it.explicitIdAttribute?.rawValue == "deepOutput" }
 
         assertThat(
             listOf(repeatNode, forEachNode, deepOutputNode).map { node ->
@@ -378,8 +433,12 @@ class SemanticNodeExtractionTest {
         )
         assertThat(deepOutputNode.structuralContext.formAncestry.map { it.nodeName }).containsExactly("h:form")
         assertThat(deepOutputNode.structuralContext.namingContainerAncestry.map { it.nodeName }).containsExactly("h:form")
-        assertThat(deepOutputNode.structuralContext.iterationAncestry.map { it.nodeName }).containsExactly("ui:repeat", "c:forEach")
-        assertThat(deepOutputNode.structuralContext.iterationAncestry.flatMap { it.bindingOrigins }.map { it.descriptor })
+        assertThat(deepOutputNode.structuralContext.iterationAncestry.map { it.nodeName }).containsExactly(
+            "ui:repeat",
+            "c:forEach"
+        )
+        assertThat(deepOutputNode.structuralContext.iterationAncestry.flatMap { it.bindingOrigins }
+            .map { it.descriptor })
             .containsExactly(
                 "ui:repeat var=row",
                 "ui:repeat varStatus=rowStatus",
@@ -388,12 +447,51 @@ class SemanticNodeExtractionTest {
             )
         assertThat(
             deepOutputNode.structuralContext.formAncestry +
-                deepOutputNode.structuralContext.namingContainerAncestry,
+                    deepOutputNode.structuralContext.namingContainerAncestry,
         )
             .allSatisfy { ancestor ->
                 assertThat(ancestor.nodeName).isNotEqualTo("ui:composition")
                 assertThat(ancestor.nodeName).isNotEqualTo("ui:fragment")
             }
+    }
+
+    @Test
+    fun `component-id targets resolve against same-form semantic nodes before matching uses them`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:form id="leftForm">
+                <h:panelGroup id="panel" />
+                <h:commandButton id="leftButton" update="panel" execute="@form panel" />
+              </h:form>
+              <h:form id="rightForm">
+                <h:panelGroup id="panel" />
+                <h:commandButton id="rightButton" update="panel" />
+              </h:form>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets" />
+            """,
+        )
+
+        val semanticModel = semanticModelsFor(oldRoot, newRoot, tempDir).oldRoot
+        val leftButton = semanticModel.semanticNodes.single { it.explicitIdAttribute?.rawValue == "leftButton" }
+        val rightButton = semanticModel.semanticNodes.single { it.explicitIdAttribute?.rawValue == "rightButton" }
+
+        assertThat(leftButton.componentTargetAttributes.map { it.renderResolved() })
+            .containsExactly(
+                "update=component:panel->h:panelGroup#panel@form:leftForm",
+                "execute=@form->h:form#leftForm@form:leftForm component:panel->h:panelGroup#panel@form:leftForm",
+            )
+        assertThat(rightButton.componentTargetAttributes.single().renderResolved())
+            .isEqualTo("update=component:panel->h:panelGroup#panel@form:rightForm")
     }
 
     private fun semanticModelsFor(oldRoot: Path, newRoot: Path, baseDir: Path): SemanticModels =

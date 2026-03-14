@@ -222,6 +222,7 @@ private fun SemanticNode.asAncestor(): SemanticNodeAncestor =
     SemanticNodeAncestor(
         nodeId = nodeId,
         nodeName = nodeName,
+        explicitId = explicitIdAttribute?.rawValue,
         location = location,
         provenance = provenance,
     )

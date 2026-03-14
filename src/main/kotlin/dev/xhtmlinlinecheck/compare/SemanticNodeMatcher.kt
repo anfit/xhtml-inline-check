@@ -2,7 +2,6 @@ package dev.xhtmlinlinecheck.compare
 
 import dev.xhtmlinlinecheck.semantic.SemanticNode
 import dev.xhtmlinlinecheck.semantic.SemanticNodeId
-import dev.xhtmlinlinecheck.semantic.ComponentTargetAttribute
 
 data class SemanticNodeMatch(
     val oldNodeId: SemanticNodeId,
@@ -115,7 +114,7 @@ private fun structuralSignatureFor(node: SemanticNode): StructuralSignature =
     StructuralSignature(
         nodeName = node.nodeName,
         rendered = node.renderedAttribute?.normalizedTemplate?.render() ?: node.renderedAttribute?.rawValue,
-        componentTargetAttributes = node.componentTargetAttributes.map(ComponentTargetAttribute::render),
+        componentTargetAttributes = node.componentTargetAttributes.map { attribute -> attribute.renderResolved() },
         formAncestry = node.formAncestry.map { it.nodeName },
         namingContainerAncestry = node.namingContainerAncestry.map { it.nodeName },
         iterationAncestry = node.iterationAncestry.map { it.nodeName },

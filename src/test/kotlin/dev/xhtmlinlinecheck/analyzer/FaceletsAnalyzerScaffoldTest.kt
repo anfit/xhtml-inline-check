@@ -486,6 +486,65 @@ class FaceletsAnalyzerScaffoldTest {
     }
 
     @Test
+    fun `scaffold analyzer reports broken same-form target resolution after a refactor`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:form id="mainForm">
+                <h:panelGroup id="panel" />
+                <h:commandButton id="saveButton" update="panel" execute="@form panel" />
+              </h:form>
+              <h:form id="otherForm">
+                <h:panelGroup id="panel" />
+              </h:form>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:form id="mainForm">
+                <h:panelGroup id="panel" />
+              </h:form>
+              <h:form id="otherForm">
+                <h:panelGroup id="panel" />
+                <h:commandButton id="saveButton" update="panel" execute="@form panel" />
+              </h:form>
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.NOT_EQUIVALENT)
+            .hasProblemCount(2)
+            .hasWarningCount(1)
+            .hasProblemIds(
+                "P-TARGET-RESOLUTION_CHANGED",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().summary).isEqualTo("Component target resolves differently after refactor")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("legacy/root.xhtml:4:")
+        assertThat(report.problems.first().locations.new?.logicalLocation?.render()).startsWith("refactored/root.xhtml:7:")
+        assertThat(report.problems.first().locations.old?.snippet).isEqualTo("update=panel, execute=@form panel")
+        assertThat(report.problems.first().locations.new?.snippet).isEqualTo("update=panel, execute=@form panel")
+        assertThat(report.problems.first().explanation).contains("component:panel->h:panelGroup#panel@form:mainForm")
+        assertThat(report.problems.first().explanation).contains("component:panel->h:panelGroup#panel@form:otherForm")
+        assertThat(report.summary.headline).contains("target-resolution mismatches")
+    }
+
+    @Test
     fun `missing include fixture keeps dedicated diagnostic provenance stable`() {
         val scenario = FixtureScenarios.scenario("support/missing-include")
 

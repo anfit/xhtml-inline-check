@@ -17,9 +17,27 @@ fun interface SemanticAnalyzer {
                 val oldScopeModel = ScopeStackModel.fromSyntaxTree(parsedTrees.oldRoot.syntaxTree)
                 val oldElOccurrences = SemanticElExtractor.extract(parsedTrees.oldRoot.syntaxTree, tagRules)
                 val oldNormalizedElOccurrences = SemanticElNormalizer.normalize(oldElOccurrences, oldScopeModel)
+                val oldSemanticNodes =
+                    SemanticTargetResolver.resolve(
+                        SemanticNodeExtractor.extract(
+                            syntaxTree = parsedTrees.oldRoot.syntaxTree,
+                            scopeModel = oldScopeModel,
+                            elOccurrences = oldElOccurrences,
+                            normalizedElOccurrences = oldNormalizedElOccurrences,
+                        ),
+                    )
                 val newScopeModel = ScopeStackModel.fromSyntaxTree(parsedTrees.newRoot.syntaxTree)
                 val newElOccurrences = SemanticElExtractor.extract(parsedTrees.newRoot.syntaxTree, tagRules)
                 val newNormalizedElOccurrences = SemanticElNormalizer.normalize(newElOccurrences, newScopeModel)
+                val newSemanticNodes =
+                    SemanticTargetResolver.resolve(
+                        SemanticNodeExtractor.extract(
+                            syntaxTree = parsedTrees.newRoot.syntaxTree,
+                            scopeModel = newScopeModel,
+                            elOccurrences = newElOccurrences,
+                            normalizedElOccurrences = newNormalizedElOccurrences,
+                        ),
+                    )
                 SemanticModels(
                     oldRoot = SemanticModel(
                         document = parsedTrees.oldRoot.document,
@@ -29,13 +47,7 @@ fun interface SemanticAnalyzer {
                         scopeModel = oldScopeModel,
                         elOccurrences = oldElOccurrences,
                         normalizedElOccurrences = oldNormalizedElOccurrences,
-                        semanticNodes =
-                            SemanticNodeExtractor.extract(
-                                syntaxTree = parsedTrees.oldRoot.syntaxTree,
-                                scopeModel = oldScopeModel,
-                                elOccurrences = oldElOccurrences,
-                                normalizedElOccurrences = oldNormalizedElOccurrences,
-                            ),
+                        semanticNodes = oldSemanticNodes,
                     ),
                     newRoot = SemanticModel(
                         document = parsedTrees.newRoot.document,
@@ -45,13 +57,7 @@ fun interface SemanticAnalyzer {
                         scopeModel = newScopeModel,
                         elOccurrences = newElOccurrences,
                         normalizedElOccurrences = newNormalizedElOccurrences,
-                        semanticNodes =
-                            SemanticNodeExtractor.extract(
-                                syntaxTree = parsedTrees.newRoot.syntaxTree,
-                                scopeModel = newScopeModel,
-                                elOccurrences = newElOccurrences,
-                                normalizedElOccurrences = newNormalizedElOccurrences,
-                            ),
+                        semanticNodes = newSemanticNodes,
                     ),
                 )
             }

@@ -18,10 +18,12 @@ import dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailure
 import dev.xhtmlinlinecheck.domain.SourceGraphIncludeFailureKind
 import dev.xhtmlinlinecheck.domain.WarningIds
 import dev.xhtmlinlinecheck.domain.WarningTotals
+import dev.xhtmlinlinecheck.semantic.ComponentTargetAttribute
 import dev.xhtmlinlinecheck.semantic.NormalizedSemanticElOccurrence
 import dev.xhtmlinlinecheck.semantic.SemanticElCarrierKind
 import dev.xhtmlinlinecheck.semantic.SemanticElOccurrence
 import dev.xhtmlinlinecheck.semantic.SemanticModels
+import dev.xhtmlinlinecheck.semantic.SemanticNode
 import dev.xhtmlinlinecheck.syntax.LogicalIncludeNode
 import dev.xhtmlinlinecheck.syntax.XhtmlSyntaxTree
 import dev.xhtmlinlinecheck.syntax.walkDepthFirst
@@ -33,6 +35,12 @@ fun interface EquivalenceComparator {
         fun scaffold(): EquivalenceComparator =
             EquivalenceComparator { semanticModels ->
                 val elComparison = compareNormalizedEl(semanticModels)
+                val matchResult =
+                    SemanticNodeMatcher.matchStructuralCandidates(
+                        oldNodes = semanticModels.oldRoot.semanticNodes,
+                        newNodes = semanticModels.newRoot.semanticNodes,
+                    )
+                val targetComparison = compareResolvedTargets(semanticModels, matchResult)
                 val includeProblems =
                     buildList {
                         addAll(semanticModels.oldRoot.syntaxTree.collectIncludeProblems())
@@ -56,20 +64,26 @@ fun interface EquivalenceComparator {
                         )
                 val problems =
                     elComparison.problems +
+                        targetComparison.problems +
                         includeProblems +
                         extractedElProblems +
                         scaffoldWarning
                 val warningCount = problems.count { it.severity == Severity.WARNING }
                 val warningTotals = WarningTotals(total = warningCount, blocking = warningCount)
-                val counts = AggregateCounts(checked = elComparison.checked, matched = elComparison.matched, mismatched = elComparison.mismatched)
+                val counts =
+                    AggregateCounts(
+                        checked = elComparison.checked + targetComparison.checked,
+                        matched = elComparison.matched + targetComparison.matched,
+                        mismatched = elComparison.mismatched + targetComparison.mismatched,
+                    )
 
                 AnalysisReport(
                     result = AnalysisResult.derive(
-                        hasMismatch = elComparison.mismatched > 0,
+                        hasMismatch = counts.mismatched > 0,
                         blocksEquivalenceClaim = true,
                     ),
                     summary = AnalysisSummary(
-                        headline = summaryHeadline(elComparison),
+                        headline = summaryHeadline(elComparison, targetComparison),
                         counts = counts,
                         coverage = AggregateCoverage.from(counts),
                         warnings = warningTotals,
@@ -90,6 +104,13 @@ private data class ElComparisonResult(
     val matched: Int,
     val mismatched: Int,
     val uncertain: Int,
+    val problems: List<Problem>,
+)
+
+private data class TargetComparisonResult(
+    val checked: Int,
+    val matched: Int,
+    val mismatched: Int,
     val problems: List<Problem>,
 )
 
@@ -133,6 +154,49 @@ private fun compareNormalizedEl(semanticModels: SemanticModels): ElComparisonRes
         matched = matched,
         mismatched = mismatched,
         uncertain = uncertain,
+        problems = problems,
+    )
+}
+
+private fun compareResolvedTargets(
+    semanticModels: SemanticModels,
+    matchResult: SemanticNodeMatchResult,
+): TargetComparisonResult {
+    val oldNodesById = semanticModels.oldRoot.semanticNodes.associateBy(SemanticNode::nodeId)
+    val newNodesById = semanticModels.newRoot.semanticNodes.associateBy(SemanticNode::nodeId)
+    val problems = mutableListOf<Problem>()
+    var checked = 0
+    var matched = 0
+    var mismatched = 0
+
+    matchResult.matches.forEach { match ->
+        val oldNode = oldNodesById.getValue(match.oldNodeId)
+        val newNode = newNodesById.getValue(match.newNodeId)
+        val allKinds =
+            (oldNode.componentTargetAttributes.map(ComponentTargetAttribute::kind) +
+                newNode.componentTargetAttributes.map(ComponentTargetAttribute::kind))
+                .distinct()
+
+        allKinds.forEach { kind ->
+            checked++
+            val oldAttributes = oldNode.componentTargetAttributes.filter { it.kind == kind }
+            val newAttributes = newNode.componentTargetAttributes.filter { it.kind == kind }
+            val oldResolved = oldAttributes.map(ComponentTargetAttribute::renderResolved)
+            val newResolved = newAttributes.map(ComponentTargetAttribute::renderResolved)
+
+            if (oldResolved == newResolved) {
+                matched++
+            } else {
+                mismatched++
+                problems += targetResolutionProblem(oldNode, oldAttributes, newNode, newAttributes)
+            }
+        }
+    }
+
+    return TargetComparisonResult(
+        checked = checked,
+        matched = matched,
+        mismatched = mismatched,
         problems = problems,
     )
 }
@@ -196,17 +260,64 @@ private fun unresolvedGlobalRootProblem(
 
 private fun NormalizedSemanticElOccurrence.firstBindingOrigin() = bindingReferences.firstOrNull()?.binding?.origin
 
-private fun summaryHeadline(elComparison: ElComparisonResult): String =
+private fun summaryHeadline(
+    elComparison: ElComparisonResult,
+    targetComparison: TargetComparisonResult,
+): String =
     when {
+        targetComparison.mismatched > 0 && elComparison.mismatched > 0 ->
+            "Detected target-resolution and local-binding EL mismatches; broader semantic comparison is still scaffolded."
+        targetComparison.mismatched > 0 ->
+            "Detected target-resolution mismatches; broader semantic comparison is still scaffolded."
         elComparison.mismatched > 0 ->
             "Detected local-binding EL mismatches; broader semantic comparison is still scaffolded."
         elComparison.uncertain > 0 ->
             "Local-binding EL comparison encountered unresolved global roots, so bean-level equivalence remains uncertain."
+        targetComparison.checked > 0 ->
+            "Resolved component targets matched for structurally paired nodes; broader semantic comparison is still scaffolded."
         elComparison.checked > 0 ->
             "Local-binding EL normalization matched for comparable occurrences; broader semantic comparison is still scaffolded."
         else ->
             "Scaffolded analyzer pipeline only; semantic comparison is not implemented yet."
     }
+
+private fun targetResolutionProblem(
+    oldNode: SemanticNode,
+    oldAttributes: List<ComponentTargetAttribute>,
+    newNode: SemanticNode,
+    newAttributes: List<ComponentTargetAttribute>,
+): Problem {
+    val oldAttribute = oldAttributes.firstOrNull()
+    val newAttribute = newAttributes.firstOrNull()
+    val oldSnippet = oldAttributes.joinToString(separator = ", ") { attribute -> attribute.render() }.takeIf { it.isNotBlank() }
+    val newSnippet = newAttributes.joinToString(separator = ", ") { attribute -> attribute.render() }.takeIf { it.isNotBlank() }
+    val oldResolved = oldAttributes.joinToString(separator = ", ") { attribute -> attribute.renderResolved() }.ifBlank { "<missing>" }
+    val newResolved = newAttributes.joinToString(separator = ", ") { attribute -> attribute.renderResolved() }.ifBlank { "<missing>" }
+
+    return Problem(
+        id = ProblemIds.TARGET_RESOLUTION_CHANGED,
+        severity = Severity.ERROR,
+        category = ProblemCategory.TARGET,
+        summary = "Component target resolves differently after refactor",
+        locations =
+            ProblemLocations(
+                old =
+                    ProblemLocation(
+                        provenance = oldNode.attributeProvenance(oldAttribute),
+                        snippet = oldSnippet,
+                    ),
+                new =
+                    ProblemLocation(
+                        provenance = newNode.attributeProvenance(newAttribute),
+                        snippet = newSnippet,
+                    ),
+            ),
+        explanation =
+            "The matched node's target-bearing attributes no longer resolve to the same semantic targets. " +
+                "Old: $oldResolved New: $newResolved",
+        hint = "Keep the component in the same form or preserve the target component ids so the resolved target meaning stays the same.",
+    )
+}
 
 private fun List<SemanticElOccurrence>.collectUnsupportedElProblems(): List<Problem> =
     filter { !it.isSupported }.map { occurrence ->
@@ -319,3 +430,26 @@ private fun SemanticElOccurrence.describeCarrier(): String =
             "$ownerTagName$parameterNameSuffix @$attributeName"
         }
     }
+
+private fun SemanticNode.attributeProvenance(attribute: ComponentTargetAttribute?): Provenance {
+    val targetLocation = attribute?.location
+    if (targetLocation == null) {
+        return provenance
+    }
+
+    return Provenance(
+        physicalLocation =
+            provenance.physicalLocation.copy(
+                span = targetLocation.span,
+                attributeName = targetLocation.attributeName,
+                attributeLocationPrecision = targetLocation.attributeLocationPrecision,
+            ),
+        logicalLocation =
+            provenance.logicalLocation.copy(
+                span = targetLocation.span,
+                attributeName = targetLocation.attributeName,
+                attributeLocationPrecision = targetLocation.attributeLocationPrecision,
+            ),
+        includeStack = provenance.includeStack,
+    )
+}

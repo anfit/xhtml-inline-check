@@ -1,4 +1,3 @@
-Implement target resolution against semantic nodes and add diagnostics plus tests for same-form target resolution and broken target resolution after refactors so target meaning is available before matching leans on it.
 Define semantic signatures for matching by combining tag identity, ancestry, iteration context, rendered guards, and other stable semantic facts needed when explicit anchors are missing.
 Implement anchor-first matching by explicit `id`, secondary matching by explicit target relationships, and fallback matching by semantic signature plus ancestry constraints so alignment stays stable across include flattening and wrapper churn.
 Implement unmatched-node tracking together with matching tests for include-inlined pages and wrapper-only changes so comparator alignment is stable before mismatch rules land.

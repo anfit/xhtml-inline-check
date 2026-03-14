@@ -30,6 +30,7 @@ data class SemanticNodeAttribute(
 data class SemanticNodeAncestor(
     val nodeId: SemanticNodeId,
     val nodeName: String,
+    val explicitId: String? = null,
     val location: SourceLocation,
     val provenance: Provenance,
 )

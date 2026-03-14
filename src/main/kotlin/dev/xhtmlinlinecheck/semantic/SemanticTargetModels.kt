@@ -31,10 +31,58 @@ data class ComponentTargetReference(
     fun render(): String = rawToken
 }
 
+enum class ComponentTargetResolutionKind {
+    COMPONENT,
+    SOURCE_NODE,
+    FORM,
+    SEARCH_EXPRESSION,
+    UNRESOLVED,
+}
+
+data class ResolvedComponentTargetNode(
+    val nodeName: String,
+    val explicitId: String? = null,
+    val formAnchor: String? = null,
+) {
+    fun render(): String =
+        buildString {
+            append(nodeName)
+            explicitId?.let { append("#").append(it) }
+            append("@form:")
+            append(formAnchor ?: "<none>")
+        }
+}
+
+data class ResolvedComponentTargetReference(
+    val reference: ComponentTargetReference,
+    val kind: ComponentTargetResolutionKind,
+    val target: ResolvedComponentTargetNode? = null,
+    val detail: String? = null,
+) {
+    fun render(): String =
+        when (kind) {
+            ComponentTargetResolutionKind.COMPONENT ->
+                "component:${reference.rawToken}->${requireNotNull(target).render()}"
+
+            ComponentTargetResolutionKind.SOURCE_NODE ->
+                "@this"
+
+            ComponentTargetResolutionKind.FORM ->
+                "@form->${requireNotNull(target).render()}"
+
+            ComponentTargetResolutionKind.SEARCH_EXPRESSION ->
+                "search:${reference.rawToken}"
+
+            ComponentTargetResolutionKind.UNRESOLVED ->
+                "unresolved:${reference.rawToken}"
+        }
+}
+
 data class ComponentTargetAttribute(
     val kind: ComponentTargetAttributeKind,
     val attribute: SemanticNodeAttribute,
     val references: List<ComponentTargetReference>,
+    val resolvedReferences: List<ResolvedComponentTargetReference> = emptyList(),
 ) {
     val attributeName: String
         get() = kind.attributeName
@@ -50,6 +98,19 @@ data class ComponentTargetAttribute(
                 references.joinToString(separator = if (kind.allowsMultipleReferences) " " else "") {
                     it.render()
                 },
+            )
+        }
+
+    fun renderResolved(): String =
+        buildString {
+            append(attributeName)
+            append("=")
+            append(
+                resolvedReferences
+                    .ifEmpty { references.map { reference -> ResolvedComponentTargetReference(reference, ComponentTargetResolutionKind.UNRESOLVED) } }
+                    .joinToString(separator = if (kind.allowsMultipleReferences) " " else "") { resolvedReference ->
+                        resolvedReference.render()
+                    },
             )
         }
 }
