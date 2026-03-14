@@ -5,6 +5,8 @@ import dev.xhtmlinlinecheck.domain.AnalysisResult
 import dev.xhtmlinlinecheck.domain.AnalysisStats
 import dev.xhtmlinlinecheck.domain.Problem
 import dev.xhtmlinlinecheck.domain.ProblemCategory
+import dev.xhtmlinlinecheck.domain.ProblemLocation
+import dev.xhtmlinlinecheck.domain.ProblemLocations
 import dev.xhtmlinlinecheck.domain.Severity
 import dev.xhtmlinlinecheck.semantic.SemanticModels
 
@@ -26,6 +28,10 @@ fun interface EquivalenceComparator {
                             severity = Severity.WARNING,
                             category = ProblemCategory.UNSUPPORTED,
                             summary = "Analyzer pipeline scaffold is in place",
+                            locations = ProblemLocations(
+                                old = ProblemLocation(semanticModels.oldRoot.provenance),
+                                new = ProblemLocation(semanticModels.newRoot.provenance),
+                            ),
                             explanation = "The loader, syntax, semantic, and comparison stages exist as placeholders for later tasks.",
                             hint = "Implement the stage-specific logic before relying on comparison results.",
                         ),
