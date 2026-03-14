@@ -17,6 +17,16 @@ class FixtureScenariosTest {
     }
 
     @Test
+    fun `resolves support fixture for include parameter scope regressions`() {
+        val scenario = FixtureScenarios.scenario("support/include-param-scope")
+
+        assertThat(scenario.name).isEqualTo("support/include-param-scope")
+        assertThat(scenario.oldRoot).isRegularFile()
+        assertThat(scenario.oldDir.resolve("fragments/panel.xhtml")).isRegularFile()
+        assertThat(scenario.newRoot).isRegularFile()
+    }
+
+    @Test
     fun `reads expected contracts for canonical comparison fixtures`() {
         val scenario = FixtureScenarios.scenario("inconclusive/dynamic-include")
         val expectation = FixtureExpectations.read(scenario)
