@@ -1,0 +1,17 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:l="http://www.company.com/components/layouts"
+>
+	<c:if test="#{GUISettings.freeText1Enabled}">
+		<l:field label="#{customBundleProvider.dmBundleWithCustomLabels['Plant.freeText1']}">
+			<custom:inputText id="PLANT_FREE_TEXT1_FILTER" value="#{SearchBean.plantFreeText1}" />
+		</l:field>
+	</c:if>
+	<c:if test="#{GUISettings.freeText2Enabled}">
+		<l:field label="#{customBundleProvider.dmBundleWithCustomLabels['Plant.freeText2']}">
+			<custom:inputText id="PLANT_FREE_TEXT2_FILTER" value="#{SearchBean.plantFreeText2}" />
+		</l:field>
+	</c:if>
+</ui:composition>

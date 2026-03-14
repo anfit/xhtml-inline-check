@@ -1,0 +1,53 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:l="http://www.company.com/components/layouts"
+>
+	<!-- Modal: edit yield adjustment for one plant/period combination -->
+	<custom:failIfNotDefined vars="onChangeRender refreshMethod" />
+
+	<custom:modalPanel id="yieldAdjustmentModal"
+			windowTitle="#{appBundle['YieldAdjustmentsDialog.ScreenName']}"
+			rendered="#{not empty YieldAdjustmentsDialogBean.period}"
+			closeAction="#{MethodExpression.chain(YieldAdjustmentsDialogBean.clear(), refreshMethod)}"
+			closeRender="#{onChangeRender}" styleClass="wide">
+		<h:panelGroup id="YIELD_ADJUSTMENTS_panel">
+			<c:if test="#{not empty YieldAdjustmentsDialogBean.plant}">
+				<l:fieldlist defaultCellSpan="6">
+					<l:field label="#{dmBundle['Plant.plantCode']}">
+						<custom:outputText id="PLANT_CODE_ADJ"
+							value="#{YieldAdjustmentsDialogBean.plant.plantCode}" />
+					</l:field>
+					<l:field label="#{dmBundle['Period.period']}">
+						<custom:outputText id="PERIOD_ADJ"
+							value="#{YieldAdjustmentsDialogBean.period.period}" />
+					</l:field>
+					<l:field label="#{dmBundle['Yield.systemEstimate']}">
+						<custom:outputDecimal id="SYSTEM_ESTIMATE_ADJ"
+							value="#{YieldAdjustmentsDialogBean.systemEstimate}" precision="low" />
+					</l:field>
+					<l:field label="#{dmBundle['Yield.adjustmentValue']}">
+						<custom:inputDecimal id="ADJUSTMENT_VALUE_ADJ"
+							value="#{YieldAdjustmentsDialogBean.adjustmentValue}" required="false">
+							<custom:ajax event="change"
+								listener="#{YieldAdjustmentsDialogBean.onAdjustmentChange}"
+								render="YIELD_ADJUSTMENTS_panel" execute="@this" />
+						</custom:inputDecimal>
+					</l:field>
+					<l:field label="#{dmBundle['Yield.totalYield']}">
+						<custom:outputDecimal id="TOTAL_YIELD_ADJ"
+							value="#{YieldAdjustmentsDialogBean.totalYield}" precision="low" />
+					</l:field>
+				</l:fieldlist>
+				<custom:commandButton id="SAVE_BTN"
+					action="#{YieldAdjustmentsDialogBean.save}"
+					value="#{generalBundle['SAVE']}"
+					render="#{onChangeRender} YIELD_ADJUSTMENTS_panel"
+					execute="YIELD_ADJUSTMENTS_panel"
+					oncomplete="#{custom:success(custom:hide('yieldAdjustmentModal'))}" />
+			</c:if>
+		</h:panelGroup>
+	</custom:modalPanel>
+</ui:composition>

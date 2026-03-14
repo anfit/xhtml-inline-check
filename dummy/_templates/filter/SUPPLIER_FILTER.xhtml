@@ -1,0 +1,60 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:l="http://www.company.com/components/layouts"
+	xmlns:app="http://www.company.com/components/app"
+>
+	<!-- Complex lookup: supplier search with nested bed/class sub-filters -->
+	<custom:injectAttributes names="rendered">
+		<l:field label="#{dmBundle['Supplier.displayName']}">
+			<ui:fragment rendered="#{!disabled}">
+				<custom:complexlookupinput name="SUPPLIER_FILTER"
+						lookupHelper="#{SupplierLookup.lookupHelper}"
+						dataSource="#{SupplierLookup.dataSource}"
+						openAction="#{SupplierLookup.open(SearchBean.bedNodes)}"
+						windowTitle="#{dmBundle['Supplier']}"
+						advancedSearch="false" disableAjaxCall="true">
+
+					<ui:define name="filteringQuery">
+						<custom:and>
+							<custom:like propertyName="o.displayName" ref="supplierNameInput" />
+							<app:formulaBuilder propertyName="o.customerBed"
+								value="#{SupplierLookup.searchBean.bedNodes}" />
+							<ui:include src="../query/CURRENT_SUPPLIER_CLASS_FILTER_QUERY.xhtml">
+								<ui:param name="supplier" value="" />
+								<ui:param name="SearchBean" value="#{SupplierLookup.searchBean}" />
+							</ui:include>
+						</custom:and>
+					</ui:define>
+
+					<ui:define name="filteringFields">
+						<l:fieldset defaultCellSpan="3">
+							<l:field label="#{dmBundle['Supplier.displayName_long']}">
+								<custom:inputLookup id="supplierNameInput"
+									lookupHelper="#{SupplierLookup.lookupHelper}" type="search" />
+							</l:field>
+							<l:field label="#{dmBundle['Bed']}">
+								<ui:include src="BED_FILTER_SELECT_MANY.xhtml">
+									<ui:param name="externalId" value="supplierCode" />
+									<ui:param name="SearchBean"  value="#{SupplierLookup.searchBean}" />
+								</ui:include>
+							</l:field>
+							<ui:include src="SUPPLIER_CLASS_FILTER.xhtml">
+								<ui:param name="SearchBean" value="#{SupplierLookup.searchBean}" />
+							</ui:include>
+						</l:fieldset>
+					</ui:define>
+
+					<ui:define name="gridColumns">
+						<custom:column label="#{dmBundle['Supplier.displayName']}" propertyName="displayName">
+							#{row.displayName}
+						</custom:column>
+					</ui:define>
+				</custom:complexlookupinput>
+			</ui:fragment>
+			<ui:fragment rendered="#{disabled}">
+				<custom:outputText value="#{SupplierLookup.lookupHelper.searchValue}" />
+			</ui:fragment>
+		</l:field>
+	</custom:injectAttributes>
+</ui:composition>

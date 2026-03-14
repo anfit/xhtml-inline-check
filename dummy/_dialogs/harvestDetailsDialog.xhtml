@@ -1,0 +1,71 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:l="http://www.company.com/components/layouts"
+>
+	<!-- Modal: harvest detail view with period navigation and editable override -->
+	<custom:failIfNotDefined vars="forId" />
+
+	<custom:modalPanel id="HARVEST_DETAILS_modal"
+			windowTitle="#{appBundle['HarvestDetailsDialog.ScreenName']}"
+			rendered="#{not empty HarvestDetailsDialog.report}"
+			closeAction="#{HarvestDetailsDialog.clear}"
+			closeRender="HARVEST_DETAILS,#{closeRender}" styleClass="wide">
+		<h:panelGroup id="HARVEST_DETAILS_panel">
+			<custom:with plant="#{HarvestDetailsDialog.plant}">
+				<l:fieldlist defaultCellSpan="6">
+					<l:field label="#{dmBundle['Period.period']}">
+						<custom:action id="prevPeriod" icon="ARROW_CIRCLE_LEFT"
+							tooltip="#{HarvestDetailsDialog.previousPeriod.period}"
+							rendered="#{not empty HarvestDetailsDialog.previousPeriod}"
+							action="#{HarvestDetailsDialog.moveToPreviousPeriod}"
+							render="HARVEST_DETAILS_panel" execute="@this" />
+						<custom:outputText id="PERIOD_FORM" value="#{HarvestDetailsDialog.period.period}" />
+						<custom:action id="nextPeriod" icon="ARROW_CIRCLE_RIGHT"
+							tooltip="#{HarvestDetailsDialog.nextPeriod.period}"
+							rendered="#{not empty HarvestDetailsDialog.nextPeriod}"
+							action="#{HarvestDetailsDialog.moveToNextPeriod}"
+							render="HARVEST_DETAILS_panel" execute="@this" />
+					</l:field>
+					<l:field label="#{dmBundle['HarvestHistory.quantity']}">
+						<custom:outputDecimal id="HARVEST_QTY_FORM"
+							value="#{HarvestDetailsDialog.report.harvest.quantity}" precision="0" />
+					</l:field>
+				</l:fieldlist>
+
+				<c:if test="#{not harvestReadOnly}">
+					<l:fieldlist defaultCellSpan="6">
+						<l:field label="#{appBundle['HarvestHistory.quantityOverride']}">
+							<custom:inputDecimal id="HARVEST_OVERRIDE_FORM"
+								value="#{HarvestDetailsDialog.quantityOverride}" required="false">
+								<custom:ajax event="change"
+									listener="#{HarvestDetailsDialog.onOverrideChange}"
+									render="HARVEST_DETAILS_panel" execute="@this" />
+							</custom:inputDecimal>
+						</l:field>
+					</l:fieldlist>
+					<h:form id="harvestDetailsForm">
+						<custom:commandButton id="SAVE_HARVEST_BTN"
+							action="#{HarvestDetailsDialog.save}"
+							value="#{generalBundle['SAVE']}"
+							render="HARVEST_DETAILS_panel #{forId}"
+							execute="harvestDetailsForm" />
+					</h:form>
+				</c:if>
+
+				<custom:dataTable id="HARVEST_DETAILS_GRID"
+						dataSource="#{HarvestDetailsDialog.dataSource}" styleClass="nowrap">
+					<custom:column propertyName="eventDate" label="#{appBundle['HarvestDetail.eventDate']}">
+						<custom:outputText id="HARVEST_EVENT_DATE" value="#{cell}" />
+					</custom:column>
+					<custom:column align="right" propertyName="quantity"
+							label="#{appBundle['HarvestDetail.quantity']}">
+						<custom:outputDecimal id="HARVEST_DETAIL_QTY" value="#{cell}" precision="0" />
+					</custom:column>
+				</custom:dataTable>
+			</custom:with>
+		</h:panelGroup>
+	</custom:modalPanel>
+</ui:composition>

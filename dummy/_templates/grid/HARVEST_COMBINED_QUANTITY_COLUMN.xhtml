@@ -1,0 +1,20 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:app="http://www.company.com/components/app"
+>
+	<!-- Combined (propagated) harvest quantity — only shown when propagation is active -->
+	<custom:failIfNotDefined vars="harvestHistory plant" />
+
+	<custom:defaults columnInitiallyVisible="#{true}">
+		<app:column id="HARVEST_COMBINED_QUANTITY_COLUMN" align="right"
+				propertyName="harvestHistory.combinedHarvest.quantity"
+				label="#{dmBundle['HarvestHistory.combinedQuantity']}"
+				visible="#{columnInitiallyVisible ? 'initiallyVisible' : 'initiallyHidden'}">
+			<h:panelGroup id="combinedQuantityValue">
+				<custom:outputDecimal value="#{cell}" precision="0" />
+			</h:panelGroup>
+		</app:column>
+	</custom:defaults>
+</ui:composition>

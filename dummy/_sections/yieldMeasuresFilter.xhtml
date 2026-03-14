@@ -1,0 +1,21 @@
+<ui:composition
+	xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+>
+	<!-- Advanced filter: numeric quality thresholds -->
+
+	<!-- Greater-than bound: mean absolute error on total yield -->
+	<ui:include src="../../_templates/filter/ACCURACY_MEASURE_GREATER_THAN_FILTER_TEMPLATE.xhtml">
+		<ui:param name="labelKey"            value="Yield.Accuracy.totalYieldAccuracy.meanAbsoluteError" />
+		<ui:param name="inputDecimalId"      value="meanAbsoluteErrorTotalFilter" />
+		<ui:param name="searchBeanProperty"  value="#{SearchBean.meanAbsoluteErrorTotalLowerBound}" />
+	</ui:include>
+
+	<!-- Lesser-than bound: composite yield score -->
+	<ui:include src="../../_templates/filter/ACCURACY_MEASURE_LESSER_THAN_FILTER_TEMPLATE.xhtml">
+		<ui:param name="labelKey"            value="Yield.Accuracy.yieldScore" />
+		<ui:param name="inputDecimalId"      value="yieldScoreFilter" />
+		<ui:param name="searchBeanProperty"  value="#{SearchBean.yieldScoreUpperBound}" />
+	</ui:include>
+
+</ui:composition>

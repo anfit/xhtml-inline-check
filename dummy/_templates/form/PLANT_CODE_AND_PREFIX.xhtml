@@ -1,0 +1,17 @@
+<ui:component xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+>
+	<custom:defaults masterPlantPrefix="#{plant.masterPlant.prefix}"
+			plantCodeDefaultValue="#{plant.plantCode}">
+		<custom:failIfNotDefined vars="plant" />
+		<span class="plantPrefix">
+			<custom:outputText id="#{idPrefix}PLANT_PREFIX_FORM"
+				value="#{masterPlantPrefix}" maxlength="5" />
+		</span>
+		<custom:injectAttributes names="maxlength tooltip">
+			<custom:outputText id="#{idPrefix}PLANT_CODE_FORM"
+				value="#{plantCodeDefaultValue}" styleClass="preservedWhiteSpaces" />
+		</custom:injectAttributes>
+	</custom:defaults>
+</ui:component>

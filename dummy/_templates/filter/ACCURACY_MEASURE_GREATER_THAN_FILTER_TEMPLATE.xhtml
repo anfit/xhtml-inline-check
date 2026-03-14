@@ -1,0 +1,14 @@
+<ui:composition
+	xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:l="http://www.company.com/components/layouts"
+	xmlns:custom="http://www.company.com/components"
+>
+	<custom:failIfNotDefined vars="labelKey inputDecimalId searchBeanProperty" />
+
+	<l:field label="#{dmBundle[labelKey]} #{appBundle['GreaterThan_long']}"
+			labelTooltip="#{dmBundle[labelKey.concat('_long')]} #{appBundle['GreaterThan_long']}">
+		<custom:inputDecimal id="#{inputDecimalId}" value="#{searchBeanProperty}" />
+	</l:field>
+
+</ui:composition>

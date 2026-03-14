@@ -1,0 +1,25 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:l="http://www.company.com/components/layouts"
+>
+	<!-- Totals footer: full count when summary enabled, limited count otherwise -->
+	<custom:failIfNotDefined vars="summarySection" />
+
+	<custom:totals>
+		<h:panelGroup id="totalsGrid">
+			<c:choose>
+				<c:when test="#{summarySection.enabled}">
+					<ui:insert name="fullTotals" />
+				</c:when>
+				<c:otherwise>
+					<l:box>
+						<ui:include src="summaryFragmentLimitedNumberOfRows.xhtml" />
+					</l:box>
+				</c:otherwise>
+			</c:choose>
+		</h:panelGroup>
+	</custom:totals>
+</ui:composition>

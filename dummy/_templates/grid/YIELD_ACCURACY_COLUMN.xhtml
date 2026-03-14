@@ -1,0 +1,18 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:app="http://www.company.com/components/app"
+>
+	<!-- Generic reusable column for any numeric accuracy metric -->
+	<custom:failIfNotDefined vars="propertyName shortLabel label outputId" />
+
+	<custom:defaults errorLevel="#{null}" visible="initiallyHidden">
+		<custom:injectAttributes names="id">
+			<app:column align="right" propertyName="#{propertyName}"
+					shortLabel="#{shortLabel}" label="#{label}" visible="#{visible}">
+				<custom:outputDecimal id="#{outputId}" value="#{cell}" precision="low"
+					styleClass="#{YieldAccuracyGUIHelperBean.getStyle(errorLevel)}" />
+			</app:column>
+		</custom:injectAttributes>
+	</custom:defaults>
+</ui:composition>

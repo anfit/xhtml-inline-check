@@ -1,0 +1,98 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+>
+	<custom:dataTable id="GARDEN_REPORT_GRID" dataSource="#{GridDataSource}" styleClass="nowrap">
+
+		<custom:toolbar id="TOOLBAR">
+			<custom:exportButton modalId="exportGardenReport" exportBean="#{GardenReportExportBean}"
+				gridId="GARDEN_REPORT_GRID" fileNamePrefix="gardenReport" />
+		</custom:toolbar>
+
+		<!-- Plant identification column with link to plant worksheet -->
+		<custom:column align="right" propertyName="plant.plantCode"
+				label="#{dmBundle['Plant.plantCode']}" visible="always">
+			<custom:link id="#{idPrefix}plantFormLink" outcome="website:/plant/worksheet" target="worksheetTab">
+				<f:param name="plantId" value="#{row.plant.id}" />
+				<ui:include src="../../_templates/form/PLANT_CODE_AND_PREFIX.xhtml">
+					<ui:param name="plant"                 value="#{cell}" />
+					<ui:param name="plantCodeDefaultValue"  value="#{row.plant.plantCode}" />
+					<ui:param name="tooltip"               value="#{appBundle.OpenWorksheet}" />
+				</ui:include>
+			</custom:link>
+		</custom:column>
+
+		<custom:column align="right" propertyName="plant.bed.name"
+				label="#{dmBundle['Bed']}" visible="initiallyHidden">
+			<custom:outputText id="PLANT_BED_NAME" value="#{cell}" />
+		</custom:column>
+
+		<!-- Harvest demand group: period + observed picks + observed quantity -->
+		<custom:columnGroup label="#{dmBundle['Harvest.observed']}">
+			<custom:column align="right" propertyName="period.period"
+					label="#{dmBundle['Period.period']}">
+				<custom:outputText id="PERIOD_GRID" value="#{cell}" />
+			</custom:column>
+
+			<ui:include src="../../_templates/grid/HARVEST_PICKS_COLUMN.xhtml">
+				<ui:param name="harvestHistory" value="#{row.harvestHistory}" />
+				<ui:param name="plant"          value="#{row.plant}" />
+				<ui:param name="period"         value="#{row.period}" />
+			</ui:include>
+
+			<ui:include src="../../_templates/grid/HARVEST_QUANTITY_COLUMN.xhtml">
+				<ui:param name="harvestHistory"       value="#{row.harvestHistory}" />
+				<ui:param name="plant"                value="#{row.plant}" />
+				<ui:param name="showExcludeHarvestLink" value="false" />
+			</ui:include>
+
+			<!-- Combined columns only present when propagation is active -->
+			<c:if test="#{AppConfiguration.propagationEnabled}">
+				<ui:include src="../../_templates/grid/HARVEST_COMBINED_QUANTITY_COLUMN.xhtml">
+					<ui:param name="harvestHistory" value="#{row.harvestHistory}" />
+					<ui:param name="plant"          value="#{row.plant}" />
+				</ui:include>
+			</c:if>
+		</custom:columnGroup>
+
+		<!-- System estimate columns -->
+		<custom:columnGroup label="#{dmBundle['Yield.systemEstimate_long']}">
+			<ui:include src="systemEstimateGrid.xhtml" />
+		</custom:columnGroup>
+
+		<!-- Total (adjusted) yield estimate columns -->
+		<custom:columnGroup label="#{dmBundle['Yield']}">
+			<ui:include src="totalYieldGrid.xhtml" />
+		</custom:columnGroup>
+
+		<!-- Two representative accuracy columns (one with error-level styling, one plain) -->
+		<ui:include src="../../_templates/grid/YIELD_ACCURACY_COLUMN.xhtml">
+			<ui:param name="propertyName" value="yieldAccuracy.yieldScore" />
+			<ui:param name="shortLabel"   value="#{dmBundle['Yield.Accuracy.yieldScore_short']}" />
+			<ui:param name="label"        value="#{dmBundle['Yield.Accuracy.yieldScore_long']}" />
+			<ui:param name="outputId"     value="yieldScore" />
+			<ui:param name="errorLevel"
+				value="#{row.yieldAccuracy == null ? null : row.yieldAccuracy.yieldScoreErrorLevel}" />
+			<ui:param name="visible"      value="initiallyVisible" />
+		</ui:include>
+
+		<ui:include src="../../_templates/grid/YIELD_ACCURACY_COLUMN.xhtml">
+			<ui:param name="propertyName" value="yieldAccuracy.totalYieldAccuracy.meanAbsoluteError" />
+			<ui:param name="shortLabel"   value="#{dmBundle['Yield.Accuracy.meanAbsoluteError_short']}" />
+			<ui:param name="label"        value="#{dmBundle['Yield.Accuracy.totalYieldAccuracy.meanAbsoluteError_long']}" />
+			<ui:param name="outputId"     value="meanAbsoluteErrorTotal" />
+			<ui:param name="visible"      value="initiallyVisible" />
+		</ui:include>
+
+		<!-- Totals footer: shows row count, falls back to limited count when summary disabled -->
+		<ui:decorate template="../../_templates/grid/total/complexTotals.xhtml">
+			<ui:param name="summarySection" value="#{GardenReportViewBean.summarySection}" />
+			<ui:define name="fullTotals">
+				<ui:include src="../../_templates/grid/total/summarySectionTotalNumberOfRows.xhtml" />
+			</ui:define>
+		</ui:decorate>
+
+	</custom:dataTable>
+</ui:composition>

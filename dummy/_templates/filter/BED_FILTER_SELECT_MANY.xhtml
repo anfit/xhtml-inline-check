@@ -1,0 +1,26 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+>
+	<!-- Tree-select widget for garden beds; fires ajax to dependent components when changed -->
+	<custom:defaults disableSuperLevel="false">
+		<custom:injectAttributes>
+			<custom:selectMany id="#{externalId}bedFilterSelectMany"
+					searchable="true"
+					preload="#{SearchBean.getPreloadMode()}"
+					value="#{SearchBean.bedNodes}"
+					dataModel="#{BedTreeDataModelFactory.produce(SearchBean.getBedTree(), disableSuperLevel)}">
+				<c:choose>
+					<c:when test="#{not empty bedRender}">
+						<custom:ajax event="change" listener="#{SearchBean.onBedSelectionChange}"
+							render="#{bedRender}" execute="@this,#{bedExecute}" />
+					</c:when>
+					<c:otherwise>
+						<custom:ajax event="change" execute="@this,#{bedExecute}" />
+					</c:otherwise>
+				</c:choose>
+			</custom:selectMany>
+		</custom:injectAttributes>
+	</custom:defaults>
+</ui:composition>

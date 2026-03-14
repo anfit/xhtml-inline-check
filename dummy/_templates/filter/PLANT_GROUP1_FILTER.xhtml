@@ -1,0 +1,17 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:l="http://www.company.com/components/layouts"
+	xmlns:app="http://www.company.com/components/app"
+>
+	<custom:injectAttributes names="rendered">
+		<l:field label="#{customBundleProvider.dmBundleWithCustomLabels['Plant.plantGroup1']}"
+				rendered="#{GUISettings.plantGroup1Enabled}">
+			<custom:injectAttributes names="disabled">
+				<custom:inputText id="PLANT_GROUP_1_FILTER" value="#{SearchBean.plantGroup1s}">
+					<app:convertMultipleEntries />
+				</custom:inputText>
+			</custom:injectAttributes>
+		</l:field>
+	</custom:injectAttributes>
+</ui:composition>

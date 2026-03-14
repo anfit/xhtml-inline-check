@@ -1,0 +1,28 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:l="http://www.company.com/components/layouts"
+	xmlns:app="http://www.company.com/components/app"
+>
+	<!-- Free-text code filter; supports prefix when enabled in settings -->
+	<custom:defaults plantSearchCodes="#{SearchBean.plantSearchCodes}" prefixOfId="" label="#{dmBundle['Plant']}">
+		<custom:injectAttributes names="rendered">
+			<l:field label="#{label}">
+				<custom:with withPrefix="#{AppConfiguration.usesPrefix and !noPrefixHere}">
+					<l:row>
+						<l:cell span="#{withPrefix ? 4 : 0}">
+							<custom:inputText id="#{prefixOfId}PREFIX_FILTER"
+								value="#{plantSearchCodes.plantPrefix}" rendered="#{withPrefix}" />
+						</l:cell>
+						<l:cell span="#{withPrefix ? 8 : 12}">
+							<custom:inputText id="#{prefixOfId}PLANT_CODE_FILTER"
+								value="#{plantSearchCodes.plantCodes}" maxlength="50000">
+								<app:convertMultipleEntries />
+							</custom:inputText>
+						</l:cell>
+					</l:row>
+				</custom:with>
+			</l:field>
+		</custom:injectAttributes>
+	</custom:defaults>
+</ui:composition>

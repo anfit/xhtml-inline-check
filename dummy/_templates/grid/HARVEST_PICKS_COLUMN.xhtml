@@ -1,0 +1,34 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:app="http://www.company.com/components/app"
+>
+	<!-- Number of individual harvest events (picks) in the period; opens detail dialog -->
+	<custom:failIfNotDefined vars="harvestHistory plant period" />
+
+	<app:column id="HARVEST_PICKS_COLUMN" sort="false" align="right"
+			propertyName="harvestHistory.harvest.picks"
+			label="#{dmBundle['HarvestHistory.numberOfPicks']}"
+			tooltip="#{dmBundle['HarvestHistory.numberOfPicks_long']}">
+		<custom:openModalAction id="HARVEST_DETAILS_handler"
+				modalId="HARVEST_DETAILS_modal"
+				action="#{HarvestDetailsDialog.open(period, plant.id)}">
+			<h:panelGroup id="picksColumnValue">
+				<custom:outputDecimal id="PLANT_PICKS" value="#{cell}" precision="2">
+					<f:convertNumber groupingUsed="true" maxFractionDigits="2" minFractionDigits="0" />
+				</custom:outputDecimal>
+				<ui:fragment rendered="#{plant.replacingCalc or harvestHistory.isNotEqualToWithReplaced()}">
+					<app:outputDecimal id="PLANT_PICKS_WITH_REPLACED"
+						value="#{harvestHistory.harvestWithReplaced.picks}" precision="2" inBrackets="true">
+						<f:convertNumber groupingUsed="true" maxFractionDigits="2" minFractionDigits="0" />
+					</app:outputDecimal>
+				</ui:fragment>
+			</h:panelGroup>
+		</custom:openModalAction>
+		<custom:tooltip for="picksColumnValue">
+			<custom:outputText value="#{appBundle['OpenHarvestDetailsDialog']}" />
+		</custom:tooltip>
+	</app:column>
+</ui:composition>

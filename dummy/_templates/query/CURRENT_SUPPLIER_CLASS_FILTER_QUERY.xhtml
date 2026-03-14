@@ -1,0 +1,8 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:app="http://www.company.com/components/app"
+>
+	<custom:failIfNotDefined vars="supplier" />
+	<app:formulaBuilder propertyName="#{supplier}" value="#{SearchBean.presentSupplierClassFormula}" />
+</ui:composition>

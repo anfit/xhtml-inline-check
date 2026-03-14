@@ -1,0 +1,17 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:l="http://www.company.com/components/layouts"
+>
+	<custom:injectAttributes names="disabled rendered">
+		<l:field label="#{dmBundle['SupplierClass.name_long']}">
+			<custom:selectFromEnum id="SUPPLIER_CLASS_FILTER"
+					value="#{SearchBean.supplierClass}"
+					enumClass="com.company.app.transfer.valueobject.SupplierClassFilter">
+				<ui:insert name="baseChild">
+					<custom:ajax event="change" execute="@this" />
+				</ui:insert>
+			</custom:selectFromEnum>
+		</l:field>
+	</custom:injectAttributes>
+</ui:composition>

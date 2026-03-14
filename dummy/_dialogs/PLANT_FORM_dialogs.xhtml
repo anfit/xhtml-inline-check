@@ -1,0 +1,44 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:l="http://www.company.com/components/layouts"
+>
+	<!-- Plant-form modal bundle: audit trail dialog (representative example) -->
+
+	<custom:modalPanel id="PLANT_AUDIT_TRAIL_modal"
+			windowTitle="#{appBundle['PlantAuditTrailDialog.ScreenName']}"
+			rendered="#{not empty PlantAuditTrailDialog.plant}"
+			closeAction="#{PlantAuditTrailDialog.clear}" styleClass="wide">
+		<h:panelGroup id="PLANT_AUDIT_TRAIL_panel">
+			<c:if test="#{not empty PlantAuditTrailDialog.plant}">
+				<l:fieldlist defaultCellSpan="4">
+					<l:field label="#{dmBundle['Plant.plantCode']}">
+						<custom:outputText id="AUDIT_PLANT_CODE"
+							value="#{PlantAuditTrailDialog.plant.plantCode}" />
+					</l:field>
+					<l:field label="#{dmBundle['Bed']}">
+						<custom:outputText id="AUDIT_BED_NAME"
+							value="#{PlantAuditTrailDialog.plant.bed.name}" />
+					</l:field>
+				</l:fieldlist>
+				<custom:dataTable id="AUDIT_TRAIL_GRID"
+						dataSource="#{PlantAuditTrailDialog.dataSource}" styleClass="nowrap">
+					<custom:column propertyName="changedAt" label="#{appBundle['AuditTrail.changedAt']}">
+						<custom:outputText id="AUDIT_CHANGED_AT" value="#{cell}" />
+					</custom:column>
+					<custom:column propertyName="fieldName" label="#{appBundle['AuditTrail.fieldName']}">
+						<custom:outputText id="AUDIT_FIELD_NAME" value="#{cell}" />
+					</custom:column>
+					<custom:column propertyName="oldValue" label="#{appBundle['AuditTrail.oldValue']}">
+						<custom:outputText id="AUDIT_OLD_VALUE" value="#{cell}" />
+					</custom:column>
+					<custom:column propertyName="newValue" label="#{appBundle['AuditTrail.newValue']}">
+						<custom:outputText id="AUDIT_NEW_VALUE" value="#{cell}" />
+					</custom:column>
+				</custom:dataTable>
+			</c:if>
+		</h:panelGroup>
+	</custom:modalPanel>
+</ui:composition>

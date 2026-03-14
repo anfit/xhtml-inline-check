@@ -1,0 +1,783 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:l="http://www.company.com/components/layouts"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:app="http://www.company.com/components/app"
+	xmlns:o="http://www.company.com/components/overlays"
+	xmlns:q="http://www.company.com/components/query"
+	template="/views/_templates/base.xhtml">
+
+	<!-- Garden Report: shows plots, beds, plants and yield estimates per harvest period -->
+
+	<f:metadata>
+		<f:viewParam name="plotId" value="#{GardenReportViewBean.viewParams.plotId}">
+			<f:validateLongRange minimum="0" />
+		</f:viewParam>
+		<f:viewParam name="bedId" value="#{GardenReportViewBean.viewParams.bedId}" />
+		<f:event type="preRenderView" listener="#{GardenReportViewBean.onPreRenderView}" />
+	</f:metadata>
+
+	<ui:define name="definitions">
+		<ui:param name="ViewBean"       value="#{GardenReportViewBean}" />
+		<ui:param name="SearchBean"     value="#{ViewBean.searchBean}" />
+		<ui:param name="GridDataSource" value="#{ViewBean.dataSource}" />
+
+		<!-- Dialog: edit yield adjustment for a plant in a period -->
+		<!-- [merged] _dialogs/yieldAdjustmentsDialog/yieldAdjustmentsDialog.xhtml
+		     params: onChangeRender="coreForm:GARDEN_REPORT_GRID"  refreshMethod="#{GridDataSource.clearCache()}" -->
+
+		<custom:modalPanel id="yieldAdjustmentModal"
+				windowTitle="#{appBundle['YieldAdjustmentsDialog.ScreenName']}"
+				rendered="#{not empty YieldAdjustmentsDialogBean.period}"
+				closeAction="#{MethodExpression.chain(YieldAdjustmentsDialogBean.clear(), GridDataSource.clearCache())}"
+				closeRender="coreForm:GARDEN_REPORT_GRID" styleClass="wide">
+			<h:panelGroup id="YIELD_ADJUSTMENTS_panel">
+				<c:if test="#{not empty YieldAdjustmentsDialogBean.plant}">
+					<l:fieldlist defaultCellSpan="6">
+						<l:field label="#{dmBundle['Plant.plantCode']}">
+							<custom:outputText id="PLANT_CODE_ADJ"
+								value="#{YieldAdjustmentsDialogBean.plant.plantCode}" />
+						</l:field>
+						<l:field label="#{dmBundle['Period.period']}">
+							<custom:outputText id="PERIOD_ADJ"
+								value="#{YieldAdjustmentsDialogBean.period.period}" />
+						</l:field>
+						<l:field label="#{dmBundle['Yield.systemEstimate']}">
+							<custom:outputDecimal id="SYSTEM_ESTIMATE_ADJ"
+								value="#{YieldAdjustmentsDialogBean.systemEstimate}" precision="low" />
+						</l:field>
+						<l:field label="#{dmBundle['Yield.adjustmentValue']}">
+							<custom:inputDecimal id="ADJUSTMENT_VALUE_ADJ"
+								value="#{YieldAdjustmentsDialogBean.adjustmentValue}" required="false">
+								<custom:ajax event="change"
+									listener="#{YieldAdjustmentsDialogBean.onAdjustmentChange}"
+									render="YIELD_ADJUSTMENTS_panel" execute="@this" />
+							</custom:inputDecimal>
+						</l:field>
+						<l:field label="#{dmBundle['Yield.totalYield']}">
+							<custom:outputDecimal id="TOTAL_YIELD_ADJ"
+								value="#{YieldAdjustmentsDialogBean.totalYield}" precision="low" />
+						</l:field>
+					</l:fieldlist>
+					<custom:commandButton id="SAVE_BTN"
+						action="#{YieldAdjustmentsDialogBean.save}"
+						value="#{generalBundle['SAVE']}"
+						render="coreForm:GARDEN_REPORT_GRID YIELD_ADJUSTMENTS_panel"
+						execute="YIELD_ADJUSTMENTS_panel"
+						oncomplete="#{custom:success(custom:hide('yieldAdjustmentModal'))}" />
+				</c:if>
+			</h:panelGroup>
+		</custom:modalPanel>
+
+		<!-- Dialog bundle: plant-form related modals (audit trail, etc.) -->
+		<!-- [merged] _dialogs/PLANT_FORM_dialogs.xhtml -->
+		<custom:modalPanel id="PLANT_AUDIT_TRAIL_modal"
+				windowTitle="#{appBundle['PlantAuditTrailDialog.ScreenName']}"
+				rendered="#{not empty PlantAuditTrailDialog.plant}"
+				closeAction="#{PlantAuditTrailDialog.clear}" styleClass="wide">
+			<h:panelGroup id="PLANT_AUDIT_TRAIL_panel">
+				<c:if test="#{not empty PlantAuditTrailDialog.plant}">
+					<l:fieldlist defaultCellSpan="4">
+						<l:field label="#{dmBundle['Plant.plantCode']}">
+							<custom:outputText id="AUDIT_PLANT_CODE"
+								value="#{PlantAuditTrailDialog.plant.plantCode}" />
+						</l:field>
+						<l:field label="#{dmBundle['Bed']}">
+							<custom:outputText id="AUDIT_BED_NAME"
+								value="#{PlantAuditTrailDialog.plant.bed.name}" />
+						</l:field>
+					</l:fieldlist>
+					<custom:dataTable id="AUDIT_TRAIL_GRID"
+							dataSource="#{PlantAuditTrailDialog.dataSource}" styleClass="nowrap">
+						<custom:column propertyName="changedAt" label="#{appBundle['AuditTrail.changedAt']}">
+							<custom:outputText id="AUDIT_CHANGED_AT" value="#{cell}" />
+						</custom:column>
+						<custom:column propertyName="fieldName" label="#{appBundle['AuditTrail.fieldName']}">
+							<custom:outputText id="AUDIT_FIELD_NAME" value="#{cell}" />
+						</custom:column>
+						<custom:column propertyName="oldValue" label="#{appBundle['AuditTrail.oldValue']}">
+							<custom:outputText id="AUDIT_OLD_VALUE" value="#{cell}" />
+						</custom:column>
+						<custom:column propertyName="newValue" label="#{appBundle['AuditTrail.newValue']}">
+							<custom:outputText id="AUDIT_NEW_VALUE" value="#{cell}" />
+						</custom:column>
+					</custom:dataTable>
+				</c:if>
+			</h:panelGroup>
+		</custom:modalPanel>
+
+		<custom:exportModal id="exportGardenReport" headerName="#{generalBundle.EXPORT}"
+			exportBean="#{GardenReportExportBean}" />
+	</ui:define>
+
+	<ui:define name="filter">
+		<custom:filtering id="filter" dataSource="#{GridDataSource}"
+				render="GARDEN_REPORT_GRID" advancedSearch="true">
+			<f:event type="postSearch" listener="#{ViewBean.onPostSearch}" />
+			<f:event type="postClear"  listener="#{ViewBean.onPostClear}" />
+
+			<f:facet name="query">
+				<custom:and>
+					<app:formulaBuilder propertyName="bed" value="#{SearchBean.bedNodes}" />
+
+					<!-- [merged] _templates/query/PLANT_QUERY.xhtml -->
+					<custom:defaults plantSearchCodes="#{SearchBean.plantSearchCodes}">
+						<custom:fail test="#{empty plantSearchCodes}"
+							message="PlantSearchCodes missing in #{SearchBean.class.name}" />
+						<custom:condition condition="#{not noPrefixHere}">
+							<custom:like propertyName="#{pathToPlant}masterPlant.prefix"
+								value="#{plantSearchCodes.plantPrefix}" />
+						</custom:condition>
+						<custom:condition condition="#{not empty plantSearchCodes.plantCodes}">
+							<custom:or>
+								<q:likeAny propertyName="#{pathToPlant}plantCode"
+									value="#{plantSearchCodes.plantCodesWithWildcard}" />
+								<custom:in propertyName="#{pathToPlant}plantCode"
+									value="#{plantSearchCodes.plantCodesWithoutWildcard}" />
+							</custom:or>
+						</custom:condition>
+					</custom:defaults>
+
+					<custom:like propertyName="plantSupplierData.supplier.displayName"
+							ref="SUPPLIER_FILTERInputLookup" />
+
+					<!-- [merged] _templates/query/CURRENT_SUPPLIER_CLASS_FILTER_QUERY.xhtml
+					     param supplier="plantSupplierData.supplier" -->
+					<app:formulaBuilder propertyName="plantSupplierData.supplier"
+						value="#{SearchBean.presentSupplierClassFormula}" />
+
+					<!-- [merged] _templates/query/PLANT_GROUP_1_QUERY.xhtml -->
+					<q:likeAny propertyName="#{pathToPlant}plantGroup1" value="#{SearchBean.plantGroup1s}" />
+
+					<custom:greater propertyName="p.endDate"
+							value="#{SearchBean.dateInterval.fromAsLocalDate}" />
+					<custom:lessEqual propertyName="p.startDate"
+							value="#{SearchBean.dateInterval.toAsLocalDate}" />
+					<custom:less propertyName="ya.yieldScore" ref="yieldScoreFilter" />
+					<custom:greater propertyName="ya.totalYieldAccuracy.meanAbsoluteError"
+							ref="meanAbsoluteErrorTotalFilter" />
+				</custom:and>
+			</f:facet>
+
+			<f:facet name="advancedQuery">
+				<custom:and>
+					<!-- [merged] _templates/query/PLANT_FREE_TEXTS_FILTER_QUERY.xhtml
+					     param plantPrefix="" -->
+					<custom:and>
+						<custom:like propertyName="freeText1" value="#{SearchBean.plantFreeText1}" />
+						<custom:like propertyName="freeText2" value="#{SearchBean.plantFreeText2}" />
+					</custom:and>
+				</custom:and>
+			</f:facet>
+
+			<l:fieldset>
+				<l:field label="#{dmBundle['Bed']}">
+					<!-- [merged] _templates/filter/BED_FILTER_SELECT_MANY.xhtml -->
+					<custom:defaults disableSuperLevel="false">
+						<custom:injectAttributes>
+							<custom:selectMany id="bedFilterSelectMany"
+									searchable="true"
+									preload="#{SearchBean.getPreloadMode()}"
+									value="#{SearchBean.bedNodes}"
+									dataModel="#{BedTreeDataModelFactory.produce(SearchBean.getBedTree(), disableSuperLevel)}">
+								<c:choose>
+									<c:when test="#{not empty bedRender}">
+										<custom:ajax event="change" listener="#{SearchBean.onBedSelectionChange}"
+											render="#{bedRender}" execute="@this,#{bedExecute}" />
+									</c:when>
+									<c:otherwise>
+										<custom:ajax event="change" execute="@this,#{bedExecute}" />
+									</c:otherwise>
+								</c:choose>
+							</custom:selectMany>
+						</custom:injectAttributes>
+					</custom:defaults>
+				</l:field>
+
+				<!-- [merged] _templates/filter/SUPPLIER_CLASS_FILTER.xhtml -->
+				<custom:injectAttributes names="disabled rendered">
+					<l:field label="#{dmBundle['SupplierClass.name_long']}">
+						<custom:selectFromEnum id="SUPPLIER_CLASS_FILTER"
+								value="#{SearchBean.supplierClass}"
+								enumClass="com.company.app.transfer.valueobject.SupplierClassFilter">
+							<ui:insert name="baseChild">
+								<custom:ajax event="change" execute="@this" />
+							</ui:insert>
+						</custom:selectFromEnum>
+					</l:field>
+				</custom:injectAttributes>
+
+				<!-- [merged] _templates/filter/SUPPLIER_FILTER.xhtml -->
+				<custom:injectAttributes names="rendered">
+					<l:field label="#{dmBundle['Supplier.displayName']}">
+						<ui:fragment rendered="#{!disabled}">
+							<custom:complexlookupinput name="SUPPLIER_FILTER"
+									lookupHelper="#{SupplierLookup.lookupHelper}"
+									dataSource="#{SupplierLookup.dataSource}"
+									openAction="#{SupplierLookup.open(SearchBean.bedNodes)}"
+									windowTitle="#{dmBundle['Supplier']}"
+									advancedSearch="false" disableAjaxCall="true">
+
+								<ui:define name="filteringQuery">
+									<custom:and>
+										<custom:like propertyName="o.displayName" ref="supplierNameInput" />
+										<app:formulaBuilder propertyName="o.customerBed"
+											value="#{SupplierLookup.searchBean.bedNodes}" />
+										<!-- [merged] _templates/query/CURRENT_SUPPLIER_CLASS_FILTER_QUERY.xhtml
+										     param supplier=""  SearchBean="#{SupplierLookup.searchBean}" -->
+										<app:formulaBuilder propertyName=""
+											value="#{SupplierLookup.searchBean.presentSupplierClassFormula}" />
+									</custom:and>
+								</ui:define>
+
+								<ui:define name="filteringFields">
+									<l:fieldset defaultCellSpan="3">
+										<l:field label="#{dmBundle['Supplier.displayName_long']}">
+											<custom:inputLookup id="supplierNameInput"
+												lookupHelper="#{SupplierLookup.lookupHelper}" type="search" />
+										</l:field>
+										<l:field label="#{dmBundle['Bed']}">
+											<!-- [merged] _templates/filter/BED_FILTER_SELECT_MANY.xhtml
+											     param externalId="supplierCode"  SearchBean="#{SupplierLookup.searchBean}" -->
+											<custom:defaults disableSuperLevel="false">
+												<custom:injectAttributes>
+													<custom:selectMany id="supplierCodebedFilterSelectMany"
+															searchable="true"
+															preload="#{SupplierLookup.searchBean.getPreloadMode()}"
+															value="#{SupplierLookup.searchBean.bedNodes}"
+															dataModel="#{BedTreeDataModelFactory.produce(SupplierLookup.searchBean.getBedTree(), disableSuperLevel)}">
+														<c:choose>
+															<c:when test="#{not empty bedRender}">
+																<custom:ajax event="change"
+																	listener="#{SupplierLookup.searchBean.onBedSelectionChange}"
+																	render="#{bedRender}" execute="@this,#{bedExecute}" />
+															</c:when>
+															<c:otherwise>
+																<custom:ajax event="change" execute="@this,#{bedExecute}" />
+															</c:otherwise>
+														</c:choose>
+													</custom:selectMany>
+												</custom:injectAttributes>
+											</custom:defaults>
+										</l:field>
+										<!-- [merged] _templates/filter/SUPPLIER_CLASS_FILTER.xhtml
+										     param SearchBean="#{SupplierLookup.searchBean}" -->
+										<custom:injectAttributes names="disabled rendered">
+											<l:field label="#{dmBundle['SupplierClass.name_long']}">
+												<custom:selectFromEnum id="SUPPLIER_CLASS_FILTER"
+														value="#{SupplierLookup.searchBean.supplierClass}"
+														enumClass="com.company.app.transfer.valueobject.SupplierClassFilter">
+													<ui:insert name="baseChild">
+														<custom:ajax event="change" execute="@this" />
+													</ui:insert>
+												</custom:selectFromEnum>
+											</l:field>
+										</custom:injectAttributes>
+									</l:fieldset>
+								</ui:define>
+
+								<ui:define name="gridColumns">
+									<custom:column label="#{dmBundle['Supplier.displayName']}" propertyName="displayName">
+										#{row.displayName}
+									</custom:column>
+								</ui:define>
+							</custom:complexlookupinput>
+						</ui:fragment>
+						<ui:fragment rendered="#{disabled}">
+							<custom:outputText value="#{SupplierLookup.lookupHelper.searchValue}" />
+						</ui:fragment>
+					</l:field>
+				</custom:injectAttributes>
+
+				<!-- [merged] _templates/filter/PLANT_FILTER.xhtml -->
+				<custom:defaults plantSearchCodes="#{SearchBean.plantSearchCodes}" prefixOfId="" label="#{dmBundle['Plant']}">
+					<custom:injectAttributes names="rendered">
+						<l:field label="#{label}">
+							<custom:with withPrefix="#{AppConfiguration.usesPrefix and !noPrefixHere}">
+								<l:row>
+									<l:cell span="#{withPrefix ? 4 : 0}">
+										<custom:inputText id="PREFIX_FILTER"
+											value="#{plantSearchCodes.plantPrefix}" rendered="#{withPrefix}" />
+									</l:cell>
+									<l:cell span="#{withPrefix ? 8 : 12}">
+										<custom:inputText id="PLANT_CODE_FILTER"
+											value="#{plantSearchCodes.plantCodes}" maxlength="50000">
+											<app:convertMultipleEntries />
+										</custom:inputText>
+									</l:cell>
+								</l:row>
+							</custom:with>
+						</l:field>
+					</custom:injectAttributes>
+				</custom:defaults>
+
+				<l:field label="#{appBundle['DateRange']}" span="4">
+					<custom:inputDateInterval id="FROM_TO_DATE_FILTER" shortForm="true"
+						prompt="#{UserBean.user.dataPresentationLocale.datePattern}"
+						value="#{SearchBean.dateInterval}" required="false" />
+				</l:field>
+
+				<!-- [merged] _templates/filter/GARDENER_FILTER.xhtml -->
+				<custom:injectAttributes names="rendered">
+					<l:field label="#{dmBundle['Plant.gardenerCode']}">
+						<ui:fragment rendered="#{!disabled}">
+							<custom:complexlookupinput name="GARDENER_FILTER"
+									lookupHelper="#{GardenerLookup.lookupHelper}"
+									dataSource="#{GardenerLookup.dataSource}"
+									openAction="#{GardenerLookup.open(SearchBean.bedNode)}"
+									windowTitle="#{dmBundle['Plant.gardenerCode']}"
+									advancedSearch="false" disableAjaxCall="true">
+								<ui:define name="filteringQuery">
+									<custom:and>
+										<app:formulaBuilder propertyName="o.bed"
+											value="#{GardenerLookup.searchBean.bedNodes}" />
+									</custom:and>
+								</ui:define>
+								<ui:define name="filteringFields">
+									<l:fieldset>
+										<l:field label="#{dmBundle['Bed']}" span="3">
+											<!-- [merged] _templates/filter/BED_FILTER_SELECT_MANY.xhtml
+											     param externalId="gardenerCode"  SearchBean="#{GardenerLookup.searchBean}" -->
+											<custom:defaults disableSuperLevel="false">
+												<custom:injectAttributes>
+													<custom:selectMany id="gardenerCodebedFilterSelectMany"
+															searchable="true"
+															preload="#{GardenerLookup.searchBean.getPreloadMode()}"
+															value="#{GardenerLookup.searchBean.bedNodes}"
+															dataModel="#{BedTreeDataModelFactory.produce(GardenerLookup.searchBean.getBedTree(), disableSuperLevel)}">
+														<c:choose>
+															<c:when test="#{not empty bedRender}">
+																<custom:ajax event="change"
+																	listener="#{GardenerLookup.searchBean.onBedSelectionChange}"
+																	render="#{bedRender}" execute="@this,#{bedExecute}" />
+															</c:when>
+															<c:otherwise>
+																<custom:ajax event="change" execute="@this,#{bedExecute}" />
+															</c:otherwise>
+														</c:choose>
+													</custom:selectMany>
+												</custom:injectAttributes>
+											</custom:defaults>
+										</l:field>
+									</l:fieldset>
+								</ui:define>
+								<ui:define name="gridColumns">
+									<custom:column label="#{dmBundle['Plant.gardenerCode']}" propertyName="name">
+										#{row.code}
+									</custom:column>
+								</ui:define>
+							</custom:complexlookupinput>
+						</ui:fragment>
+						<ui:fragment rendered="#{disabled}">
+							<custom:outputText value="#{GardenerLookup.lookupHelper.searchValue}" />
+						</ui:fragment>
+					</l:field>
+				</custom:injectAttributes>
+
+				<!-- [merged] _templates/filter/PLANT_GROUP1_FILTER.xhtml -->
+				<custom:injectAttributes names="rendered">
+					<l:field label="#{customBundleProvider.dmBundleWithCustomLabels['Plant.plantGroup1']}"
+							rendered="#{GUISettings.plantGroup1Enabled}">
+						<custom:injectAttributes names="disabled">
+							<custom:inputText id="PLANT_GROUP_1_FILTER" value="#{SearchBean.plantGroup1s}">
+								<app:convertMultipleEntries />
+							</custom:inputText>
+						</custom:injectAttributes>
+					</l:field>
+				</custom:injectAttributes>
+			</l:fieldset>
+
+			<custom:advancedSearch idToHide="search" idToShow="advSearch">
+				<l:fieldset>
+					<!-- [merged] _templates/filter/PLANT_FREE_TEXT_FILTER.xhtml -->
+					<c:if test="#{GUISettings.freeText1Enabled}">
+						<l:field label="#{customBundleProvider.dmBundleWithCustomLabels['Plant.freeText1']}">
+							<custom:inputText id="PLANT_FREE_TEXT1_FILTER" value="#{SearchBean.plantFreeText1}" />
+						</l:field>
+					</c:if>
+					<c:if test="#{GUISettings.freeText2Enabled}">
+						<l:field label="#{customBundleProvider.dmBundleWithCustomLabels['Plant.freeText2']}">
+							<custom:inputText id="PLANT_FREE_TEXT2_FILTER" value="#{SearchBean.plantFreeText2}" />
+						</l:field>
+					</c:if>
+
+					<!-- [merged] _sections/yieldMeasuresFilter.xhtml -->
+					<!-- [merged]   _templates/filter/ACCURACY_MEASURE_GREATER_THAN_FILTER_TEMPLATE.xhtml
+					     labelKey="Yield.Accuracy.totalYieldAccuracy.meanAbsoluteError"
+					     inputDecimalId="meanAbsoluteErrorTotalFilter"
+					     searchBeanProperty="#{SearchBean.meanAbsoluteErrorTotalLowerBound}" -->
+					<l:field label="#{dmBundle['Yield.Accuracy.totalYieldAccuracy.meanAbsoluteError']} #{appBundle['GreaterThan_long']}"
+							labelTooltip="#{dmBundle['Yield.Accuracy.totalYieldAccuracy.meanAbsoluteError_long']} #{appBundle['GreaterThan_long']}">
+						<custom:inputDecimal id="meanAbsoluteErrorTotalFilter"
+							value="#{SearchBean.meanAbsoluteErrorTotalLowerBound}" />
+					</l:field>
+
+					<!-- [merged]   _templates/filter/ACCURACY_MEASURE_LESSER_THAN_FILTER_TEMPLATE.xhtml
+					     labelKey="Yield.Accuracy.yieldScore"
+					     inputDecimalId="yieldScoreFilter"
+					     searchBeanProperty="#{SearchBean.yieldScoreUpperBound}" -->
+					<l:field label="#{dmBundle['Yield.Accuracy.yieldScore']} #{appBundle['LowerThan_long']}"
+							labelTooltip="#{dmBundle['Yield.Accuracy.yieldScore_long']} #{appBundle['LowerThan_long']}">
+						<custom:inputDecimal id="yieldScoreFilter"
+							value="#{SearchBean.yieldScoreUpperBound}" styleClass="ibe" />
+					</l:field>
+				</l:fieldset>
+			</custom:advancedSearch>
+		</custom:filtering>
+	</ui:define>
+
+	<ui:define name="result">
+		<!-- [merged] _sections/gardenReportGrid.xhtml -->
+		<custom:dataTable id="GARDEN_REPORT_GRID" dataSource="#{GridDataSource}" styleClass="nowrap">
+
+			<custom:toolbar id="TOOLBAR">
+				<custom:exportButton modalId="exportGardenReport" exportBean="#{GardenReportExportBean}"
+					gridId="GARDEN_REPORT_GRID" fileNamePrefix="gardenReport" />
+			</custom:toolbar>
+
+			<!-- Plant identification column with link to plant worksheet -->
+			<custom:column align="right" propertyName="plant.plantCode"
+					label="#{dmBundle['Plant.plantCode']}" visible="always">
+				<custom:link id="#{idPrefix}plantFormLink" outcome="website:/plant/worksheet" target="worksheetTab">
+					<f:param name="plantId" value="#{row.plant.id}" />
+					<!-- [merged] _templates/form/PLANT_CODE_AND_PREFIX.xhtml
+					     plant="#{cell}"  plantCodeDefaultValue="#{row.plant.plantCode}"  tooltip="#{appBundle.OpenWorksheet}" -->
+					<custom:defaults masterPlantPrefix="#{cell.masterPlant.prefix}"
+							plantCodeDefaultValue="#{row.plant.plantCode}">
+						<span class="plantPrefix">
+							<custom:outputText id="#{idPrefix}PLANT_PREFIX_FORM"
+								value="#{masterPlantPrefix}" maxlength="5" />
+						</span>
+						<custom:injectAttributes names="maxlength tooltip" tooltip="#{appBundle.OpenWorksheet}">
+							<custom:outputText id="#{idPrefix}PLANT_CODE_FORM"
+								value="#{plantCodeDefaultValue}" styleClass="preservedWhiteSpaces" />
+						</custom:injectAttributes>
+					</custom:defaults>
+				</custom:link>
+			</custom:column>
+
+			<custom:column align="right" propertyName="plant.bed.name"
+					label="#{dmBundle['Bed']}" visible="initiallyHidden">
+				<custom:outputText id="PLANT_BED_NAME" value="#{cell}" />
+			</custom:column>
+
+			<!-- Harvest demand group: period + observed picks + observed quantity -->
+			<custom:columnGroup label="#{dmBundle['Harvest.observed']}">
+				<custom:column align="right" propertyName="period.period"
+						label="#{dmBundle['Period.period']}">
+					<custom:outputText id="PERIOD_GRID" value="#{cell}" />
+				</custom:column>
+
+				<!-- [merged] _templates/grid/HARVEST_PICKS_COLUMN.xhtml
+				     harvestHistory="#{row.harvestHistory}"  plant="#{row.plant}"  period="#{row.period}" -->
+				<app:column id="HARVEST_PICKS_COLUMN" sort="false" align="right"
+						propertyName="harvestHistory.harvest.picks"
+						label="#{dmBundle['HarvestHistory.numberOfPicks']}"
+						tooltip="#{dmBundle['HarvestHistory.numberOfPicks_long']}">
+					<custom:openModalAction id="HARVEST_DETAILS_handler"
+							modalId="HARVEST_DETAILS_modal"
+							action="#{HarvestDetailsDialog.open(row.period, row.plant.id)}">
+						<h:panelGroup id="picksColumnValue">
+							<custom:outputDecimal id="PLANT_PICKS" value="#{cell}" precision="2">
+								<f:convertNumber groupingUsed="true" maxFractionDigits="2" minFractionDigits="0" />
+							</custom:outputDecimal>
+							<ui:fragment rendered="#{row.plant.replacingCalc or row.harvestHistory.isNotEqualToWithReplaced()}">
+								<app:outputDecimal id="PLANT_PICKS_WITH_REPLACED"
+									value="#{row.harvestHistory.harvestWithReplaced.picks}" precision="2" inBrackets="true">
+									<f:convertNumber groupingUsed="true" maxFractionDigits="2" minFractionDigits="0" />
+								</app:outputDecimal>
+							</ui:fragment>
+						</h:panelGroup>
+					</custom:openModalAction>
+					<custom:tooltip for="picksColumnValue">
+						<custom:outputText value="#{appBundle['OpenHarvestDetailsDialog']}" />
+					</custom:tooltip>
+				</app:column>
+
+				<!-- [merged] _templates/grid/HARVEST_QUANTITY_COLUMN.xhtml
+				     harvestHistory="#{row.harvestHistory}"  plant="#{row.plant}"  showExcludeHarvestLink="false" -->
+				<custom:defaults showExcludeHarvestLink="false">
+					<app:column id="HARVEST_QUANTITY_COLUMN" align="right"
+							propertyName="harvestHistory.harvest.quantity"
+							label="#{dmBundle['HarvestHistory.quantity']}">
+						<ui:param name="showExclude"
+							value="#{(not row.plant.bed.virtual) and showExcludeHarvestLink}" />
+						<ui:fragment rendered="#{showExclude}">
+							<custom:editAction id="HARVEST_OVERRIDE_handler"
+									action="#{ExcludeHarvestDialog.open(row.harvestHistory, period)}"
+									oncomplete="#{custom:success(o:show('excludeHarvestModal'))}">
+								<h:panelGroup id="editableQuantity">
+									<custom:outputDecimal value="#{cell}" precision="0" />
+								</h:panelGroup>
+							</custom:editAction>
+							<custom:tooltip for="editableQuantity">
+								#{appBundle['EXCLUDE_THIS_HARVEST_FROM_CALCULATION']}
+							</custom:tooltip>
+						</ui:fragment>
+						<ui:fragment rendered="#{not showExclude}">
+							<h:panelGroup id="readonlyQuantity">
+								<custom:outputDecimal value="#{cell}" precision="0" />
+							</h:panelGroup>
+							<custom:tooltip for="readonlyQuantity">
+								#{appBundle['CANNOT_EXCLUDE_THIS_HARVEST_FROM_CALCULATION']}
+							</custom:tooltip>
+						</ui:fragment>
+					</app:column>
+				</custom:defaults>
+
+				<!-- Combined columns only present when propagation is active -->
+				<!-- [merged] _templates/grid/HARVEST_COMBINED_QUANTITY_COLUMN.xhtml
+				     harvestHistory="#{row.harvestHistory}"  plant="#{row.plant}" -->
+				<c:if test="#{AppConfiguration.propagationEnabled}">
+					<custom:defaults columnInitiallyVisible="#{true}">
+						<app:column id="HARVEST_COMBINED_QUANTITY_COLUMN" align="right"
+								propertyName="harvestHistory.combinedHarvest.quantity"
+								label="#{dmBundle['HarvestHistory.combinedQuantity']}"
+								visible="#{columnInitiallyVisible ? 'initiallyVisible' : 'initiallyHidden'}">
+							<h:panelGroup id="combinedQuantityValue">
+								<custom:outputDecimal value="#{cell}" precision="0" />
+							</h:panelGroup>
+						</app:column>
+					</custom:defaults>
+				</c:if>
+			</custom:columnGroup>
+
+			<!-- System estimate columns -->
+			<!-- [merged] _sections/systemEstimateGrid.xhtml -->
+			<custom:columnGroup label="#{dmBundle['Yield.systemEstimate_long']}">
+				<!-- [merged] _templates/grid/YIELD_ACCURACY_COLUMN.xhtml
+				     propertyName="yield.systemEstimate"  shortLabel="..."  label="..."  outputId="systemEstimate" -->
+				<custom:defaults errorLevel="#{null}" visible="initiallyHidden">
+					<custom:injectAttributes names="id">
+						<app:column align="right" propertyName="yield.systemEstimate"
+								shortLabel="#{dmBundle['Yield_short']}"
+								label="#{dmBundle['Yield.systemEstimate_long']}" visible="initiallyHidden">
+							<custom:outputDecimal id="systemEstimate" value="#{cell}" precision="low"
+								styleClass="#{YieldAccuracyGUIHelperBean.getStyle(null)}" />
+						</app:column>
+					</custom:injectAttributes>
+				</custom:defaults>
+
+				<!-- [merged] _templates/grid/YIELD_ACCURACY_COLUMN.xhtml
+				     propertyName="yieldAccuracy.systemEstimateAccuracy.meanAbsoluteError" -->
+				<custom:defaults errorLevel="#{null}" visible="initiallyHidden">
+					<custom:injectAttributes names="id">
+						<app:column align="right"
+								propertyName="yieldAccuracy.systemEstimateAccuracy.meanAbsoluteError"
+								shortLabel="#{dmBundle['Yield.Accuracy.meanAbsoluteError_short']}"
+								label="#{dmBundle['Yield.Accuracy.systemEstimateAccuracy.meanAbsoluteError_long']}"
+								visible="initiallyHidden">
+							<custom:outputDecimal id="meanAbsoluteErrorSystem" value="#{cell}" precision="low"
+								styleClass="#{YieldAccuracyGUIHelperBean.getStyle(null)}" />
+						</app:column>
+					</custom:injectAttributes>
+				</custom:defaults>
+
+				<!-- [merged] _templates/grid/YIELD_ACCURACY_COLUMN.xhtml
+				     propertyName="yieldAccuracy.systemEstimateAccuracy.meanAbsoluteScaledError"  errorLevel from row -->
+				<custom:defaults errorLevel="#{row.yieldAccuracy == null ? null : row.yieldAccuracy.systemEstimateAccuracy.meanAbsoluteScaledErrorErrorLevel}" visible="initiallyHidden">
+					<custom:injectAttributes names="id">
+						<app:column align="right"
+								propertyName="yieldAccuracy.systemEstimateAccuracy.meanAbsoluteScaledError"
+								shortLabel="#{dmBundle['Yield.Accuracy.meanAbsoluteScaledError_short']}"
+								label="#{dmBundle['Yield.Accuracy.systemEstimateAccuracy.meanAbsoluteScaledError_long']}"
+								visible="initiallyHidden">
+							<custom:outputDecimal id="meanAbsoluteScaledErrorSystem" value="#{cell}" precision="low"
+								styleClass="#{YieldAccuracyGUIHelperBean.getStyle(row.yieldAccuracy == null ? null : row.yieldAccuracy.systemEstimateAccuracy.meanAbsoluteScaledErrorErrorLevel)}" />
+						</app:column>
+					</custom:injectAttributes>
+				</custom:defaults>
+			</custom:columnGroup>
+
+			<!-- Total (adjusted) yield estimate columns -->
+			<!-- [merged] _sections/totalYieldGrid.xhtml -->
+			<custom:columnGroup label="#{dmBundle['Yield']}">
+				<!-- [merged] _templates/grid/YIELD_TOTAL_COLUMN.xhtml
+				     yield="#{row.yield}"  plant="#{row.plant}"  period="#{row.period}"
+				     shortLabel="#{dmBundle['Yield.totalYield_short']}"  label="#{appBundle['GardenReportGrid.yieldValue']}"
+				     yieldAdjustmentsDialogBean="#{YieldAdjustmentsDialogBean}" -->
+				<app:column align="right" propertyName="yield.totalYield"
+						label="#{appBundle['GardenReportGrid.yieldValue']}"
+						shortLabel="#{dmBundle['Yield.totalYield_short']}" styleClass="nowrap">
+					<ui:fragment rendered="#{not row.plant.bed.virtual}">
+						<custom:editAction id="PLANT_TOTAL_YIELD_action"
+								action="#{YieldAdjustmentsDialogBean.open(row.period, row.plant.id, row.plant.processing.lastClosedPeriod)}"
+								oncomplete="#{custom:success(o:show('yieldAdjustmentModal'))}"
+								tooltip="#{appBundle.OpenYieldAdjustmentsDialog}">
+							<custom:outputDecimal id="PLANT_TOTAL_YIELD" rendered="#{not empty cell}"
+								value="#{cell}" precision="low" />
+							<custom:outputText id="PLANT_NONE_TOTAL_YIELD" rendered="#{empty cell}"
+								value="#{generalBundle['NOT_APPLICABLE.short']}" />
+						</custom:editAction>
+					</ui:fragment>
+					<ui:fragment rendered="#{row.plant.bed.virtual}">
+						<custom:outputDecimal id="PLANT_TOTAL_YIELD_ro" rendered="#{not empty cell}"
+							value="#{cell}" precision="low" />
+						<custom:outputText id="PLANT_NONE_TOTAL_YIELD_ro" rendered="#{empty cell}"
+							value="#{generalBundle['NOT_APPLICABLE.short']}" />
+					</ui:fragment>
+				</app:column>
+
+				<!-- [merged] _templates/grid/YIELD_ACCURACY_COLUMN.xhtml
+				     propertyName="yieldAccuracy.totalYieldAccuracy.meanAbsoluteError"  visible="initiallyVisible" -->
+				<custom:defaults errorLevel="#{null}" visible="initiallyVisible">
+					<custom:injectAttributes names="id">
+						<app:column align="right"
+								propertyName="yieldAccuracy.totalYieldAccuracy.meanAbsoluteError"
+								shortLabel="#{dmBundle['Yield.Accuracy.meanAbsoluteError_short']}"
+								label="#{dmBundle['Yield.Accuracy.totalYieldAccuracy.meanAbsoluteError_long']}"
+								visible="initiallyVisible">
+							<custom:outputDecimal id="meanAbsoluteErrorTotal" value="#{cell}" precision="low"
+								styleClass="#{YieldAccuracyGUIHelperBean.getStyle(null)}" />
+						</app:column>
+					</custom:injectAttributes>
+				</custom:defaults>
+
+				<!-- [merged] _templates/grid/YIELD_ACCURACY_COLUMN.xhtml
+				     propertyName="yieldAccuracy.totalYieldAccuracy.meanAbsoluteScaledError"  errorLevel from row  visible="initiallyVisible" -->
+				<custom:defaults errorLevel="#{row.yieldAccuracy == null ? null : row.yieldAccuracy.totalYieldAccuracy.meanAbsoluteScaledErrorErrorLevel}" visible="initiallyVisible">
+					<custom:injectAttributes names="id">
+						<app:column align="right"
+								propertyName="yieldAccuracy.totalYieldAccuracy.meanAbsoluteScaledError"
+								shortLabel="#{dmBundle['Yield.Accuracy.meanAbsoluteScaledError_short']}"
+								label="#{dmBundle['Yield.Accuracy.totalYieldAccuracy.meanAbsoluteScaledError_long']}"
+								visible="initiallyVisible">
+							<custom:outputDecimal id="meanAbsoluteScaledErrorTotal" value="#{cell}" precision="low"
+								styleClass="#{YieldAccuracyGUIHelperBean.getStyle(row.yieldAccuracy == null ? null : row.yieldAccuracy.totalYieldAccuracy.meanAbsoluteScaledErrorErrorLevel)}" />
+						</app:column>
+					</custom:injectAttributes>
+				</custom:defaults>
+			</custom:columnGroup>
+
+			<!-- Two representative accuracy columns (one with error-level styling, one plain) -->
+			<!-- [merged] _templates/grid/YIELD_ACCURACY_COLUMN.xhtml
+			     propertyName="yieldAccuracy.yieldScore"  errorLevel from row  visible="initiallyVisible" -->
+			<custom:defaults errorLevel="#{row.yieldAccuracy == null ? null : row.yieldAccuracy.yieldScoreErrorLevel}" visible="initiallyVisible">
+				<custom:injectAttributes names="id">
+					<app:column align="right" propertyName="yieldAccuracy.yieldScore"
+							shortLabel="#{dmBundle['Yield.Accuracy.yieldScore_short']}"
+							label="#{dmBundle['Yield.Accuracy.yieldScore_long']}"
+							visible="initiallyVisible">
+						<custom:outputDecimal id="yieldScore" value="#{cell}" precision="low"
+							styleClass="#{YieldAccuracyGUIHelperBean.getStyle(row.yieldAccuracy == null ? null : row.yieldAccuracy.yieldScoreErrorLevel)}" />
+					</app:column>
+				</custom:injectAttributes>
+			</custom:defaults>
+
+			<!-- [merged] _templates/grid/YIELD_ACCURACY_COLUMN.xhtml
+			     propertyName="yieldAccuracy.totalYieldAccuracy.meanAbsoluteError"  visible="initiallyVisible" -->
+			<custom:defaults errorLevel="#{null}" visible="initiallyVisible">
+				<custom:injectAttributes names="id">
+					<app:column align="right"
+							propertyName="yieldAccuracy.totalYieldAccuracy.meanAbsoluteError"
+							shortLabel="#{dmBundle['Yield.Accuracy.meanAbsoluteError_short']}"
+							label="#{dmBundle['Yield.Accuracy.totalYieldAccuracy.meanAbsoluteError_long']}"
+							visible="initiallyVisible">
+						<custom:outputDecimal id="meanAbsoluteErrorTotal" value="#{cell}" precision="low"
+							styleClass="#{YieldAccuracyGUIHelperBean.getStyle(null)}" />
+					</app:column>
+				</custom:injectAttributes>
+			</custom:defaults>
+
+			<!-- Totals footer: shows row count, falls back to limited count when summary disabled -->
+			<!-- [merged] _templates/grid/total/complexTotals.xhtml  (ui:decorate inlined as content)
+			     summarySection="#{GardenReportViewBean.summarySection}" -->
+			<custom:totals>
+				<h:panelGroup id="totalsGrid">
+					<c:choose>
+						<c:when test="#{GardenReportViewBean.summarySection.enabled}">
+							<!-- [merged] _templates/grid/total/summarySectionTotalNumberOfRows.xhtml -->
+							<custom:outputFormat value="#{componentBundle['DataTable.TOTAL_NUMBER_OF_ROWS']}"
+									rendered="#{GardenReportViewBean.summarySection.enabled}">
+								<custom:outputDecimal id="totalNumberOfRows"
+									value="#{GardenReportViewBean.summarySection.totalNumberOfRows}"
+									styleClass="totalsValue" precision="0" />
+							</custom:outputFormat>
+						</c:when>
+						<c:otherwise>
+							<!-- [merged] _templates/grid/total/summaryFragmentLimitedNumberOfRows.xhtml -->
+							<l:box>
+								<custom:outputFormat value="#{componentBundle['DataTable.LIMITED_NUMBER_OF_ROWS']}"
+										rendered="#{GardenReportViewBean.summarySection.enabled}">
+									<custom:outputDecimal id="limitedNumberOfRows"
+										value="#{GardenReportViewBean.summarySection.limitedNumberOfRows}"
+										styleClass="totalsValue" precision="0" />
+								</custom:outputFormat>
+							</l:box>
+						</c:otherwise>
+					</c:choose>
+				</h:panelGroup>
+			</custom:totals>
+
+		</custom:dataTable>
+	</ui:define>
+
+	<ui:define name="hidden_markup">
+		<!-- [merged] _dialogs/harvestDetailsDialog.xhtml
+		     param forId="coreForm:GARDEN_REPORT_GRID" -->
+		<custom:modalPanel id="HARVEST_DETAILS_modal"
+				windowTitle="#{appBundle['HarvestDetailsDialog.ScreenName']}"
+				rendered="#{not empty HarvestDetailsDialog.report}"
+				closeAction="#{HarvestDetailsDialog.clear}"
+				closeRender="HARVEST_DETAILS,#{closeRender}" styleClass="wide">
+			<h:panelGroup id="HARVEST_DETAILS_panel">
+				<custom:with plant="#{HarvestDetailsDialog.plant}">
+					<l:fieldlist defaultCellSpan="6">
+						<l:field label="#{dmBundle['Period.period']}">
+							<custom:action id="prevPeriod" icon="ARROW_CIRCLE_LEFT"
+								tooltip="#{HarvestDetailsDialog.previousPeriod.period}"
+								rendered="#{not empty HarvestDetailsDialog.previousPeriod}"
+								action="#{HarvestDetailsDialog.moveToPreviousPeriod}"
+								render="HARVEST_DETAILS_panel" execute="@this" />
+							<custom:outputText id="PERIOD_FORM" value="#{HarvestDetailsDialog.period.period}" />
+							<custom:action id="nextPeriod" icon="ARROW_CIRCLE_RIGHT"
+								tooltip="#{HarvestDetailsDialog.nextPeriod.period}"
+								rendered="#{not empty HarvestDetailsDialog.nextPeriod}"
+								action="#{HarvestDetailsDialog.moveToNextPeriod}"
+								render="HARVEST_DETAILS_panel" execute="@this" />
+						</l:field>
+						<l:field label="#{dmBundle['HarvestHistory.quantity']}">
+							<custom:outputDecimal id="HARVEST_QTY_FORM"
+								value="#{HarvestDetailsDialog.report.harvest.quantity}" precision="0" />
+						</l:field>
+					</l:fieldlist>
+
+					<c:if test="#{not harvestReadOnly}">
+						<l:fieldlist defaultCellSpan="6">
+							<l:field label="#{appBundle['HarvestHistory.quantityOverride']}">
+								<custom:inputDecimal id="HARVEST_OVERRIDE_FORM"
+									value="#{HarvestDetailsDialog.quantityOverride}" required="false">
+									<custom:ajax event="change"
+										listener="#{HarvestDetailsDialog.onOverrideChange}"
+										render="HARVEST_DETAILS_panel" execute="@this" />
+								</custom:inputDecimal>
+							</l:field>
+						</l:fieldlist>
+						<h:form id="harvestDetailsForm">
+							<custom:commandButton id="SAVE_HARVEST_BTN"
+								action="#{HarvestDetailsDialog.save}"
+								value="#{generalBundle['SAVE']}"
+								render="HARVEST_DETAILS_panel coreForm:GARDEN_REPORT_GRID"
+								execute="harvestDetailsForm" />
+						</h:form>
+					</c:if>
+
+					<custom:dataTable id="HARVEST_DETAILS_GRID"
+							dataSource="#{HarvestDetailsDialog.dataSource}" styleClass="nowrap">
+						<custom:column propertyName="eventDate" label="#{appBundle['HarvestDetail.eventDate']}">
+							<custom:outputText id="HARVEST_EVENT_DATE" value="#{cell}" />
+						</custom:column>
+						<custom:column align="right" propertyName="quantity"
+								label="#{appBundle['HarvestDetail.quantity']}">
+							<custom:outputDecimal id="HARVEST_DETAIL_QTY" value="#{cell}" precision="0" />
+						</custom:column>
+					</custom:dataTable>
+				</custom:with>
+			</h:panelGroup>
+		</custom:modalPanel>
+	</ui:define>
+
+</ui:composition>

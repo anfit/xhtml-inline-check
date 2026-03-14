@@ -1,0 +1,109 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:l="http://www.company.com/components/layouts"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:app="http://www.company.com/components/app"
+	template="/views/_templates/base.xhtml">
+
+	<!-- Garden Report: shows plots, beds, plants and yield estimates per harvest period -->
+
+	<f:metadata>
+		<f:viewParam name="plotId" value="#{GardenReportViewBean.viewParams.plotId}">
+			<f:validateLongRange minimum="0" />
+		</f:viewParam>
+		<f:viewParam name="bedId" value="#{GardenReportViewBean.viewParams.bedId}" />
+		<f:event type="preRenderView" listener="#{GardenReportViewBean.onPreRenderView}" />
+	</f:metadata>
+
+	<ui:define name="definitions">
+		<ui:param name="ViewBean"       value="#{GardenReportViewBean}" />
+		<ui:param name="SearchBean"     value="#{ViewBean.searchBean}" />
+		<ui:param name="GridDataSource" value="#{ViewBean.dataSource}" />
+
+		<!-- Dialog: edit yield adjustment for a plant in a period -->
+		<ui:include src="../_dialogs/yieldAdjustmentsDialog/yieldAdjustmentsDialog.xhtml">
+			<ui:param name="onChangeRender" value="coreForm:GARDEN_REPORT_GRID" />
+			<ui:param name="refreshMethod"  value="#{GridDataSource.clearCache()}" />
+		</ui:include>
+
+		<!-- Dialog bundle: plant-form related modals (audit trail, etc.) -->
+		<ui:include src="../_dialogs/PLANT_FORM_dialogs.xhtml" />
+
+		<custom:exportModal id="exportGardenReport" headerName="#{generalBundle.EXPORT}"
+			exportBean="#{GardenReportExportBean}" />
+	</ui:define>
+
+	<ui:define name="filter">
+		<custom:filtering id="filter" dataSource="#{GridDataSource}"
+				render="GARDEN_REPORT_GRID" advancedSearch="true">
+			<f:event type="postSearch" listener="#{ViewBean.onPostSearch}" />
+			<f:event type="postClear"  listener="#{ViewBean.onPostClear}" />
+
+			<f:facet name="query">
+				<custom:and>
+					<app:formulaBuilder propertyName="bed" value="#{SearchBean.bedNodes}" />
+					<ui:include src="../_templates/query/PLANT_QUERY.xhtml" />
+					<custom:like propertyName="plantSupplierData.supplier.displayName"
+							ref="SUPPLIER_FILTERInputLookup" />
+					<ui:include src="../_templates/query/CURRENT_SUPPLIER_CLASS_FILTER_QUERY.xhtml">
+						<ui:param name="supplier" value="plantSupplierData.supplier" />
+					</ui:include>
+					<ui:include src="../_templates/query/PLANT_GROUP_1_QUERY.xhtml" />
+					<custom:greater propertyName="p.endDate"
+							value="#{SearchBean.dateInterval.fromAsLocalDate}" />
+					<custom:lessEqual propertyName="p.startDate"
+							value="#{SearchBean.dateInterval.toAsLocalDate}" />
+					<custom:less propertyName="ya.yieldScore" ref="yieldScoreFilter" />
+					<custom:greater propertyName="ya.totalYieldAccuracy.meanAbsoluteError"
+							ref="meanAbsoluteErrorTotalFilter" />
+				</custom:and>
+			</f:facet>
+
+			<f:facet name="advancedQuery">
+				<custom:and>
+					<ui:include src="../_templates/query/PLANT_FREE_TEXTS_FILTER_QUERY.xhtml">
+						<ui:param name="plantPrefix" value="" />
+					</ui:include>
+				</custom:and>
+			</f:facet>
+
+			<l:fieldset>
+				<l:field label="#{dmBundle['Bed']}">
+					<ui:include src="../_templates/filter/BED_FILTER_SELECT_MANY.xhtml" />
+				</l:field>
+
+				<ui:include src="../_templates/filter/SUPPLIER_CLASS_FILTER.xhtml" />
+				<ui:include src="../_templates/filter/SUPPLIER_FILTER.xhtml" />
+				<ui:include src="../_templates/filter/PLANT_FILTER.xhtml" />
+
+				<l:field label="#{appBundle['DateRange']}" span="4">
+					<custom:inputDateInterval id="FROM_TO_DATE_FILTER" shortForm="true"
+						prompt="#{UserBean.user.dataPresentationLocale.datePattern}"
+						value="#{SearchBean.dateInterval}" required="false" />
+				</l:field>
+
+				<ui:include src="../_templates/filter/GARDENER_FILTER.xhtml" />
+				<ui:include src="../_templates/filter/PLANT_GROUP1_FILTER.xhtml" />
+			</l:fieldset>
+
+			<custom:advancedSearch idToHide="search" idToShow="advSearch">
+				<l:fieldset>
+					<ui:include src="../_templates/filter/PLANT_FREE_TEXT_FILTER.xhtml" />
+					<ui:include src="_sections/yieldMeasuresFilter.xhtml" />
+				</l:fieldset>
+			</custom:advancedSearch>
+		</custom:filtering>
+	</ui:define>
+
+	<ui:define name="result">
+		<ui:include src="_sections/gardenReportGrid.xhtml" />
+	</ui:define>
+
+	<ui:define name="hidden_markup">
+		<ui:include src="../_dialogs/harvestDetailsDialog.xhtml">
+			<ui:param name="forId" value="coreForm:GARDEN_REPORT_GRID" />
+		</ui:include>
+	</ui:define>
+
+</ui:composition>

@@ -1,0 +1,25 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:app="http://www.company.com/components/app"
+	xmlns:q="http://www.company.com/components/query"
+>
+	<custom:defaults plantSearchCodes="#{SearchBean.plantSearchCodes}">
+		<custom:fail test="#{empty plantSearchCodes}"
+			message="PlantSearchCodes missing in #{SearchBean.class.name}" />
+
+		<custom:condition condition="#{not noPrefixHere}">
+			<custom:like propertyName="#{pathToPlant}masterPlant.prefix"
+				value="#{plantSearchCodes.plantPrefix}" />
+		</custom:condition>
+
+		<custom:condition condition="#{not empty plantSearchCodes.plantCodes}">
+			<custom:or>
+				<q:likeAny propertyName="#{pathToPlant}plantCode"
+					value="#{plantSearchCodes.plantCodesWithWildcard}" />
+				<custom:in propertyName="#{pathToPlant}plantCode"
+					value="#{plantSearchCodes.plantCodesWithoutWildcard}" />
+			</custom:or>
+		</custom:condition>
+	</custom:defaults>
+</ui:composition>

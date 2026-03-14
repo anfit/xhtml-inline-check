@@ -1,0 +1,32 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:app="http://www.company.com/components/app"
+	xmlns:o="http://www.company.com/components/overlays"
+>
+	<!-- Total yield column: editable for real beds, read-only for virtual or unserviceable plants -->
+	<custom:failIfNotDefined vars="yield plant period shortLabel label yieldAdjustmentsDialogBean" />
+
+	<app:column align="right" propertyName="yield.totalYield"
+			label="#{label}" shortLabel="#{shortLabel}" styleClass="nowrap">
+
+		<ui:fragment rendered="#{not plant.bed.virtual}">
+			<custom:editAction id="PLANT_TOTAL_YIELD_action"
+					action="#{yieldAdjustmentsDialogBean.open(period, plant.id, plant.processing.lastClosedPeriod)}"
+					oncomplete="#{custom:success(o:show('yieldAdjustmentModal'))}"
+					tooltip="#{appBundle.OpenYieldAdjustmentsDialog}">
+				<custom:outputDecimal id="PLANT_TOTAL_YIELD" rendered="#{not empty cell}"
+					value="#{cell}" precision="low" />
+				<custom:outputText id="PLANT_NONE_TOTAL_YIELD" rendered="#{empty cell}"
+					value="#{generalBundle['NOT_APPLICABLE.short']}" />
+			</custom:editAction>
+		</ui:fragment>
+
+		<ui:fragment rendered="#{plant.bed.virtual}">
+			<custom:outputDecimal id="PLANT_TOTAL_YIELD_ro" rendered="#{not empty cell}"
+				value="#{cell}" precision="low" />
+			<custom:outputText id="PLANT_NONE_TOTAL_YIELD_ro" rendered="#{empty cell}"
+				value="#{generalBundle['NOT_APPLICABLE.short']}" />
+		</ui:fragment>
+	</app:column>
+</ui:composition>

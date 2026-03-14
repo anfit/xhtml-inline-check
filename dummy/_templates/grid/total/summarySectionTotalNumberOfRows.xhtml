@@ -1,0 +1,11 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+>
+	<custom:failIfNotDefined vars="summarySection" />
+	<custom:outputFormat value="#{componentBundle['DataTable.TOTAL_NUMBER_OF_ROWS']}"
+			rendered="#{summarySection.enabled}">
+		<custom:outputDecimal id="totalNumberOfRows" value="#{summarySection.totalNumberOfRows}"
+			styleClass="totalsValue" precision="0" />
+	</custom:outputFormat>
+</ui:composition>

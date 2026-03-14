@@ -1,0 +1,33 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+>
+	<!-- Total (gardener-adjusted) yield estimate and one accuracy metric -->
+
+	<ui:include src="../../_templates/grid/YIELD_TOTAL_COLUMN.xhtml">
+		<ui:param name="yield"                    value="#{row.yield}" />
+		<ui:param name="plant"                    value="#{row.plant}" />
+		<ui:param name="period"                   value="#{row.period}" />
+		<ui:param name="shortLabel"               value="#{dmBundle['Yield.totalYield_short']}" />
+		<ui:param name="label"                    value="#{appBundle['GardenReportGrid.yieldValue']}" />
+		<ui:param name="yieldAdjustmentsDialogBean" value="#{YieldAdjustmentsDialogBean}" />
+	</ui:include>
+
+	<ui:include src="../../_templates/grid/YIELD_ACCURACY_COLUMN.xhtml">
+		<ui:param name="propertyName" value="yieldAccuracy.totalYieldAccuracy.meanAbsoluteError" />
+		<ui:param name="shortLabel"   value="#{dmBundle['Yield.Accuracy.meanAbsoluteError_short']}" />
+		<ui:param name="label"        value="#{dmBundle['Yield.Accuracy.totalYieldAccuracy.meanAbsoluteError_long']}" />
+		<ui:param name="outputId"     value="meanAbsoluteErrorTotal" />
+		<ui:param name="visible"      value="initiallyVisible" />
+	</ui:include>
+
+	<ui:include src="../../_templates/grid/YIELD_ACCURACY_COLUMN.xhtml">
+		<ui:param name="propertyName" value="yieldAccuracy.totalYieldAccuracy.meanAbsoluteScaledError" />
+		<ui:param name="shortLabel"   value="#{dmBundle['Yield.Accuracy.meanAbsoluteScaledError_short']}" />
+		<ui:param name="label"        value="#{dmBundle['Yield.Accuracy.totalYieldAccuracy.meanAbsoluteScaledError_long']}" />
+		<ui:param name="outputId"     value="meanAbsoluteScaledErrorTotal" />
+		<ui:param name="errorLevel"
+			value="#{row.yieldAccuracy == null ? null : row.yieldAccuracy.totalYieldAccuracy.meanAbsoluteScaledErrorErrorLevel}" />
+		<ui:param name="visible"      value="initiallyVisible" />
+	</ui:include>
+
+</ui:composition>

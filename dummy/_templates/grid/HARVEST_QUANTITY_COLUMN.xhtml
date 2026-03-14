@@ -1,0 +1,43 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:app="http://www.company.com/components/app"
+	xmlns:o="http://www.company.com/components/overlays"
+>
+	<!-- Harvested quantity: editable (exclude from calculation) or read-only based on permissions -->
+	<custom:failIfNotDefined vars="harvestHistory plant" />
+
+	<custom:defaults showExcludeHarvestLink="true">
+		<app:column id="HARVEST_QUANTITY_COLUMN" align="right"
+				propertyName="harvestHistory.harvest.quantity"
+				label="#{dmBundle['HarvestHistory.quantity']}">
+
+			<ui:param name="showExclude"
+				value="#{(not plant.bed.virtual) and showExcludeHarvestLink}" />
+
+			<ui:fragment rendered="#{showExclude}">
+				<custom:editAction id="HARVEST_OVERRIDE_handler"
+						action="#{ExcludeHarvestDialog.open(harvestHistory, period)}"
+						oncomplete="#{custom:success(o:show('excludeHarvestModal'))}">
+					<h:panelGroup id="editableQuantity">
+						<custom:outputDecimal value="#{cell}" precision="0" />
+					</h:panelGroup>
+				</custom:editAction>
+				<custom:tooltip for="editableQuantity">
+					#{appBundle['EXCLUDE_THIS_HARVEST_FROM_CALCULATION']}
+				</custom:tooltip>
+			</ui:fragment>
+
+			<ui:fragment rendered="#{not showExclude}">
+				<h:panelGroup id="readonlyQuantity">
+					<custom:outputDecimal value="#{cell}" precision="0" />
+				</h:panelGroup>
+				<custom:tooltip for="readonlyQuantity">
+					#{appBundle['CANNOT_EXCLUDE_THIS_HARVEST_FROM_CALCULATION']}
+				</custom:tooltip>
+			</ui:fragment>
+
+		</app:column>
+	</custom:defaults>
+</ui:composition>

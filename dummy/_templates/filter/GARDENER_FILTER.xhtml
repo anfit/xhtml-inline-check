@@ -1,0 +1,45 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:custom="http://www.company.com/components"
+	xmlns:l="http://www.company.com/components/layouts"
+	xmlns:app="http://www.company.com/components/app"
+>
+	<!-- Lookup: pick a gardener responsible for the bed/plant -->
+	<custom:injectAttributes names="rendered">
+		<l:field label="#{dmBundle['Plant.gardenerCode']}">
+			<ui:fragment rendered="#{!disabled}">
+				<custom:complexlookupinput name="GARDENER_FILTER"
+						lookupHelper="#{GardenerLookup.lookupHelper}"
+						dataSource="#{GardenerLookup.dataSource}"
+						openAction="#{GardenerLookup.open(SearchBean.bedNode)}"
+						windowTitle="#{dmBundle['Plant.gardenerCode']}"
+						advancedSearch="false" disableAjaxCall="true">
+					<ui:define name="filteringQuery">
+						<custom:and>
+							<app:formulaBuilder propertyName="o.bed"
+								value="#{GardenerLookup.searchBean.bedNodes}" />
+						</custom:and>
+					</ui:define>
+					<ui:define name="filteringFields">
+						<l:fieldset>
+							<l:field label="#{dmBundle['Bed']}" span="3">
+								<ui:include src="BED_FILTER_SELECT_MANY.xhtml">
+									<ui:param name="externalId" value="gardenerCode" />
+									<ui:param name="SearchBean"  value="#{GardenerLookup.searchBean}" />
+								</ui:include>
+							</l:field>
+						</l:fieldset>
+					</ui:define>
+					<ui:define name="gridColumns">
+						<custom:column label="#{dmBundle['Plant.gardenerCode']}" propertyName="name">
+							#{row.code}
+						</custom:column>
+					</ui:define>
+				</custom:complexlookupinput>
+			</ui:fragment>
+			<ui:fragment rendered="#{disabled}">
+				<custom:outputText value="#{GardenerLookup.lookupHelper.searchValue}" />
+			</ui:fragment>
+		</l:field>
+	</custom:injectAttributes>
+</ui:composition>
