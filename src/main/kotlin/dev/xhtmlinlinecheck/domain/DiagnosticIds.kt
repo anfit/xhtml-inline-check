@@ -78,6 +78,24 @@ object ProblemIds {
             slug = "FORM_ANCESTRY_CHANGED",
         )
 
+    val STRUCTURE_NAMING_CONTAINER_ANCESTRY_CHANGED: DiagnosticId =
+        DiagnosticId.problem(
+            category = ProblemCategory.STRUCTURE,
+            slug = "NAMING_CONTAINER_ANCESTRY_CHANGED",
+        )
+
+    val STRUCTURE_ITERATION_ANCESTRY_CHANGED: DiagnosticId =
+        DiagnosticId.problem(
+            category = ProblemCategory.STRUCTURE,
+            slug = "ITERATION_ANCESTRY_CHANGED",
+        )
+
+    val STRUCTURE_RENDERED_GUARD_CHANGED: DiagnosticId =
+        DiagnosticId.problem(
+            category = ProblemCategory.STRUCTURE,
+            slug = "RENDERED_GUARD_CHANGED",
+        )
+
     val TARGET_RESOLUTION_CHANGED: DiagnosticId =
         DiagnosticId.problem(
             category = ProblemCategory.TARGET,

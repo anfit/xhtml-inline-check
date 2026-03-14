@@ -98,9 +98,9 @@ class FaceletsAnalyzerScaffoldTest {
             .hasWarningCount(1)
             .hasProblemIds("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
         assertThat(report.problems.map { it.id.value }).doesNotContain("P-STRUCTURE-UNMATCHED_NODE")
-        assertThat(report.summary.headline).contains("Structural node alignment matched")
-        assertThat(report.summary.counts.checked).isEqualTo(2)
-        assertThat(report.summary.counts.matched).isEqualTo(2)
+        assertThat(report.summary.headline).contains("Matched semantic-node checks agreed")
+        assertThat(report.summary.counts.checked).isEqualTo(10)
+        assertThat(report.summary.counts.matched).isEqualTo(10)
         assertThat(report.summary.counts.mismatched).isZero()
     }
 
@@ -145,9 +145,9 @@ class FaceletsAnalyzerScaffoldTest {
             .hasWarningCount(1)
             .hasProblemIds("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
         assertThat(report.problems.map { it.id.value }).doesNotContain("P-STRUCTURE-UNMATCHED_NODE")
-        assertThat(report.summary.headline).contains("Structural node alignment matched")
-        assertThat(report.summary.counts.checked).isEqualTo(2)
-        assertThat(report.summary.counts.matched).isEqualTo(2)
+        assertThat(report.summary.headline).contains("Matched semantic-node checks agreed")
+        assertThat(report.summary.counts.checked).isEqualTo(10)
+        assertThat(report.summary.counts.matched).isEqualTo(10)
         assertThat(report.summary.counts.mismatched).isZero()
     }
 
@@ -198,8 +198,8 @@ class FaceletsAnalyzerScaffoldTest {
         assertThat(report.problems.first().locations.new?.snippet).isEqualTo("h:commandButton")
         assertThat(report.problems.first().explanation).contains("explicit id")
         assertThat(report.summary.headline).contains("unmatched structural nodes")
-        assertThat(report.summary.counts.checked).isEqualTo(3)
-        assertThat(report.summary.counts.matched).isEqualTo(2)
+        assertThat(report.summary.counts.checked).isEqualTo(11)
+        assertThat(report.summary.counts.matched).isEqualTo(10)
         assertThat(report.summary.counts.mismatched).isEqualTo(1)
     }
 
@@ -449,7 +449,7 @@ class FaceletsAnalyzerScaffoldTest {
             .hasProblemCount(1)
             .hasWarningCount(1)
             .hasProblemIds("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
-        assertThat(report.summary.headline).contains("Local-binding EL normalization matched")
+        assertThat(report.summary.headline).contains("Matched semantic-node checks agreed")
     }
 
     @Test
@@ -683,20 +683,169 @@ class FaceletsAnalyzerScaffoldTest {
 
         assertThatReport(report)
             .hasResult(AnalysisResult.NOT_EQUIVALENT)
-            .hasProblemCount(2)
+            .hasProblemCount(4)
             .hasWarningCount(1)
             .hasProblemIds(
+                "P-STRUCTURE-FORM_ANCESTRY_CHANGED",
+                "P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED",
                 "P-TARGET-RESOLUTION_CHANGED",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
             )
-        assertThat(report.problems.first().summary).isEqualTo("Component target resolves differently after refactor")
-        assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("legacy/root.xhtml:4:")
-        assertThat(report.problems.first().locations.new?.logicalLocation?.render()).startsWith("refactored/root.xhtml:7:")
-        assertThat(report.problems.first().locations.old?.snippet).isEqualTo("update=panel, execute=@form panel")
-        assertThat(report.problems.first().locations.new?.snippet).isEqualTo("update=panel, execute=@form panel")
-        assertThat(report.problems.first().explanation).contains("component:panel->h:panelGroup#panel@form:mainForm")
-        assertThat(report.problems.first().explanation).contains("component:panel->h:panelGroup#panel@form:otherForm")
+        val targetProblem = report.problems.first { it.id.value == "P-TARGET-RESOLUTION_CHANGED" }
+        assertThat(targetProblem.summary).isEqualTo("Component target resolves differently after refactor")
+        assertThat(targetProblem.locations.old?.logicalLocation?.render()).startsWith("legacy/root.xhtml:4:")
+        assertThat(targetProblem.locations.new?.logicalLocation?.render()).startsWith("refactored/root.xhtml:7:")
+        assertThat(targetProblem.locations.old?.snippet).isEqualTo("update=panel, execute=@form panel")
+        assertThat(targetProblem.locations.new?.snippet).isEqualTo("update=panel, execute=@form panel")
+        assertThat(targetProblem.explanation).contains("component:panel->h:panelGroup#panel@form:mainForm")
+        assertThat(targetProblem.explanation).contains("component:panel->h:panelGroup#panel@form:otherForm")
+        assertThat(report.problems.map { it.id.value }).contains("P-STRUCTURE-FORM_ANCESTRY_CHANGED")
+        assertThat(report.problems.map { it.id.value }).contains("P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED")
         assertThat(report.summary.headline).contains("target-resolution mismatches")
+    }
+
+    @Test
+    fun `scaffold analyzer reports matched nodes that move outside their original form and naming container ancestry`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:form id="mainForm">
+                <h:commandButton id="saveButton" />
+              </h:form>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:commandButton id="saveButton" />
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.NOT_EQUIVALENT)
+            .hasProblemCount(3)
+            .hasWarningCount(1)
+            .hasProblemIds(
+                "P-STRUCTURE-FORM_ANCESTRY_CHANGED",
+                "P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().summary).isEqualTo("Matched node no longer has the same form ancestry")
+        assertThat(report.problems[1].summary).isEqualTo("Matched node no longer has the same naming-container ancestry")
+        assertThat(report.problems.first().explanation).contains("mainForm")
+        assertThat(report.problems[1].explanation).contains("mainForm")
+        assertThat(report.summary.headline).contains("form-ancestry mismatches")
+        assertThat(report.summary.headline).contains("naming-container mismatches")
+    }
+
+    @Test
+    fun `scaffold analyzer reports matched nodes whose iteration ancestry changes`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:repeat var="row" value="#{bean.rows}">
+                <h:outputText id="value" value="#{row.label}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:outputText id="value" value="#{bean.label}" />
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.NOT_EQUIVALENT)
+            .hasProblemCount(4)
+            .hasWarningCount(2)
+        assertThat(report.problems.map { it.id.value }).containsExactly(
+            "P-STRUCTURE-UNMATCHED_NODE",
+            "W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT",
+            "P-STRUCTURE-ITERATION_ANCESTRY_CHANGED",
+            "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+        )
+        assertThat(report.problems.map { it.id.value }).contains("P-STRUCTURE-ITERATION_ANCESTRY_CHANGED")
+        assertThat(report.problems.first { it.id.value == "P-STRUCTURE-ITERATION_ANCESTRY_CHANGED" }.explanation)
+            .contains("ui:repeat")
+        assertThat(report.summary.headline).contains("iteration-ancestry mismatches")
+    }
+
+    @Test
+    fun `scaffold analyzer reports matched nodes whose rendered guard changes`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:repeat var="row" value="#{bean.rows}">
+                <h:panelGroup id="panel" rendered="#{row.visible}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:repeat var="item" value="#{bean.rows}">
+                <h:panelGroup id="panel" rendered="#{item.hidden}" />
+              </ui:repeat>
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.NOT_EQUIVALENT)
+            .hasProblemCount(2)
+            .hasWarningCount(1)
+            .hasProblemIds(
+                "P-STRUCTURE-RENDERED_GUARD_CHANGED",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().summary).isEqualTo("Matched node no longer has the same rendered guard")
+        assertThat(report.problems.first().locations.old?.snippet).isEqualTo("#{row.visible}")
+        assertThat(report.problems.first().locations.new?.snippet).isEqualTo("#{item.hidden}")
+        assertThat(report.problems.first().explanation).contains("#{binding#1.visible}")
+        assertThat(report.problems.first().explanation).contains("#{binding#1.hidden}")
+        assertThat(report.summary.headline).contains("rendered-guard mismatches")
     }
 
     @Test
