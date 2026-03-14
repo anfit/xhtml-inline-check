@@ -3,6 +3,7 @@ package dev.xhtmlinlinecheck.loader
 import dev.xhtmlinlinecheck.analyzer.AnalysisRequest
 import dev.xhtmlinlinecheck.domain.AnalysisSide
 import dev.xhtmlinlinecheck.domain.SourceDocument
+import dev.xhtmlinlinecheck.domain.SourceGraphFile
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
@@ -51,9 +52,16 @@ fun interface SourceLoader {
                 rootDirectory = rootDirectory,
             )
             val contents = readContents(document)
+            val sourceGraphFile = SourceGraphFile.root(document).copy(
+                includeEdges = SourceGraphIncludeDiscovery.discover(
+                    document = document,
+                    contents = contents,
+                ),
+            )
             return LoadedSource(
                 document = document,
                 contents = contents,
+                sourceGraphFile = sourceGraphFile,
             )
         }
 

@@ -48,6 +48,7 @@ class SourceGraphModelsTest {
                 span = SourceSpan(SourcePosition(line = 5, column = 5)),
                 attributeName = "src",
             ),
+            sourcePath = "/fragments/table.xhtml",
             includedDocument = includedDocument,
             parameters = listOf(
                 SourceGraphParameter(
@@ -61,6 +62,8 @@ class SourceGraphModelsTest {
         val includedFile = SourceGraphFile.included(includedDocument, edge)
 
         assertThat(edge.asIncludeStep().parameterNames).containsExactly("row")
+        assertThat(edge.sourcePath).isEqualTo("/fragments/table.xhtml")
+        assertThat(edge.isResolved).isTrue()
         assertThat(edge.parameters.single().valueExpression).isEqualTo("#{bean.row}")
         assertThat(edge.parameters.single().provenance.physicalLocation.render())
             .isEqualTo("legacy/root.xhtml:7:9 @value")
@@ -68,5 +71,27 @@ class SourceGraphModelsTest {
         assertThat(includedFile.stack.steps).containsExactly(edge.asIncludeStep())
         assertThat(includedFile.provenance.includeStack).containsExactly(edge.asIncludeStep())
         assertThat(includedFile.provenance.logicalLocation.render()).isEqualTo("legacy/fragments/table.xhtml")
+    }
+
+    @Test
+    fun `discovered include edges can exist before include resolution`() {
+        val rootDocument = SourceDocument.fromPath(
+            side = AnalysisSide.NEW,
+            path = Path.of("refactored", "root.xhtml"),
+        )
+
+        val edge = SourceGraphEdge.discovered(
+            includeSite = SourceLocation(
+                document = rootDocument,
+                span = SourceSpan(SourcePosition(line = 9, column = 13)),
+                attributeName = "src",
+            ),
+            sourcePath = "#{bean.fragmentPath}",
+        )
+
+        assertThat(edge.sourcePath).isEqualTo("#{bean.fragmentPath}")
+        assertThat(edge.includedDocument).isNull()
+        assertThat(edge.parameters).isEmpty()
+        assertThat(edge.isResolved).isFalse()
     }
 }
