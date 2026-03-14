@@ -24,6 +24,7 @@ import dev.xhtmlinlinecheck.rules.SyntaxRole
 import dev.xhtmlinlinecheck.semantic.ComponentTargetAttribute
 import dev.xhtmlinlinecheck.semantic.SemanticElCarrierKind
 import dev.xhtmlinlinecheck.semantic.SemanticElOccurrence
+import dev.xhtmlinlinecheck.semantic.SemanticModel
 import dev.xhtmlinlinecheck.semantic.SemanticModels
 import dev.xhtmlinlinecheck.semantic.SemanticNode
 import dev.xhtmlinlinecheck.semantic.SemanticNodeAncestor
@@ -45,8 +46,10 @@ fun interface EquivalenceComparator {
                         oldNodes = semanticModels.oldRoot.semanticNodes,
                         newNodes = semanticModels.newRoot.semanticNodes,
                     )
+                val treeInvariants = compareTreeInvariants(semanticModels)
                 val structuralAlignment = compareStructuralAlignment(semanticModels, matchResult)
                 val matchedNodeComparison = compareMatchedNodes(semanticModels, matchResult)
+                val globalSanity = compareGlobalSanity(semanticModels, matchResult)
                 val includeProblems =
                     buildList {
                         addAll(semanticModels.oldRoot.syntaxTree.collectIncludeProblems())
@@ -69,8 +72,10 @@ fun interface EquivalenceComparator {
                         hint = "Implement the stage-specific logic before relying on comparison results.",
                     )
                 val problems =
-                    structuralAlignment.problems +
+                    treeInvariants.problems +
+                        structuralAlignment.problems +
                         matchedNodeComparison.problems +
+                        globalSanity.problems +
                         includeProblems +
                         extractedElProblems +
                         scaffoldWarning
@@ -78,9 +83,9 @@ fun interface EquivalenceComparator {
                 val warningTotals = WarningTotals(total = warningCount, blocking = warningCount)
                 val counts =
                     AggregateCounts(
-                        checked = structuralAlignment.checked + matchedNodeComparison.checked,
-                        matched = structuralAlignment.matched + matchedNodeComparison.matched,
-                        mismatched = structuralAlignment.mismatched + matchedNodeComparison.mismatched,
+                        checked = treeInvariants.checked + structuralAlignment.checked + matchedNodeComparison.checked + globalSanity.checked,
+                        matched = treeInvariants.matched + structuralAlignment.matched + matchedNodeComparison.matched + globalSanity.matched,
+                        mismatched = treeInvariants.mismatched + structuralAlignment.mismatched + matchedNodeComparison.mismatched + globalSanity.mismatched,
                     )
 
                 AnalysisReport(
@@ -89,7 +94,7 @@ fun interface EquivalenceComparator {
                         blocksEquivalenceClaim = true,
                     ),
                     summary = AnalysisSummary(
-                        headline = summaryHeadline(structuralAlignment, matchedNodeComparison),
+                        headline = summaryHeadline(treeInvariants, structuralAlignment, matchedNodeComparison, globalSanity),
                         counts = counts,
                         coverage = AggregateCoverage.from(counts),
                         warnings = warningTotals,
@@ -112,6 +117,14 @@ private data class StructuralAlignmentResult(
     val problems: List<Problem>,
 )
 
+private data class InvariantCheckResult(
+    val checked: Int,
+    val matched: Int,
+    val mismatched: Int,
+    val problems: List<Problem>,
+    val mismatchSignals: Set<String>,
+)
+
 private data class MatchedNodeComparisonResult(
     val checked: Int,
     val matched: Int,
@@ -128,6 +141,60 @@ private data class FactComparisonResult(
     val uncertain: Int = 0,
     val problems: List<Problem> = emptyList(),
 )
+
+private fun compareTreeInvariants(semanticModels: SemanticModels): InvariantCheckResult {
+    val oldProblems = semanticModels.oldRoot.collectIdCollisionProblems()
+    val newProblems = semanticModels.newRoot.collectIdCollisionProblems()
+    val problems = oldProblems + newProblems
+
+    return InvariantCheckResult(
+        checked = problems.size,
+        matched = 0,
+        mismatched = problems.size,
+        problems = problems,
+        mismatchSignals =
+            if (problems.isEmpty()) {
+                emptySet()
+            } else {
+                setOf("id-collision mismatches")
+            },
+    )
+}
+
+private fun compareGlobalSanity(
+    semanticModels: SemanticModels,
+    matchResult: SemanticNodeMatchResult,
+): InvariantCheckResult {
+    val unmatchedOldNodeIds = matchResult.unmatchedOldNodeIds.toSet()
+    val unmatchedNewNodeIds = matchResult.unmatchedNewNodeIds.toSet()
+    val oldUnmatchedNodes = semanticModels.oldRoot.semanticNodes.filter { it.nodeId in unmatchedOldNodeIds }
+    val newUnmatchedNodes = semanticModels.newRoot.semanticNodes.filter { it.nodeId in unmatchedNewNodeIds }
+
+    val idProblem = globalIdSanityProblem(oldUnmatchedNodes, newUnmatchedNodes)
+    val targetProblem = globalTargetSanityProblem(oldUnmatchedNodes, newUnmatchedNodes)
+    val ancestryProblem = globalAncestrySanityProblem(oldUnmatchedNodes, newUnmatchedNodes)
+    val problems = listOfNotNull(idProblem, targetProblem, ancestryProblem)
+    val mismatchSignals =
+        buildSet {
+            if (idProblem != null) {
+                add("global id-sanity mismatches")
+            }
+            if (targetProblem != null) {
+                add("global target-sanity mismatches")
+            }
+            if (ancestryProblem != null) {
+                add("global ancestry-sanity mismatches")
+            }
+        }
+
+    return InvariantCheckResult(
+        checked = problems.size,
+        matched = 0,
+        mismatched = problems.size,
+        problems = problems,
+        mismatchSignals = mismatchSignals,
+    )
+}
 
 private fun compareMatchedNodes(
     semanticModels: SemanticModels,
@@ -460,12 +527,14 @@ private fun compareStructuralAlignment(
 }
 
 private fun summaryHeadline(
+    treeInvariants: InvariantCheckResult,
     structuralAlignment: StructuralAlignmentResult,
     matchedNodeComparison: MatchedNodeComparisonResult,
+    globalSanity: InvariantCheckResult,
 ): String =
     when {
-        mismatchSignals(structuralAlignment, matchedNodeComparison).isNotEmpty() ->
-            "Detected ${mismatchSignals(structuralAlignment, matchedNodeComparison).joinForHeadline()}; broader semantic comparison is still scaffolded."
+        mismatchSignals(treeInvariants, structuralAlignment, matchedNodeComparison, globalSanity).isNotEmpty() ->
+            "Detected ${mismatchSignals(treeInvariants, structuralAlignment, matchedNodeComparison, globalSanity).joinForHeadline()}; broader semantic comparison is still scaffolded."
         matchedNodeComparison.uncertain > 0 ->
             "Matched semantic nodes still depend on unresolved global roots, so bean-level equivalence remains uncertain."
         matchedNodeComparison.checked > 0 ->
@@ -477,14 +546,18 @@ private fun summaryHeadline(
     }
 
 private fun mismatchSignals(
+    treeInvariants: InvariantCheckResult,
     structuralAlignment: StructuralAlignmentResult,
     matchedNodeComparison: MatchedNodeComparisonResult,
+    globalSanity: InvariantCheckResult,
 ): List<String> =
     buildList {
+        addAll(treeInvariants.mismatchSignals)
         if (structuralAlignment.mismatched > 0) {
             add("unmatched structural nodes")
         }
         addAll(matchedNodeComparison.mismatchSignals)
+        addAll(globalSanity.mismatchSignals)
     }
 
 private fun List<String>.joinForHeadline(): String =
@@ -669,6 +742,131 @@ private fun unmatchedStructuralNodeProblem(
         hint = "Preserve a stable structural anchor such as explicit ids, resolved targets, or equivalent ancestry/context around this node.",
     )
 
+private fun SemanticModel.collectIdCollisionProblems(): List<Problem> =
+    semanticNodes
+        .filter { it.participatesInStructuralMatching && it.explicitIdAttribute != null }
+        .groupBy { it.explicitIdAttribute!!.rawValue }
+        .toSortedMap()
+        .values
+        .filter { it.size > 1 }
+        .map(::idCollisionProblem)
+
+private fun idCollisionProblem(nodes: List<SemanticNode>): Problem {
+    val firstNode = nodes.first()
+    val explicitId = firstNode.explicitIdAttribute!!.rawValue
+    val sideLabel =
+        when (firstNode.provenance.logicalLocation.document.side) {
+            AnalysisSide.OLD -> "legacy"
+            AnalysisSide.NEW -> "refactored"
+        }
+    val snippet = "id=\"$explicitId\""
+    val explanationDetails =
+        nodes.joinToString(separator = "; ") { node ->
+            "${node.describeForProblem()} at ${node.provenance.logicalLocation.render()} (${node.structuralContextFingerprint()})"
+        }
+
+    return Problem(
+        id = ProblemIds.STRUCTURE_ID_COLLISION,
+        severity = Severity.ERROR,
+        category = ProblemCategory.STRUCTURE,
+        summary = "Component id collides within the $sideLabel tree",
+        locations = sideSpecificLocations(firstNode.provenance, snippet),
+        explanation =
+            "The explicit id '$explicitId' is assigned to multiple structural nodes in the same $sideLabel tree: $explanationDetails",
+        hint = "Restore unique component ids per tree so explicit-id anchors and target resolution remain trustworthy.",
+    )
+}
+
+private fun globalIdSanityProblem(
+    oldNodes: List<SemanticNode>,
+    newNodes: List<SemanticNode>,
+): Problem? {
+    val oldEntries = oldNodes.explicitIdInventory()
+    val newEntries = newNodes.explicitIdInventory()
+    if (oldEntries == newEntries) {
+        return null
+    }
+
+    val oldLocation = oldNodes.firstOrNull { it.explicitIdAttribute != null }
+    val newLocation = newNodes.firstOrNull { it.explicitIdAttribute != null }
+
+    return Problem(
+        id = ProblemIds.STRUCTURE_ID_SANITY_CHANGED,
+        severity = Severity.ERROR,
+        category = ProblemCategory.STRUCTURE,
+        summary = "Unmatched explicit-id inventory changed after refactor",
+        locations =
+            ProblemLocations(
+                old = oldLocation?.let { ProblemLocation(it.provenance, "id=\"${it.explicitIdAttribute!!.rawValue}\"") },
+                new = newLocation?.let { ProblemLocation(it.provenance, "id=\"${it.explicitIdAttribute!!.rawValue}\"") },
+            ),
+        explanation =
+            "Explicit-id anchors that remain outside trustworthy one-to-one matches no longer line up globally. " +
+                "Old unmatched ids: ${oldEntries.renderInventory()} New unmatched ids: ${newEntries.renderInventory()}",
+        hint = "Preserve the same unmatched explicit-id inventory, or fix the structural alignment issue that prevented those ids from pairing cleanly.",
+    )
+}
+
+private fun globalTargetSanityProblem(
+    oldNodes: List<SemanticNode>,
+    newNodes: List<SemanticNode>,
+): Problem? {
+    val oldEntries = oldNodes.targetInventory()
+    val newEntries = newNodes.targetInventory()
+    if (oldEntries == newEntries) {
+        return null
+    }
+
+    val oldLocation = oldNodes.firstOrNull { it.componentTargetAttributes.isNotEmpty() }
+    val newLocation = newNodes.firstOrNull { it.componentTargetAttributes.isNotEmpty() }
+
+    return Problem(
+        id = ProblemIds.TARGET_SANITY_CHANGED,
+        severity = Severity.ERROR,
+        category = ProblemCategory.TARGET,
+        summary = "Unmatched target relationships changed after refactor",
+        locations =
+            ProblemLocations(
+                old = oldLocation?.let { ProblemLocation(it.provenance, it.componentTargetAttributes.first().render()) },
+                new = newLocation?.let { ProblemLocation(it.provenance, it.componentTargetAttributes.first().render()) },
+            ),
+        explanation =
+            "Resolved target-bearing attributes that remain outside trustworthy one-to-one matches no longer line up globally. " +
+                "Old unmatched targets: ${oldEntries.renderInventory()} New unmatched targets: ${newEntries.renderInventory()}",
+        hint = "Preserve the same unresolved or target-bearing relationships, or fix the structural alignment issue that left these nodes unmatched.",
+    )
+}
+
+private fun globalAncestrySanityProblem(
+    oldNodes: List<SemanticNode>,
+    newNodes: List<SemanticNode>,
+): Problem? {
+    val oldEntries = oldNodes.ancestryInventory()
+    val newEntries = newNodes.ancestryInventory()
+    if (oldEntries == newEntries) {
+        return null
+    }
+
+    val oldLocation = oldNodes.firstOrNull()
+    val newLocation = newNodes.firstOrNull()
+
+    return Problem(
+        id = ProblemIds.STRUCTURE_ANCESTRY_SANITY_CHANGED,
+        severity = Severity.ERROR,
+        category = ProblemCategory.STRUCTURE,
+        summary = "Unmatched structural ancestry inventory changed after refactor",
+        locations =
+            ProblemLocations(
+                old = oldLocation?.let { ProblemLocation(it.provenance, it.describeForProblem()) },
+                new = newLocation?.let { ProblemLocation(it.provenance, it.describeForProblem()) },
+            ),
+        explanation =
+            "Form, naming-container, and iteration context for unmatched structural nodes no longer line up globally. " +
+                "Old unmatched ancestry: ${oldEntries.renderInventory()} New unmatched ancestry: ${newEntries.renderInventory()}",
+        hint = "Preserve the same unmatched structural context, or fix the alignment issue that left these nodes outside one-to-one comparison.",
+    )
+}
+
 private fun List<SemanticElOccurrence>.collectUnsupportedElProblems(): List<Problem> =
     filter { !it.isSupported }.map { occurrence ->
         val locations = locationsFor(occurrence.provenance, occurrence.rawValue)
@@ -764,6 +962,11 @@ private fun locationsFor(
         AnalysisSide.NEW -> ProblemLocations(new = ProblemLocation(provenance, snippet))
     }
 
+private fun sideSpecificLocations(
+    provenance: Provenance,
+    snippet: String?,
+): ProblemLocations = locationsFor(provenance, snippet)
+
 private fun SemanticElOccurrence.describeCarrier(): String =
     when (carrierKind) {
         SemanticElCarrierKind.ELEMENT_ATTRIBUTE -> "$ownerTagName @$attributeName"
@@ -805,6 +1008,16 @@ private fun SemanticNode.describeForProblem(): String =
             append("#")
             append(explicitId)
         }
+    }
+
+private fun SemanticNode.structuralContextFingerprint(): String =
+    buildString {
+        append("form=")
+        append(formAncestry.renderStructuralAncestry())
+        append(", naming=")
+        append(namingContainerAncestry.renderStructuralAncestry())
+        append(", iteration=")
+        append(iterationAncestry.renderIterationAncestry())
     }
 
 private fun SemanticNodeElFact?.toProblemLocation(
@@ -868,4 +1081,29 @@ private fun semanticIdentity(
         "${nodeName}@${syntaxRole?.name ?: "<none>"}"
     } else {
         "${logicalName.namespaceUri ?: "<none>"}:${logicalName.localName}@${syntaxRole?.name ?: "<none>"}"
+    }
+
+private fun List<SemanticNode>.explicitIdInventory(): List<String> =
+    filter { it.explicitIdAttribute != null }
+        .map { node -> "${node.explicitIdAttribute!!.rawValue}@${node.nodeName}" }
+        .sorted()
+
+private fun List<SemanticNode>.targetInventory(): List<String> =
+    flatMap { node ->
+        node.componentTargetAttributes.map { attribute ->
+            "${node.describeForProblem()}|${attribute.renderResolved()}"
+        }
+    }.sorted()
+
+private fun List<SemanticNode>.ancestryInventory(): List<String> =
+    filter(SemanticNode::participatesInStructuralMatching)
+        .map { node ->
+            "${node.describeForProblem()}|${node.structuralContextFingerprint()}"
+        }.sorted()
+
+private fun List<String>.renderInventory(limit: Int = 4): String =
+    when {
+        isEmpty() -> "<none>"
+        size <= limit -> joinToString("; ")
+        else -> take(limit).joinToString("; ") + "; ... (${size - limit} more)"
     }

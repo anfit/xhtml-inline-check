@@ -72,6 +72,18 @@ object ProblemIds {
             slug = "UNMATCHED_NODE",
         )
 
+    val STRUCTURE_ID_COLLISION: DiagnosticId =
+        DiagnosticId.problem(
+            category = ProblemCategory.STRUCTURE,
+            slug = "ID_COLLISION",
+        )
+
+    val STRUCTURE_ID_SANITY_CHANGED: DiagnosticId =
+        DiagnosticId.problem(
+            category = ProblemCategory.STRUCTURE,
+            slug = "ID_SANITY_CHANGED",
+        )
+
     val STRUCTURE_FORM_ANCESTRY_CHANGED: DiagnosticId =
         DiagnosticId.problem(
             category = ProblemCategory.STRUCTURE,
@@ -96,10 +108,22 @@ object ProblemIds {
             slug = "RENDERED_GUARD_CHANGED",
         )
 
+    val STRUCTURE_ANCESTRY_SANITY_CHANGED: DiagnosticId =
+        DiagnosticId.problem(
+            category = ProblemCategory.STRUCTURE,
+            slug = "ANCESTRY_SANITY_CHANGED",
+        )
+
     val TARGET_RESOLUTION_CHANGED: DiagnosticId =
         DiagnosticId.problem(
             category = ProblemCategory.TARGET,
             slug = "RESOLUTION_CHANGED",
+        )
+
+    val TARGET_SANITY_CHANGED: DiagnosticId =
+        DiagnosticId.problem(
+            category = ProblemCategory.TARGET,
+            slug = "SANITY_CHANGED",
         )
 }
 

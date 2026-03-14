@@ -187,10 +187,11 @@ class FaceletsAnalyzerScaffoldTest {
 
         assertThatReport(report)
             .hasResult(AnalysisResult.NOT_EQUIVALENT)
-            .hasProblemCount(2)
+            .hasProblemCount(3)
             .hasWarningCount(1)
             .hasProblemIds(
                 "P-STRUCTURE-UNMATCHED_NODE",
+                "P-STRUCTURE-ANCESTRY_SANITY_CHANGED",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
             )
         assertThat(report.problems.first().summary).isEqualTo("Refactored structural node has no trustworthy match in the legacy tree")
@@ -198,9 +199,10 @@ class FaceletsAnalyzerScaffoldTest {
         assertThat(report.problems.first().locations.new?.snippet).isEqualTo("h:commandButton")
         assertThat(report.problems.first().explanation).contains("explicit id")
         assertThat(report.summary.headline).contains("unmatched structural nodes")
-        assertThat(report.summary.counts.checked).isEqualTo(11)
+        assertThat(report.summary.headline).contains("global ancestry-sanity mismatches")
+        assertThat(report.summary.counts.checked).isEqualTo(12)
         assertThat(report.summary.counts.matched).isEqualTo(10)
-        assertThat(report.summary.counts.mismatched).isEqualTo(1)
+        assertThat(report.summary.counts.mismatched).isEqualTo(2)
     }
 
     @Test
@@ -641,6 +643,108 @@ class FaceletsAnalyzerScaffoldTest {
     }
 
     @Test
+    fun `scaffold analyzer reports per-tree id collisions before downstream unmatched-node fallout`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:commandButton id="saveButton" />
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:commandButton id="saveButton" />
+              <h:commandButton id="saveButton" />
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.NOT_EQUIVALENT)
+            .hasProblemCount(7)
+            .hasWarningCount(1)
+        assertThat(report.problems.first().id.value).isEqualTo("P-STRUCTURE-ID_COLLISION")
+        assertThat(report.problems.first().summary).isEqualTo("Component id collides within the refactored tree")
+        assertThat(report.problems.first().locations.new?.logicalLocation?.render()).startsWith("refactored/root.xhtml:3:")
+        assertThat(report.problems.first().locations.new?.snippet).isEqualTo("id=\"saveButton\"")
+        assertThat(report.problems.first().explanation).contains("h:commandButton#saveButton")
+        assertThat(report.problems.map { it.id.value }).contains(
+            "P-STRUCTURE-ID_COLLISION",
+            "P-STRUCTURE-UNMATCHED_NODE",
+            "P-STRUCTURE-ID_SANITY_CHANGED",
+            "P-STRUCTURE-ANCESTRY_SANITY_CHANGED",
+            "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+        )
+        assertThat(report.summary.headline).contains("id-collision mismatches")
+        assertThat(report.summary.headline).contains("global id-sanity mismatches")
+    }
+
+    @Test
+    fun `scaffold analyzer keeps unmatched target drift visible through global sanity checks`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:form id="mainForm">
+                <h:inputText id="nameInput" />
+                <h:outputLabel for="nameInput" />
+              </h:form>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:form id="mainForm">
+                <h:inputText id="nameInput" />
+                <h:outputLabel for="missingInput" />
+              </h:form>
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.NOT_EQUIVALENT)
+            .hasProblemCount(4)
+            .hasWarningCount(1)
+        assertThat(report.problems.map { it.id.value }).containsExactly(
+            "P-STRUCTURE-UNMATCHED_NODE",
+            "P-STRUCTURE-UNMATCHED_NODE",
+            "P-TARGET-SANITY_CHANGED",
+            "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+        )
+        val targetProblem = report.problems.first { it.id.value == "P-TARGET-SANITY_CHANGED" }
+        assertThat(targetProblem.summary).isEqualTo("Unmatched target relationships changed after refactor")
+        assertThat(targetProblem.explanation).contains("for=component:nameInput->h:inputText#nameInput@form:mainForm")
+        assertThat(targetProblem.explanation).contains("for=unresolved:missingInput")
+        assertThat(report.summary.headline).contains("global target-sanity mismatches")
+    }
+
+    @Test
     fun `scaffold analyzer reports broken same-form target resolution after a refactor`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(
@@ -785,11 +889,12 @@ class FaceletsAnalyzerScaffoldTest {
 
         assertThatReport(report)
             .hasResult(AnalysisResult.NOT_EQUIVALENT)
-            .hasProblemCount(4)
+            .hasProblemCount(5)
             .hasWarningCount(2)
         assertThat(report.problems.map { it.id.value }).containsExactly(
             "P-STRUCTURE-UNMATCHED_NODE",
             "W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT",
+            "P-STRUCTURE-ANCESTRY_SANITY_CHANGED",
             "P-STRUCTURE-ITERATION_ANCESTRY_CHANGED",
             "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
         )
@@ -797,6 +902,7 @@ class FaceletsAnalyzerScaffoldTest {
         assertThat(report.problems.first { it.id.value == "P-STRUCTURE-ITERATION_ANCESTRY_CHANGED" }.explanation)
             .contains("ui:repeat")
         assertThat(report.summary.headline).contains("iteration-ancestry mismatches")
+        assertThat(report.summary.headline).contains("global ancestry-sanity mismatches")
     }
 
     @Test
