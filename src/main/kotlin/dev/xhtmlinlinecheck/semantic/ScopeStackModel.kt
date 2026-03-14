@@ -116,16 +116,9 @@ private class ScopeStackBuilder {
     }
 
     private fun visit(node: LogicalNode, path: LogicalNodePath, currentScopeId: ScopeId): ScopeId {
-        val introducedBindings =
-            when (node) {
-                is LogicalElementNode -> elementBindings(node, currentScopeId)
-                is LogicalIncludeNode -> includeBindings(node, currentScopeId)
-                is LogicalTextNode -> emptyList()
-            }
-        val descendantScopeId = createChildScopeIfNeeded(currentScopeId, introducedBindings)
-        nodeScopes[path] = ScopeSnapshot(nodeScopeId = currentScopeId, descendantScopeId = descendantScopeId)
+        val transition = enterNode(node, path, currentScopeId)
 
-        var childScopeId = descendantScopeId
+        var childScopeId = transition.descendantScopeId
         val children =
             when (node) {
                 is LogicalElementNode -> node.children
@@ -136,12 +129,39 @@ private class ScopeStackBuilder {
             childScopeId = visit(child, path.child(index), childScopeId)
         }
 
-        return when (node) {
-            is LogicalElementNode -> node.exitScopeId(currentScopeId, childScopeId, introducedBindings)
-            is LogicalIncludeNode -> currentScopeId
-            is LogicalTextNode -> currentScopeId
-        }
+        return leaveNode(node, transition, childScopeId)
     }
+
+    private fun enterNode(
+        node: LogicalNode,
+        path: LogicalNodePath,
+        currentScopeId: ScopeId,
+    ): ScopeTransition {
+        val introducedBindings =
+            when (node) {
+                is LogicalElementNode -> elementBindings(node, currentScopeId)
+                is LogicalIncludeNode -> includeBindings(node, currentScopeId)
+                is LogicalTextNode -> emptyList()
+            }
+        val descendantScopeId = createChildScopeIfNeeded(currentScopeId, introducedBindings)
+        nodeScopes[path] = ScopeSnapshot(nodeScopeId = currentScopeId, descendantScopeId = descendantScopeId)
+        return ScopeTransition(
+            nodeScopeId = currentScopeId,
+            descendantScopeId = descendantScopeId,
+            introducedBindings = introducedBindings,
+        )
+    }
+
+    private fun leaveNode(
+        node: LogicalNode,
+        transition: ScopeTransition,
+        childScopeId: ScopeId,
+    ): ScopeId =
+        when (node) {
+            is LogicalElementNode -> node.exitScopeId(transition, childScopeId)
+            is LogicalIncludeNode -> transition.nodeScopeId
+            is LogicalTextNode -> transition.nodeScopeId
+        }
 
     private fun elementBindings(node: LogicalElementNode, currentScopeId: ScopeId): List<ScopeBinding> =
         node.tagRule.bindingRules.mapNotNull { rule ->
@@ -234,15 +254,20 @@ private class ScopeStackBuilder {
         attributes.firstOrNull { it.name.localName == localName }
 }
 
+private data class ScopeTransition(
+    val nodeScopeId: ScopeId,
+    val descendantScopeId: ScopeId,
+    val introducedBindings: List<ScopeBinding>,
+)
+
 private fun LogicalElementNode.exitScopeId(
-    currentScopeId: ScopeId,
+    transition: ScopeTransition,
     childScopeId: ScopeId,
-    introducedBindings: List<ScopeBinding>,
 ): ScopeId =
-    if (introducedBindings.any { it.kind == BindingKind.C_SET }) {
+    if (transition.introducedBindings.any { it.kind == BindingKind.C_SET }) {
         childScopeId
     } else {
-        currentScopeId
+        transition.nodeScopeId
     }
 
 private fun Provenance.atBindingLocation(location: SourceLocation): Provenance =

@@ -31,6 +31,7 @@ class ScopeStackModelTest {
                 <c:forEach var="row" varStatus="loop" items="#{row.children}">
                   <h:outputText id="nestedValue" value="#{row.label}" />
                 </c:forEach>
+                <h:outputText id="afterNestedValue" value="#{row.label}" />
               </ui:repeat>
               <h:outputText id="outsideValue" value="#{outer}" />
             </ui:composition>
@@ -49,6 +50,7 @@ class ScopeStackModelTest {
         val repeatPath = findPathById(semanticModels.oldRoot.syntaxTree, "repeatValue").parent()
         val repeatValuePath = findPathById(semanticModels.oldRoot.syntaxTree, "repeatValue")
         val nestedValuePath = findPathById(semanticModels.oldRoot.syntaxTree, "nestedValue")
+        val afterNestedValuePath = findPathById(semanticModels.oldRoot.syntaxTree, "afterNestedValue")
         val outsideValuePath = findPathById(semanticModels.oldRoot.syntaxTree, "outsideValue")
 
         assertThat(scopeModel.snapshotAt(LogicalNodePath.root()).nodeScopeId).isEqualTo(scopeModel.rootScopeId)
@@ -68,6 +70,10 @@ class ScopeStackModelTest {
         assertThat(scopeModel.resolve("loop", nestedValuePath))
             .extracting("kind", "writtenName")
             .containsExactly(dev.xhtmlinlinecheck.domain.BindingKind.VAR_STATUS, "loop")
+        assertThat(scopeModel.resolve("row", afterNestedValuePath))
+            .extracting("kind", "origin.descriptor")
+            .containsExactly(dev.xhtmlinlinecheck.domain.BindingKind.ITERATION_VAR, "ui:repeat var=row")
+        assertThat(scopeModel.resolve("loop", afterNestedValuePath)).isNull()
         assertThat(scopeModel.resolve("row", outsideValuePath)).isNull()
         assertThat(scopeModel.visibleBindingsAt(nestedValuePath).map { it.writtenName })
             .containsExactly("loop", "row", "status", "row", "outer")

@@ -1,6 +1,3 @@
-Implement scope push and pop behavior while walking the syntax tree, using the rule-registry tasks so binding-introducing tags change scope at the right points.
-Implement binding creation for `ui:param`, building on the include-parameter extraction task and the scope-stack task.
-Implement binding creation for `ui:repeat var` and `varStatus`, using the `ui:repeat` rule and scope-walker tasks so iterator bindings become visible to EL normalization.
 Implement binding creation for `c:set`, using the JSTL rule-registry task and scope-walker task.
 Implement binding creation for `c:forEach`, using the JSTL rule-registry task and scope-walker task to mirror iterator semantics outside Facelets.
 Implement local-shadowing behavior so the scope stack resolves inner bindings over outer ones, because the variable-capture and alpha-renaming tasks depend on correct shadowing.
