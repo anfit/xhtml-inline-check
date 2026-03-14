@@ -14,16 +14,31 @@ data class SourceDocument(
     val rootDirectory: Path,
     val displayPath: String = absolutePath.invariantSeparatorsPathString,
 ) {
+    fun resolveIncludeSource(sourcePath: String): SourceDocument? {
+        val includePath = parseIncludePath(sourcePath) ?: return null
+        val normalizedPath =
+            normalizeAbsolute(
+                if (sourcePath.startsWith("/")) {
+                    rootDirectory.resolve(includePath)
+                } else {
+                    absolutePath.parent.resolve(includePath)
+                },
+            )
+        return fromAbsolutePath(
+            side = side,
+            absolutePath = normalizedPath,
+            rootDirectory = rootDirectory,
+        )
+    }
+
     companion object {
         fun fromPath(side: AnalysisSide, path: Path, rootDirectory: Path? = null): SourceDocument {
             val normalizedRootDirectory = normalizeAbsolute(rootDirectory ?: defaultRootDirectory(path))
             val normalizedPath = resolveAbsolute(path, normalizedRootDirectory)
-            val displayPath = normalizedPath.relativeTo(normalizedRootDirectory)
-            return SourceDocument(
+            return fromAbsolutePath(
                 side = side,
                 absolutePath = normalizedPath,
                 rootDirectory = normalizedRootDirectory,
-                displayPath = displayPath,
             )
         }
 
@@ -43,7 +58,35 @@ data class SourceDocument(
                 },
             )
 
+        private fun fromAbsolutePath(side: AnalysisSide, absolutePath: Path, rootDirectory: Path): SourceDocument {
+            val normalizedRootDirectory = normalizeAbsolute(rootDirectory)
+            val normalizedPath = normalizeAbsolute(absolutePath)
+            val displayPath = normalizedPath.relativeTo(normalizedRootDirectory)
+            return SourceDocument(
+                side = side,
+                absolutePath = normalizedPath,
+                rootDirectory = normalizedRootDirectory,
+                displayPath = displayPath,
+            )
+        }
+
         private fun normalizeAbsolute(path: Path): Path = path.toAbsolutePath().normalize()
+
+        private fun parseIncludePath(sourcePath: String): Path? {
+            if (sourcePath.isBlank()) {
+                return null
+            }
+            if (sourcePath.contains("#{") || sourcePath.contains("\${")) {
+                return null
+            }
+
+            val normalized = sourcePath.removePrefix("/").replace('\\', '/')
+            if (normalized.isBlank()) {
+                return null
+            }
+
+            return Path.of(normalized).normalize()
+        }
 
         private fun Path.relativeTo(rootDirectory: Path): String =
             if (startsWith(rootDirectory)) {

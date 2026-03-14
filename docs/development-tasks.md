@@ -1,4 +1,3 @@
-Implement include `src` resolution relative to the current file and optional base directory, building on the root-path, file-reading, and `ui:include`-detection tasks.
 Implement `ui:param` extraction on include sites so the later binding and scope tasks can inherit the parameter flow established during include expansion.
 Implement include expansion into a logical tree representation, using the source graph, include-resolution, and `ui:param`-extraction tasks so old and new trees can be compared on equal footing.
 Implement cycle detection for recursive includes, integrating with the source graph and include-expansion tasks so the analyzer fails predictably instead of looping.

@@ -52,12 +52,18 @@ fun interface SourceLoader {
                 rootDirectory = rootDirectory,
             )
             val contents = readContents(document)
-            val sourceGraphFile = SourceGraphFile.root(document).copy(
-                includeEdges = SourceGraphIncludeDiscovery.discover(
-                    document = document,
-                    contents = contents,
-                ),
-            )
+            val sourceGraphFile =
+                SourceGraphFile.root(document).copy(
+                    includeEdges =
+                        SourceGraphIncludeDiscovery.discover(
+                            document = document,
+                            contents = contents,
+                        ).map { edge ->
+                            edge.copy(
+                                includedDocument = edge.sourcePath?.let(document::resolveIncludeSource),
+                            )
+                        },
+                )
             return LoadedSource(
                 document = document,
                 contents = contents,
