@@ -1,4 +1,3 @@
-Define stable problem-id and warning-id conventions that the comparison, `--explain`, JSON output, and fixture-assertion tasks can rely on.
 Add unit tests for serialization and deterministic ordering of result objects, covering the result, problem, summary, and id-convention tasks before reporters are implemented.
 Implement root-path resolution for old and new XHTML trees so the loader pipeline can anchor all include-expansion and provenance tasks on trustworthy input locations.
 Implement file reading with normalized path handling, building on the root-path-resolution task so include expansion and missing-file diagnostics behave consistently across platforms.

@@ -6,6 +6,16 @@ import java.nio.file.Path
 
 class ProblemModelsTest {
     @Test
+    fun `diagnostic ids use stable kind-category-slug format`() {
+        assertThat(ProblemIds.STRUCTURE_FORM_ANCESTRY_CHANGED.value)
+            .isEqualTo("P-STRUCTURE-FORM_ANCESTRY_CHANGED")
+        assertThat(WarningIds.UNSUPPORTED_ANALYZER_PIPELINE_SCAFFOLD.value)
+            .isEqualTo("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
+        assertThat(DiagnosticId.parse("P-TARGET-RESOLUTION_CHANGED"))
+            .isEqualTo(ProblemIds.TARGET_RESOLUTION_CHANGED)
+    }
+
+    @Test
     fun `problem locations expose logical and physical locations from provenance`() {
         val document = SourceDocument.fromPath(
             side = AnalysisSide.OLD,
@@ -44,7 +54,7 @@ class ProblemModelsTest {
         )
 
         val problem = Problem(
-            id = "P17",
+            id = ProblemIds.SCOPE_BINDING_MISMATCH,
             severity = Severity.ERROR,
             category = ProblemCategory.SCOPE,
             summary = "Local variable resolves to different binding",
@@ -56,6 +66,7 @@ class ProblemModelsTest {
             hint = "Preserve the original iteration scope when inlining the fragment.",
         )
 
+        assertThat(problem.id.value).isEqualTo("P-SCOPE-BINDING_MISMATCH")
         assertThat(problem.locations.old).isEqualTo(oldLocation)
         assertThat(problem.locations.new).isEqualTo(newLocation)
         assertThat(problem.locations.old?.snippet).isEqualTo("#{row.label}")

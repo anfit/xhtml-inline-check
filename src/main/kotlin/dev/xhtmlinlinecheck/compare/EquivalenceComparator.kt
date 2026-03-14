@@ -11,6 +11,7 @@ import dev.xhtmlinlinecheck.domain.ProblemCategory
 import dev.xhtmlinlinecheck.domain.ProblemLocation
 import dev.xhtmlinlinecheck.domain.ProblemLocations
 import dev.xhtmlinlinecheck.domain.Severity
+import dev.xhtmlinlinecheck.domain.WarningIds
 import dev.xhtmlinlinecheck.domain.WarningTotals
 import dev.xhtmlinlinecheck.semantic.SemanticModels
 
@@ -43,7 +44,7 @@ fun interface EquivalenceComparator {
                     ),
                     problems = listOf(
                         Problem(
-                            id = "W00",
+                            id = WarningIds.UNSUPPORTED_ANALYZER_PIPELINE_SCAFFOLD,
                             severity = Severity.WARNING,
                             category = ProblemCategory.UNSUPPORTED,
                             summary = "Analyzer pipeline scaffold is in place",

@@ -7,6 +7,7 @@ import dev.xhtmlinlinecheck.domain.AnalysisSummary
 import dev.xhtmlinlinecheck.domain.AnalysisStats
 import dev.xhtmlinlinecheck.domain.AggregateCounts
 import dev.xhtmlinlinecheck.domain.AggregateCoverage
+import dev.xhtmlinlinecheck.domain.ProblemIds
 import dev.xhtmlinlinecheck.domain.Problem
 import dev.xhtmlinlinecheck.domain.ProblemCategory
 import dev.xhtmlinlinecheck.domain.ProblemLocation
@@ -47,7 +48,7 @@ class ReportRenderersBaselineTest {
             ),
             problems = listOf(
                 Problem(
-                    id = "P01",
+                    id = ProblemIds.STRUCTURE_FORM_ANCESTRY_CHANGED,
                     severity = Severity.ERROR,
                     category = ProblemCategory.STRUCTURE,
                     summary = "Component moved outside form",
@@ -100,7 +101,7 @@ class ReportRenderersBaselineTest {
 
         assertThat(rendered).contains("NOT_EQUIVALENT")
         assertThat(rendered).contains("Found one mismatch")
-        assertThat(rendered).contains("P01")
+        assertThat(rendered).contains("P-STRUCTURE-FORM_ANCESTRY_CHANGED")
         assertThat(rendered).contains("legacy/order.xhtml")
         assertThat(rendered).contains("refactored/order.xhtml")
         assertThat(rendered).contains("Component moved outside form")

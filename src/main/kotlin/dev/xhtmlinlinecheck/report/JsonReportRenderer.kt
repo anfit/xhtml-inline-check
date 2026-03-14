@@ -49,7 +49,7 @@ $problemEntries
     private fun renderProblem(problem: Problem): String =
         """
         {
-          "id": "${escape(problem.id)}",
+          "id": "${escape(problem.id.value)}",
           "severity": "${problem.severity.name}",
           "category": "${problem.category.name}",
           "summary": "${escape(problem.summary)}",

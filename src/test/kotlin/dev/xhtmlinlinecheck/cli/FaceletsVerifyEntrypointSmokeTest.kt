@@ -29,7 +29,7 @@ class FaceletsVerifyEntrypointSmokeTest {
 
         assertThat(exitCode).isEqualTo(2)
         assertThat(rendered).contains("INCONCLUSIVE")
-        assertThat(rendered).contains("W00")
+        assertThat(rendered).contains("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
     }
 
     private fun javaExecutable(): Path =

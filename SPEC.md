@@ -108,7 +108,7 @@ Static model says pages are equivalent
 EL bindings matched: 146/146
 Structural facts matched: 89/89
 Warnings: 1
-W12 Dynamic map access at newRoot.xhtml:88 may hide runtime differences
+W-UNSUPPORTED-DYNAMIC_MAP_ACCESS Dynamic map access at newRoot.xhtml:88 may hide runtime differences
 ```
 
 ### 6.2 Example Failure Output
@@ -117,7 +117,7 @@ W12 Dynamic map access at newRoot.xhtml:88 may hide runtime differences
 NOT EQUIVALENT
 Problems: 3
 
-P01 Scope mismatch
+P-SCOPE-BINDING_MISMATCH Scope mismatch
 oldRoot.xhtml:114:23 -> #{row.label}
 newRoot.xhtml:97:19  -> #{item.label}
 Root binding differs
@@ -125,13 +125,13 @@ Old: ui:repeat var=row from /fragments/table.xhtml:8
 New: ui:repeat var=item from /newRoot.xhtml:72
 Reason: expression moved from inner iteration context to outer iteration context
 
-P02 Form ancestry changed
+P-STRUCTURE-FORM_ANCESTRY_CHANGED Form ancestry changed
 Component id=saveBtn
 Old path: /ui:composition/h:form[1]/p:commandButton[2]
 New path: /ui:composition/p:commandButton[2]
 Reason: component is no longer inside a form
 
-P03 Update target no longer resolves the same way
+P-TARGET-RESOLUTION_CHANGED Update target no longer resolves the same way
 oldRoot.xhtml:140: update="msgs panel"
 newRoot.xhtml:125: update="panel"
 Missing target: msgs
@@ -143,7 +143,7 @@ Missing target: msgs
 INCONCLUSIVE
 Warnings: 1
 
-W02 Unsupported dynamic include
+W-UNSUPPORTED-DYNAMIC_INCLUDE Unsupported dynamic include
 legacy/order.xhtml:31:17 -> src=#{bean.fragmentPath}
 Comparison beneath this node is not trustworthy
 ```
@@ -358,10 +358,19 @@ Every issue must be emitted as a structured problem with:
 - semantic explanation
 - remediation hint
 
+Problem-id and warning-id convention:
+
+- ids identify stable diagnostic kinds, not per-run ordinal positions
+- error ids use `P-<CATEGORY>-<SLUG>`
+- warning ids use `W-<CATEGORY>-<SLUG>`
+- `<CATEGORY>` is one of the structured problem categories such as `SCOPE`, `STRUCTURE`, `TARGET`, `PARSE`, `UNSUPPORTED`, or `INTERNAL`
+- `<SLUG>` is uppercase ASCII snake case naming the rule family, for example `BINDING_MISMATCH` or `DYNAMIC_INCLUDE`
+- `--explain <problem-id>`, JSON output, and fixture assertions should key off this stable id string directly
+
 Example:
 
 ```text
-P17
+P-SCOPE-BINDING_MISMATCH
 severity=error
 category=scope
 summary=Local variable resolves to different binding

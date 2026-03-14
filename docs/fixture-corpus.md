@@ -55,13 +55,20 @@ Optional additions:
 ```json
 {
   "result": "NOT_EQUIVALENT",
-  "problemIds": ["P01"],
+  "problemIds": ["P-SCOPE-BINDING_MISMATCH"],
   "warningIds": [],
   "notes": "Variable capture introduced by flattening an inner ui:repeat."
 }
 ```
 
-The implementation can evolve the exact schema later, but the fixture contract should stay concise and deterministic.
+Id convention requirements for fixtures:
+
+- `problemIds` and `warningIds` should store stable diagnostic-kind ids, not report-local ordinals
+- error ids use `P-<CATEGORY>-<SLUG>`
+- warning ids use `W-<CATEGORY>-<SLUG>`
+- `<SLUG>` should stay stable even if renderer ordering, wording, or counts change
+
+The implementation can evolve the exact schema later, but the fixture contract should stay concise, deterministic, and keyed on those stable ids.
 
 ## Minimum Fixture Categories
 

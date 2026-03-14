@@ -33,11 +33,20 @@ data class ProblemLocations(
 )
 
 data class Problem(
-    val id: String,
+    val id: DiagnosticId,
     val severity: Severity,
     val category: ProblemCategory,
     val summary: String,
     val locations: ProblemLocations = ProblemLocations(),
     val explanation: String,
     val hint: String? = null,
-)
+) {
+    init {
+        require(id.category == category) {
+            "diagnostic id category must match problem category"
+        }
+        require(id.kind.severity == severity) {
+            "diagnostic id kind must match problem severity"
+        }
+    }
+}

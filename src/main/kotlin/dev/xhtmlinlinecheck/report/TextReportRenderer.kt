@@ -16,7 +16,7 @@ class TextReportRenderer {
             if (report.problems.isNotEmpty()) {
                 add("Problems:")
                 report.problems.forEach { problem ->
-                    add("${problem.id} [${problem.severity.name.lowercase()}/${problem.category.name.lowercase()}] ${problem.summary}")
+                    add("${problem.id.value} [${problem.severity.name.lowercase()}/${problem.category.name.lowercase()}] ${problem.summary}")
                     problem.locations.old?.let { location ->
                         add("  old: ${renderLocation(location)}")
                     }

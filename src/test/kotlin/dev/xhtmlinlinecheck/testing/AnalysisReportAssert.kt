@@ -33,7 +33,7 @@ class AnalysisReportAssert(actual: AnalysisReport) :
 
     fun hasProblemIds(vararg expected: String): AnalysisReportAssert {
         isNotNull
-        assertThat(actual.problems.map { it.id }).containsExactly(*expected)
+        assertThat(actual.problems.map { it.id.value }).containsExactly(*expected)
         return this
     }
 }

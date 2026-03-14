@@ -22,7 +22,7 @@ class FaceletsVerifyCliTest {
 
         assertThat(exitCode).isEqualTo(2)
         assertThat(output.toString()).contains("INCONCLUSIVE")
-        assertThat(output.toString()).contains("W00")
+        assertThat(output.toString()).contains("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
     }
 
     @Test

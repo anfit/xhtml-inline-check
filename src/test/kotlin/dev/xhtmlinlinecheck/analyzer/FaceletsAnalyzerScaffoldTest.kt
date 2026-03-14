@@ -40,7 +40,7 @@ class FaceletsAnalyzerScaffoldTest {
             .hasSummaryContaining("Scaffold")
             .hasProblemCount(1)
             .hasWarningCount(1)
-            .hasProblemIds("W00")
+            .hasProblemIds("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
         assertThat(report.problems.single().locations.old?.logicalLocation?.render()).isEqualTo("old/root.xhtml")
         assertThat(report.problems.single().locations.new?.logicalLocation?.render()).isEqualTo("new/root.xhtml")
     }
