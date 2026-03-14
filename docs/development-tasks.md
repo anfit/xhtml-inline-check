@@ -1,4 +1,3 @@
-Define the semantic-node model that carries normalized EL, ids, rendered and target-bearing attributes, transparency hints, ancestry data, and stable provenance/location information as the analyzer's comparison-ready intermediate representation.
 Implement the syntax-tree walker that emits semantic nodes with stable ids, normalized EL, rendered and target attributes, transparency hints, and stable provenance so downstream comparison no longer depends on raw syntax nodes.
 Add deterministic semantic-extraction tests so semantic nodes become the single stable source of truth for ids, EL facts, and target-bearing attributes.
 Compute form ancestry, naming-container ancestry, and iteration ancestry on semantic nodes together so one semantic model captures the behaviorally relevant structural context needed by matching and comparison.

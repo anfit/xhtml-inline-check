@@ -13,6 +13,7 @@ data class SemanticModel(
     val scopeModel: ScopeStackModel,
     val elOccurrences: List<SemanticElOccurrence>,
     val normalizedElOccurrences: List<NormalizedSemanticElOccurrence>,
+    val semanticNodes: List<SemanticNode>,
 ) {
     init {
         require(provenance.physicalLocation.document == document) {

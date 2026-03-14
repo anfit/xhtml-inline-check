@@ -36,6 +36,7 @@ class TagRuleRegistryTest {
         val resolvedRepeatRule = repeatRule!!
 
         assertThat(resolvedRepeatRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(resolvedRepeatRule.isForm).isFalse()
         assertThat(resolvedRepeatRule.bindingRules).containsExactly(
             BindingCreationRule(
                 kind = BindingKind.ITERATION_VAR,
@@ -93,6 +94,7 @@ class TagRuleRegistryTest {
 
         assertThat(formRule).isNotNull()
         assertThat(formRule!!.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(formRule.isForm).isTrue()
         assertThat(formRule.isNamingContainer).isTrue()
         assertThat(formRule.bindingRules).isEmpty()
         assertThat(formRule.elAttributeNames).containsExactly("rendered")
@@ -182,6 +184,7 @@ class TagRuleRegistryTest {
             )
 
         assertThat(prefixedFormRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(prefixedFormRule.isForm).isTrue()
         assertThat(prefixedFormRule.isNamingContainer).isTrue()
         assertThat(prefixedFormRule.isTransparentStructureWrapper).isFalse()
         assertThat(prefixedFormRule.elAttributeNames).containsExactly("rendered")
@@ -202,6 +205,7 @@ class TagRuleRegistryTest {
         assertThat(genericRule).isNotNull()
         assertThat(genericRule!!.bindingRules).isEmpty()
         assertThat(genericRule.isTransparentStructureWrapper).isFalse()
+        assertThat(genericRule.isForm).isFalse()
         assertThat(genericRule.isNamingContainer).isFalse()
         assertThat(genericRule.elAttributeNames).containsExactly("rendered")
         assertThat(genericRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
@@ -253,6 +257,7 @@ class TagRuleRegistryTest {
 
         assertThat(compositionRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
         assertThat(compositionRule.isTransparentStructureWrapper).isTrue()
+        assertThat(compositionRule.isForm).isFalse()
         assertThat(compositionRule.elAttributeNames).isEmpty()
         assertThat(compositionRule.targetAttributeNames).isEmpty()
         assertThat(fragmentRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)

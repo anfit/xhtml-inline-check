@@ -24,6 +24,7 @@ interface TagRule {
     val bindingRules: List<BindingCreationRule>
     val inheritsFallbackRule: Boolean
     val isTransparentStructureWrapper: Boolean
+    val isForm: Boolean
     val isNamingContainer: Boolean
     val elAttributeNames: Set<String>
     val targetAttributeNames: Set<String>
@@ -34,6 +35,7 @@ data class StaticTagRule(
     override val bindingRules: List<BindingCreationRule> = emptyList(),
     override val inheritsFallbackRule: Boolean = true,
     override val isTransparentStructureWrapper: Boolean = false,
+    override val isForm: Boolean = false,
     override val isNamingContainer: Boolean = false,
     override val elAttributeNames: Set<String> = emptySet(),
     override val targetAttributeNames: Set<String> = emptySet(),
@@ -164,6 +166,7 @@ object BuiltInTagRuleRegistry : TagRuleRegistry by StaticTagRuleRegistry(
                 ),
             TagSelector(JSF_HTML_NAMESPACE, "form") to
                 StaticTagRule(
+                    isForm = true,
                     isNamingContainer = true,
                 ),
         ),
@@ -195,6 +198,7 @@ private fun TagRule.overlay(base: TagRule): TagRule =
         bindingRules = (bindingRules + base.bindingRules).distinct(),
         inheritsFallbackRule = inheritsFallbackRule && base.inheritsFallbackRule,
         isTransparentStructureWrapper = isTransparentStructureWrapper || base.isTransparentStructureWrapper,
+        isForm = isForm || base.isForm,
         isNamingContainer = isNamingContainer || base.isNamingContainer,
         elAttributeNames = (elAttributeNames + base.elAttributeNames).toLinkedSet(),
         targetAttributeNames = (targetAttributeNames + base.targetAttributeNames).toLinkedSet(),
