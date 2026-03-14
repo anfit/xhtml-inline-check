@@ -14,7 +14,7 @@ What exists today:
 - an execution plan
 - architecture and fixture-planning docs
 - repository conventions for future implementation
-- a single-module Gradle Kotlin CLI scaffold with placeholder pipeline stages and baseline tests
+- a single-module Gradle Kotlin CLI scaffold with placeholder pipeline stages, baseline tests, and application packaging for `facelets-verify`
 
 What does not exist yet:
 
@@ -80,7 +80,13 @@ settings.gradle.kts
 
 ## Development
 
-The current scaffold defines a single JVM application with a placeholder analyzer pipeline and smoke tests. A Gradle wrapper has not been generated yet in this environment, so use a local Gradle installation if you want to run the build before the wrapper task lands.
+The current scaffold defines a single JVM application with a placeholder analyzer pipeline and smoke tests. The Gradle application setup is configured around the `facelets-verify` entrypoint, so a local Gradle installation can:
+
+- compile and test with `gradle test`
+- run the CLI with `gradle run --args="legacy.xhtml refactored.xhtml"`
+- assemble distribution archives with `gradle installDist distZip distTar`
+
+A Gradle wrapper has not been generated yet in this environment, so use a local Gradle installation until the wrapper task lands.
 
 ## Near-Term Roadmap
 
