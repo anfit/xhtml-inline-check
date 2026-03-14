@@ -7,6 +7,8 @@ import java.nio.file.Path
 class ProblemModelsTest {
     @Test
     fun `diagnostic ids use stable kind-category-slug format`() {
+        assertThat(ProblemIds.STRUCTURE_UNMATCHED_NODE.value)
+            .isEqualTo("P-STRUCTURE-UNMATCHED_NODE")
         assertThat(ProblemIds.STRUCTURE_FORM_ANCESTRY_CHANGED.value)
             .isEqualTo("P-STRUCTURE-FORM_ANCESTRY_CHANGED")
         assertThat(WarningIds.UNSUPPORTED_EXTRACTED_EL.value)

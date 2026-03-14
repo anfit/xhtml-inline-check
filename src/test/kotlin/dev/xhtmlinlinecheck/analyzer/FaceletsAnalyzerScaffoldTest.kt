@@ -49,6 +49,161 @@ class FaceletsAnalyzerScaffoldTest {
     }
 
     @Test
+    fun `scaffold analyzer keeps include-inlined pages fully aligned before later mismatch rules land`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:include src="/fragments/content.xhtml" />
+            </ui:composition>
+            """,
+        )
+        tree.write(
+            "fragments/content.xhtml",
+            """
+            <ui:fragment xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                         xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup id="panel">
+                <h:outputText id="value" value="#{bean.label}" />
+              </h:panelGroup>
+            </ui:fragment>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup id="panel">
+                <h:outputText id="value" value="#{bean.label}" />
+              </h:panelGroup>
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = tempDir.relativize(oldRoot),
+                newRoot = tempDir.relativize(newRoot),
+                baseOld = tempDir,
+                baseNew = tempDir,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasProblemCount(1)
+            .hasWarningCount(1)
+            .hasProblemIds("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
+        assertThat(report.problems.map { it.id.value }).doesNotContain("P-STRUCTURE-UNMATCHED_NODE")
+        assertThat(report.summary.headline).contains("Structural node alignment matched")
+        assertThat(report.summary.counts.checked).isEqualTo(2)
+        assertThat(report.summary.counts.matched).isEqualTo(2)
+        assertThat(report.summary.counts.mismatched).isZero()
+    }
+
+    @Test
+    fun `scaffold analyzer keeps wrapper-only structure changes aligned instead of reporting unmatched nodes`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <ui:fragment>
+                <h:panelGroup>
+                  <h:outputText value="#{bean.label}" />
+                </h:panelGroup>
+              </ui:fragment>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup>
+                <h:outputText value="#{bean.label}" />
+              </h:panelGroup>
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasProblemCount(1)
+            .hasWarningCount(1)
+            .hasProblemIds("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
+        assertThat(report.problems.map { it.id.value }).doesNotContain("P-STRUCTURE-UNMATCHED_NODE")
+        assertThat(report.summary.headline).contains("Structural node alignment matched")
+        assertThat(report.summary.counts.checked).isEqualTo(2)
+        assertThat(report.summary.counts.matched).isEqualTo(2)
+        assertThat(report.summary.counts.mismatched).isZero()
+    }
+
+    @Test
+    fun `scaffold analyzer surfaces unmatched structural candidates when alignment fails`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup>
+                <h:outputText value="legacy only" />
+              </h:panelGroup>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup>
+                <h:outputText value="legacy only" />
+                <h:commandButton />
+              </h:panelGroup>
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.NOT_EQUIVALENT)
+            .hasProblemCount(2)
+            .hasWarningCount(1)
+            .hasProblemIds(
+                "P-STRUCTURE-UNMATCHED_NODE",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().summary).isEqualTo("Refactored structural node has no trustworthy match in the legacy tree")
+        assertThat(report.problems.first().locations.new?.logicalLocation?.render()).startsWith("refactored/root.xhtml:4:")
+        assertThat(report.problems.first().locations.new?.snippet).isEqualTo("h:commandButton")
+        assertThat(report.problems.first().explanation).contains("explicit id")
+        assertThat(report.summary.headline).contains("unmatched structural nodes")
+        assertThat(report.summary.counts.checked).isEqualTo(3)
+        assertThat(report.summary.counts.matched).isEqualTo(2)
+        assertThat(report.summary.counts.mismatched).isEqualTo(1)
+    }
+
+    @Test
     fun `scaffold analyzer emits a dedicated warning for include cycles before the generic scaffold warning`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(

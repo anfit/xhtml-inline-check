@@ -40,6 +40,7 @@ fun interface EquivalenceComparator {
                         oldNodes = semanticModels.oldRoot.semanticNodes,
                         newNodes = semanticModels.newRoot.semanticNodes,
                     )
+                val structuralAlignment = compareStructuralAlignment(semanticModels, matchResult)
                 val targetComparison = compareResolvedTargets(semanticModels, matchResult)
                 val includeProblems =
                     buildList {
@@ -64,6 +65,7 @@ fun interface EquivalenceComparator {
                         )
                 val problems =
                     elComparison.problems +
+                        structuralAlignment.problems +
                         targetComparison.problems +
                         includeProblems +
                         extractedElProblems +
@@ -72,9 +74,9 @@ fun interface EquivalenceComparator {
                 val warningTotals = WarningTotals(total = warningCount, blocking = warningCount)
                 val counts =
                     AggregateCounts(
-                        checked = elComparison.checked + targetComparison.checked,
-                        matched = elComparison.matched + targetComparison.matched,
-                        mismatched = elComparison.mismatched + targetComparison.mismatched,
+                        checked = elComparison.checked + structuralAlignment.checked + targetComparison.checked,
+                        matched = elComparison.matched + structuralAlignment.matched + targetComparison.matched,
+                        mismatched = elComparison.mismatched + structuralAlignment.mismatched + targetComparison.mismatched,
                     )
 
                 AnalysisReport(
@@ -83,7 +85,7 @@ fun interface EquivalenceComparator {
                         blocksEquivalenceClaim = true,
                     ),
                     summary = AnalysisSummary(
-                        headline = summaryHeadline(elComparison, targetComparison),
+                        headline = summaryHeadline(elComparison, structuralAlignment, targetComparison),
                         counts = counts,
                         coverage = AggregateCoverage.from(counts),
                         warnings = warningTotals,
@@ -108,6 +110,13 @@ private data class ElComparisonResult(
 )
 
 private data class TargetComparisonResult(
+    val checked: Int,
+    val matched: Int,
+    val mismatched: Int,
+    val problems: List<Problem>,
+)
+
+private data class StructuralAlignmentResult(
     val checked: Int,
     val matched: Int,
     val mismatched: Int,
@@ -201,6 +210,45 @@ private fun compareResolvedTargets(
     )
 }
 
+private fun compareStructuralAlignment(
+    semanticModels: SemanticModels,
+    matchResult: SemanticNodeMatchResult,
+): StructuralAlignmentResult {
+    val oldNodesById = semanticModels.oldRoot.semanticNodes.associateBy(SemanticNode::nodeId)
+    val newNodesById = semanticModels.newRoot.semanticNodes.associateBy(SemanticNode::nodeId)
+    val unmatchedOldProblems =
+        matchResult.unmatchedOldNodeIds.map { nodeId ->
+            val node = oldNodesById.getValue(nodeId)
+            unmatchedStructuralNodeProblem(
+                node = node,
+                summary = "Legacy structural node has no trustworthy match in the refactored tree",
+                explanationSide = "legacy",
+                counterpartSide = "refactored",
+                locations = ProblemLocations(old = ProblemLocation(node.provenance, node.describeForProblem())),
+            )
+        }
+    val unmatchedNewProblems =
+        matchResult.unmatchedNewNodeIds.map { nodeId ->
+            val node = newNodesById.getValue(nodeId)
+            unmatchedStructuralNodeProblem(
+                node = node,
+                summary = "Refactored structural node has no trustworthy match in the legacy tree",
+                explanationSide = "refactored",
+                counterpartSide = "legacy",
+                locations = ProblemLocations(new = ProblemLocation(node.provenance, node.describeForProblem())),
+            )
+        }
+    val mismatched = unmatchedOldProblems.size + unmatchedNewProblems.size
+    val matched = matchResult.matches.size
+
+    return StructuralAlignmentResult(
+        checked = matched + mismatched,
+        matched = matched,
+        mismatched = mismatched,
+        problems = unmatchedOldProblems + unmatchedNewProblems,
+    )
+}
+
 private fun NormalizedSemanticElOccurrence.hasComparableShapeTo(other: NormalizedSemanticElOccurrence): Boolean =
     occurrence.carrierKind == other.occurrence.carrierKind &&
         occurrence.ownerTagName == other.occurrence.ownerTagName &&
@@ -262,23 +310,47 @@ private fun NormalizedSemanticElOccurrence.firstBindingOrigin() = bindingReferen
 
 private fun summaryHeadline(
     elComparison: ElComparisonResult,
+    structuralAlignment: StructuralAlignmentResult,
     targetComparison: TargetComparisonResult,
 ): String =
     when {
-        targetComparison.mismatched > 0 && elComparison.mismatched > 0 ->
-            "Detected target-resolution and local-binding EL mismatches; broader semantic comparison is still scaffolded."
-        targetComparison.mismatched > 0 ->
-            "Detected target-resolution mismatches; broader semantic comparison is still scaffolded."
-        elComparison.mismatched > 0 ->
-            "Detected local-binding EL mismatches; broader semantic comparison is still scaffolded."
+        mismatchSignals(structuralAlignment, targetComparison, elComparison).isNotEmpty() ->
+            "Detected ${mismatchSignals(structuralAlignment, targetComparison, elComparison).joinForHeadline()}; broader semantic comparison is still scaffolded."
         elComparison.uncertain > 0 ->
             "Local-binding EL comparison encountered unresolved global roots, so bean-level equivalence remains uncertain."
         targetComparison.checked > 0 ->
             "Resolved component targets matched for structurally paired nodes; broader semantic comparison is still scaffolded."
         elComparison.checked > 0 ->
             "Local-binding EL normalization matched for comparable occurrences; broader semantic comparison is still scaffolded."
+        structuralAlignment.checked > 0 ->
+            "Structural node alignment matched for all candidates; broader semantic comparison is still scaffolded."
         else ->
             "Scaffolded analyzer pipeline only; semantic comparison is not implemented yet."
+    }
+
+private fun mismatchSignals(
+    structuralAlignment: StructuralAlignmentResult,
+    targetComparison: TargetComparisonResult,
+    elComparison: ElComparisonResult,
+): List<String> =
+    buildList {
+        if (structuralAlignment.mismatched > 0) {
+            add("unmatched structural nodes")
+        }
+        if (targetComparison.mismatched > 0) {
+            add("target-resolution mismatches")
+        }
+        if (elComparison.mismatched > 0) {
+            add("local-binding EL mismatches")
+        }
+    }
+
+private fun List<String>.joinForHeadline(): String =
+    when (size) {
+        0 -> ""
+        1 -> single()
+        2 -> "${first()} and ${last()}"
+        else -> dropLast(1).joinToString(", ") + ", and ${last()}"
     }
 
 private fun targetResolutionProblem(
@@ -318,6 +390,25 @@ private fun targetResolutionProblem(
         hint = "Keep the component in the same form or preserve the target component ids so the resolved target meaning stays the same.",
     )
 }
+
+private fun unmatchedStructuralNodeProblem(
+    node: SemanticNode,
+    summary: String,
+    explanationSide: String,
+    counterpartSide: String,
+    locations: ProblemLocations,
+): Problem =
+    Problem(
+        id = ProblemIds.STRUCTURE_UNMATCHED_NODE,
+        severity = Severity.ERROR,
+        category = ProblemCategory.STRUCTURE,
+        summary = summary,
+        locations = locations,
+        explanation =
+            "The structural matcher could not align ${node.describeForProblem()} from the $explanationSide tree " +
+                "with any node in the $counterpartSide tree after explicit id, explicit target-relationship, and semantic-signature matching.",
+        hint = "Preserve a stable structural anchor such as explicit ids, resolved targets, or equivalent ancestry/context around this node.",
+    )
 
 private fun List<SemanticElOccurrence>.collectUnsupportedElProblems(): List<Problem> =
     filter { !it.isSupported }.map { occurrence ->
@@ -453,3 +544,12 @@ private fun SemanticNode.attributeProvenance(attribute: ComponentTargetAttribute
         includeStack = provenance.includeStack,
     )
 }
+
+private fun SemanticNode.describeForProblem(): String =
+    buildString {
+        append(nodeName)
+        explicitIdAttribute?.rawValue?.let { explicitId ->
+            append("#")
+            append(explicitId)
+        }
+    }

@@ -66,6 +66,12 @@ object ProblemIds {
             slug = "BINDING_MISMATCH",
         )
 
+    val STRUCTURE_UNMATCHED_NODE: DiagnosticId =
+        DiagnosticId.problem(
+            category = ProblemCategory.STRUCTURE,
+            slug = "UNMATCHED_NODE",
+        )
+
     val STRUCTURE_FORM_ANCESTRY_CHANGED: DiagnosticId =
         DiagnosticId.problem(
             category = ProblemCategory.STRUCTURE,

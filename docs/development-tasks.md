@@ -1,4 +1,3 @@
-Implement unmatched-node tracking together with matching tests for include-inlined pages and wrapper-only changes so comparator alignment is stable before mismatch rules land.
 Implement matched-node comparisons together for normalized EL equivalence, form ancestry, naming-container ancestry, iteration ancestry, rendered guards, and target-resolution behavior so aligned semantic nodes can produce trustworthy equivalence decisions.
 Implement tree-level invariant checks together, including per-tree id-collision detection plus post-match global sanity checks for ids, targets, and ancestry, so structural validity problems remain visible even outside one-to-one node comparisons.
 Implement mismatch-to-problem translation and duplicate/cascade suppression together so raw comparator findings become concise navigable diagnostics rather than noisy, repetitive output.
