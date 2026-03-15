@@ -1,4 +1,3 @@
-Implement reporter behavior together, including concise equivalent text output, detailed mismatch text output, visible inconclusive text output, deterministic problem ordering, stable JSON output, and shared summary/statistics rendering.
 Add golden tests for both text and JSON reporters once ordering, ids, provenance, and statistics are stable so human-facing and machine-facing output contracts stop drifting accidentally.
 Implement CLI/reporting controls together, including `--max-problems`, `--fail-on-warning`, and `--explain <problem-id>`, on top of deterministic ordering and finalized problem ids.
 Wire the CLI end to end by connecting argument parsing to the analysis pipeline, keeping base-directory wiring deterministic, adding output-format selection, and mapping semantic outcomes to process exit codes.

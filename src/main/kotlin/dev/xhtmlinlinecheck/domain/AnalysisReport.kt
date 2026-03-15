@@ -82,4 +82,49 @@ data class AnalysisReport(
         coverage = summary.coverage,
         warnings = summary.warnings,
     ),
-)
+) {
+    val orderedProblems: List<Problem>
+        get() = problems.sortedWith(problemOrdering)
+
+    val errors: List<Problem>
+        get() = orderedProblems.filter { it.severity == Severity.ERROR }
+
+    val warnings: List<Problem>
+        get() = orderedProblems.filter { it.severity == Severity.WARNING }
+
+    companion object {
+        private val problemOrdering =
+            compareBy<Problem>(
+                { severityRank(it.severity) },
+                { it.category.ordinal },
+                { it.id.value },
+                { it.locations.old.sortKey() },
+                { it.locations.new.sortKey() },
+                { it.summary },
+                { it.explanation },
+            )
+
+        private fun severityRank(severity: Severity): Int =
+            when (severity) {
+                Severity.ERROR -> 0
+                Severity.WARNING -> 1
+            }
+
+        private fun ProblemLocation?.sortKey(): String =
+            if (this == null) {
+                ""
+            } else {
+                buildString {
+                    append(logicalLocation.document.displayPath)
+                    append('|')
+                    append(logicalLocation.span?.start?.line ?: -1)
+                    append('|')
+                    append(logicalLocation.span?.start?.column ?: -1)
+                    append('|')
+                    append(logicalLocation.attributeName.orEmpty())
+                    append('|')
+                    append(snippet.orEmpty())
+                }
+            }
+    }
+}

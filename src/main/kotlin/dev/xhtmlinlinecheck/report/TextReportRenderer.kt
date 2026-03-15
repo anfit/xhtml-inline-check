@@ -1,31 +1,47 @@
 package dev.xhtmlinlinecheck.report
 
 import dev.xhtmlinlinecheck.domain.AnalysisReport
-import dev.xhtmlinlinecheck.domain.AggregateCoverage
-import dev.xhtmlinlinecheck.domain.ProblemLocation
-import java.util.Locale
+import dev.xhtmlinlinecheck.domain.AnalysisResult
+import dev.xhtmlinlinecheck.domain.Problem
 
 class TextReportRenderer {
     fun render(report: AnalysisReport): String {
+        val sections = report.toReportSections()
+
         val lines = buildList {
-            add(report.result.name)
-            add(report.summary.headline)
-            add(renderCounts(report.stats.counts.checked, report.stats.counts.matched, report.stats.counts.mismatched))
-            add(renderCoverage(report.stats.coverage))
-            add(renderWarnings(report.stats.warnings.total, report.stats.warnings.blocking))
-            if (report.problems.isNotEmpty()) {
-                add("Problems:")
-                report.problems.forEach { problem ->
-                    add("${problem.id.value} [${problem.severity.name.lowercase()}/${problem.category.name.lowercase()}] ${problem.summary}")
-                    problem.locations.old?.let { location ->
-                        add("  old: ${renderLocation(location)}")
+            add(sections.result)
+            add(sections.headline)
+            add(renderAggregateLines(sections.summary))
+
+            when (report.result) {
+                AnalysisResult.EQUIVALENT -> {
+                    if (sections.warnings.isNotEmpty()) {
+                        add("Warnings:")
+                        sections.warnings.forEach { warning ->
+                            add(renderConciseDiagnostic(warning))
+                        }
                     }
-                    problem.locations.new?.let { location ->
-                        add("  new: ${renderLocation(location)}")
+                }
+
+                AnalysisResult.INCONCLUSIVE -> {
+                    if (sections.warnings.isNotEmpty()) {
+                        add("Warnings:")
+                        sections.warnings.forEach { warning ->
+                            add(renderDetailedDiagnostic(warning))
+                        }
                     }
-                    add("  explanation: ${problem.explanation}")
-                    problem.hint?.let { hint ->
-                        add("  hint: $hint")
+                }
+
+                AnalysisResult.NOT_EQUIVALENT -> {
+                    add("Problems: ${sections.errors.size}")
+                    sections.errors.forEach { problem ->
+                        add(renderDetailedDiagnostic(problem))
+                    }
+                    if (sections.warnings.isNotEmpty()) {
+                        add("Warnings: ${sections.warnings.size}")
+                        sections.warnings.forEach { warning ->
+                            add(renderConciseDiagnostic(warning))
+                        }
                     }
                 }
             }
@@ -34,24 +50,64 @@ class TextReportRenderer {
         return lines.joinToString(System.lineSeparator())
     }
 
-    private fun renderCounts(checked: Int, matched: Int, mismatched: Int): String =
-        "Counts: checked=$checked, matched=$matched, mismatched=$mismatched"
+    private fun renderAggregateLines(aggregate: ReportAggregateView): String =
+        buildString {
+            append("Checked: ")
+            append(aggregate.checked)
+            append("  Matched: ")
+            append(aggregate.matched)
+            append("  Mismatched: ")
+            append(aggregate.mismatched)
+            append(System.lineSeparator())
+            append("Coverage: ")
+            append(aggregate.covered)
+            append("/")
+            append(aggregate.total)
+            append(" (")
+            append(aggregate.percentText)
+            append(")")
+            append(System.lineSeparator())
+            append("Warnings: ")
+            append(aggregate.warningTotal)
+            append(" total")
+            append(" (")
+            append(aggregate.warningBlocking)
+            append(" blocking)")
+        }
 
-    private fun renderCoverage(coverage: AggregateCoverage): String {
-        val percent = coverage.percent?.let { String.format(Locale.ROOT, "%.1f%%", it) } ?: "n/a"
-        return "Coverage: covered=${coverage.covered}/${coverage.total} ($percent)"
+    private fun renderConciseDiagnostic(problem: Problem): String = buildString {
+        append(problem.id.value)
+        append(" ")
+        append(problem.summary)
+        firstLocation(problem)?.let { location ->
+            append(" at ")
+            append(location.render())
+        }
     }
 
-    private fun renderWarnings(total: Int, blocking: Int): String =
-        "Warnings: total=$total, blocking=$blocking"
+    private fun renderDetailedDiagnostic(problem: Problem): String =
+        buildString {
+            append(problem.id.value)
+            append(" ")
+            append(problem.summary)
+            append(System.lineSeparator())
+            problem.locations.old?.let { location ->
+                append("old: ")
+                append(location.renderWithContext())
+                append(System.lineSeparator())
+            }
+            problem.locations.new?.let { location ->
+                append("new: ")
+                append(location.renderWithContext())
+                append(System.lineSeparator())
+            }
+            append(problem.explanation)
+            problem.hint?.let { hint ->
+                append(System.lineSeparator())
+                append("Hint: ")
+                append(hint)
+            }
+        }
 
-    private fun renderLocation(location: ProblemLocation): String = buildString {
-        append(location.render())
-        location.snippet?.let { snippet ->
-            append(" -> ").append(snippet)
-        }
-        location.bindingOrigin?.let { origin ->
-            append(" [binding: ").append(origin.render()).append("]")
-        }
-    }
+    private fun firstLocation(problem: Problem) = problem.locations.old ?: problem.locations.new
 }

@@ -51,7 +51,7 @@ class FaceletsVerifyCliTest {
         val exitCode = FaceletsVerifyCli().run(args, output)
 
         assertThat(exitCode).isEqualTo(0)
-        assertThat(output.toString()).contains("\"result\": \"EQUIVALENT\"")
+        assertThat(output.toString()).contains("\"result\" : \"EQUIVALENT\"")
     }
 
     @Test

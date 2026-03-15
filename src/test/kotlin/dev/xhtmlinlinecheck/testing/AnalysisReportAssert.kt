@@ -21,7 +21,7 @@ class AnalysisReportAssert(actual: AnalysisReport) :
 
     fun hasProblemCount(expected: Int): AnalysisReportAssert {
         isNotNull
-        assertThat(actual.problems).hasSize(expected)
+        assertThat(actual.orderedProblems).hasSize(expected)
         return this
     }
 
@@ -33,7 +33,7 @@ class AnalysisReportAssert(actual: AnalysisReport) :
 
     fun hasProblemIds(vararg expected: String): AnalysisReportAssert {
         isNotNull
-        assertThat(actual.problems.map { it.id.value }).containsExactly(*expected)
+        assertThat(actual.orderedProblems.map { it.id.value }).containsExactly(*expected)
         return this
     }
 }

@@ -30,15 +30,16 @@ class JsonReportRendererOrderingTest {
     fun `renders top-level summary and problem fields in stable order`() {
         val rendered = JsonReportRenderer().render(reportWithProblems())
 
-        assertThat(rendered).contains("\"result\": \"NOT_EQUIVALENT\"")
-        assertThat(rendered).contains("\"id\": \"P-SCOPE-BINDING_MISMATCH\"")
-        assertThat(rendered).contains("\"id\": \"W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD\"")
+        assertThat(rendered).contains("\"result\" : \"NOT_EQUIVALENT\"")
+        assertThat(rendered).contains("\"id\" : \"P-SCOPE-BINDING_MISMATCH\"")
+        assertThat(rendered).contains("\"id\" : \"W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD\"")
 
         assertContainsInOrder(
             rendered,
             "\"result\"",
             "\"summary\"",
             "\"problems\"",
+            "\"warnings\"",
             "\"stats\"",
         )
         assertContainsInOrder(
@@ -66,16 +67,20 @@ class JsonReportRendererOrderingTest {
         )
         assertThat(rendered).contains("\"logicalLocationDetails\"")
         assertThat(rendered).contains("\"physicalLocationDetails\"")
-        assertThat(rendered).contains("\"attributeLocationPrecision\": \"ELEMENT_FALLBACK\"")
+        assertThat(rendered).contains("\"attributeLocationPrecision\" : \"ELEMENT_FALLBACK\"")
     }
 
     @Test
-    fun `preserves caller supplied problem order deterministically`() {
+    fun `sorts diagnostics deterministically with errors before warnings`() {
         val rendered = JsonReportRenderer().render(reportWithProblems())
 
-        val firstProblemId = rendered.indexOf("\"id\": \"P-SCOPE-BINDING_MISMATCH\"")
-        val secondProblemId = rendered.indexOf("\"id\": \"W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD\"")
+        val problemsIndex = rendered.indexOf("\"problems\"")
+        val warningsIndex = rendered.indexOf("\"warnings\"", problemsIndex + 1)
+        val firstProblemId = rendered.indexOf("\"id\" : \"P-SCOPE-BINDING_MISMATCH\"")
+        val secondProblemId = rendered.indexOf("\"id\" : \"W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD\"")
 
+        assertThat(problemsIndex).isGreaterThanOrEqualTo(0)
+        assertThat(warningsIndex).isGreaterThan(problemsIndex)
         assertThat(firstProblemId).isGreaterThanOrEqualTo(0)
         assertThat(secondProblemId).isGreaterThan(firstProblemId)
     }
@@ -101,6 +106,21 @@ class JsonReportRendererOrderingTest {
             ),
             problems = listOf(
                 Problem(
+                    id = WarningIds.UNSUPPORTED_ANALYZER_PIPELINE_SCAFFOLD,
+                    severity = Severity.WARNING,
+                    category = ProblemCategory.UNSUPPORTED,
+                    summary = "Analyzer pipeline is still scaffolded",
+                    locations = ProblemLocations(
+                        new = location(
+                            side = AnalysisSide.NEW,
+                            path = Path.of("refactored", "order.xhtml"),
+                            snippet = "<ui:composition />",
+                        ),
+                    ),
+                    explanation = "Current analysis stages still return a scaffold warning.",
+                    hint = null,
+                ),
+                Problem(
                     id = ProblemIds.SCOPE_BINDING_MISMATCH,
                     severity = Severity.ERROR,
                     category = ProblemCategory.SCOPE,
@@ -120,21 +140,6 @@ class JsonReportRendererOrderingTest {
                     ),
                     explanation = "The same expression now resolves against a different local binding.",
                     hint = "Restore the original repeat scope.",
-                ),
-                Problem(
-                    id = WarningIds.UNSUPPORTED_ANALYZER_PIPELINE_SCAFFOLD,
-                    severity = Severity.WARNING,
-                    category = ProblemCategory.UNSUPPORTED,
-                    summary = "Analyzer pipeline is still scaffolded",
-                    locations = ProblemLocations(
-                        new = location(
-                            side = AnalysisSide.NEW,
-                            path = Path.of("refactored", "order.xhtml"),
-                            snippet = "<ui:composition />",
-                        ),
-                    ),
-                    explanation = "Current analysis stages still return a scaffold warning.",
-                    hint = null,
                 ),
             ),
         )

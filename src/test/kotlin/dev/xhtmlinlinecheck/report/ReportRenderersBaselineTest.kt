@@ -20,13 +20,11 @@ import dev.xhtmlinlinecheck.domain.SourceDocument
 import dev.xhtmlinlinecheck.domain.SourceLocation
 import dev.xhtmlinlinecheck.domain.SourcePosition
 import dev.xhtmlinlinecheck.domain.SourceSpan
+import dev.xhtmlinlinecheck.domain.WarningIds
 import dev.xhtmlinlinecheck.domain.WarningTotals
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.MethodSource
 import java.nio.file.Path
-import java.util.stream.Stream
 
 class ReportRenderersBaselineTest {
     @Test
@@ -53,9 +51,9 @@ class ReportRenderersBaselineTest {
                 ),
                 problems = listOf(
                     Problem(
-                        id = ProblemIds.SCOPE_BINDING_MISMATCH,
-                        severity = Severity.ERROR,
-                        category = ProblemCategory.SCOPE,
+                        id = WarningIds.UNSUPPORTED_EXTRACTED_EL,
+                        severity = Severity.WARNING,
+                        category = ProblemCategory.UNSUPPORTED,
                         summary = "Attribute location stays explicit",
                         locations = ProblemLocations(old = ProblemLocation(Provenance(location, location), "#{bean.flag}")),
                         explanation = "Reporter should preserve fallback metadata.",
@@ -69,7 +67,7 @@ class ReportRenderersBaselineTest {
             )
 
         assertThat(TextReportRenderer().render(report)).contains("@rendered (element fallback)")
-        assertThat(JsonReportRenderer().render(report)).contains("\"attributeLocationPrecision\": \"ELEMENT_FALLBACK\"")
+        assertThat(JsonReportRenderer().render(report)).contains("\"attributeLocationPrecision\" : \"ELEMENT_FALLBACK\"")
     }
 
     @Test
@@ -129,12 +127,103 @@ class ReportRenderersBaselineTest {
         assertThat(JsonReportRenderer().render(report)).contains("\"rendered\": \"ui:repeat var=item from refactored/order.xhtml\"")
     }
 
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("renderers")
-    fun `renders baseline report fields deterministically`(
-        rendererName: String,
-    ) {
-        val report = AnalysisReport(
+    @Test
+    fun `equivalent text output stays concise while keeping warnings visible`() {
+        val rendered = TextReportRenderer().render(equivalentReport())
+
+        assertThat(rendered).contains("EQUIVALENT")
+        assertThat(rendered).contains("Checked: 4  Matched: 4  Mismatched: 0")
+        assertThat(rendered).contains("Coverage: 4/4 (100.0%)")
+        assertThat(rendered).contains("Warnings: 1 total (0 blocking)")
+        assertThat(rendered).contains("Warnings:")
+        assertThat(rendered).contains("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD Analyzer pipeline is still scaffolded at refactored/order.xhtml")
+        assertThat(rendered).doesNotContain("Problems:")
+        assertThat(rendered).doesNotContain("Hint:")
+    }
+
+    @Test
+    fun `mismatch text output stays detailed and separates warnings`() {
+        val rendered = TextReportRenderer().render(notEquivalentReport())
+
+        assertThat(rendered).contains("NOT_EQUIVALENT")
+        assertThat(rendered).contains("Problems: 1")
+        assertThat(rendered).contains("P-STRUCTURE-FORM_ANCESTRY_CHANGED Component moved outside form")
+        assertThat(rendered).contains("old: legacy/order.xhtml -> <h:form><p:commandButton id=\"saveBtn\" /></h:form>")
+        assertThat(rendered).contains("new: refactored/order.xhtml -> <p:commandButton id=\"saveBtn\" />")
+        assertThat(rendered).contains("The component no longer has the same form ancestry.")
+        assertThat(rendered).contains("Hint: Restore the original form wrapper around the command button.")
+        assertThat(rendered).contains("Warnings: 1")
+        assertThat(rendered).contains("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD Analyzer pipeline is still scaffolded")
+    }
+
+    @Test
+    fun `inconclusive text output keeps warnings detailed and visible`() {
+        val rendered = TextReportRenderer().render(inconclusiveReport())
+
+        assertThat(rendered).contains("INCONCLUSIVE")
+        assertThat(rendered).contains("Warnings: 1 total (1 blocking)")
+        assertThat(rendered).contains("Warnings:")
+        assertThat(rendered).contains("W-UNSUPPORTED-DYNAMIC_INCLUDE Dynamic include path is not statically resolvable")
+        assertThat(rendered).contains("new: refactored/order.xhtml -> src=#{bean.fragmentPath}")
+        assertThat(rendered).contains("The include src uses a dynamic expression")
+        assertThat(rendered).doesNotContain("Problems:")
+    }
+
+    @Test
+    fun `json output separates errors and warnings with shared aggregates`() {
+        val rendered = JsonReportRenderer().render(notEquivalentReport())
+
+        assertThat(rendered).contains("\"result\" : \"NOT_EQUIVALENT\"")
+        assertThat(rendered).contains("\"summary\"")
+        assertThat(rendered).contains("\"headline\" : \"Found one mismatch\"")
+        assertThat(rendered).contains("\"problems\"")
+        assertThat(rendered).contains("\"warnings\"")
+        assertThat(rendered).contains("\"id\" : \"P-STRUCTURE-FORM_ANCESTRY_CHANGED\"")
+        assertThat(rendered).contains("\"id\" : \"W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD\"")
+        assertThat(rendered).contains("\"mismatched\" : 1")
+        assertThat(rendered).contains("\"blocking\" : 0")
+        assertThat(rendered).contains("\"stats\"")
+    }
+
+    private fun equivalentReport(): AnalysisReport =
+        AnalysisReport(
+            result = AnalysisResult.EQUIVALENT,
+            summary = AnalysisSummary(
+                headline = "All checked facts matched",
+                counts = AggregateCounts(
+                    checked = 4,
+                    matched = 4,
+                    mismatched = 0,
+                ),
+                coverage = AggregateCoverage(
+                    covered = 4,
+                    total = 4,
+                ),
+                warnings = WarningTotals(
+                    total = 1,
+                    blocking = 0,
+                ),
+            ),
+            problems = listOf(scaffoldWarning()),
+            stats = AnalysisStats(
+                counts = AggregateCounts(
+                    checked = 4,
+                    matched = 4,
+                    mismatched = 0,
+                ),
+                coverage = AggregateCoverage(
+                    covered = 4,
+                    total = 4,
+                ),
+                warnings = WarningTotals(
+                    total = 1,
+                    blocking = 0,
+                ),
+            ),
+        )
+
+    private fun notEquivalentReport(): AnalysisReport =
+        AnalysisReport(
             result = AnalysisResult.NOT_EQUIVALENT,
             summary = AnalysisSummary(
                 headline = "Found one mismatch",
@@ -148,11 +237,12 @@ class ReportRenderersBaselineTest {
                     total = 4,
                 ),
                 warnings = WarningTotals(
-                    total = 0,
+                    total = 1,
                     blocking = 0,
                 ),
             ),
             problems = listOf(
+                scaffoldWarning(),
                 Problem(
                     id = ProblemIds.STRUCTURE_FORM_ANCESTRY_CHANGED,
                     severity = Severity.ERROR,
@@ -193,40 +283,71 @@ class ReportRenderersBaselineTest {
                     total = 4,
                 ),
                 warnings = WarningTotals(
-                    total = 0,
+                    total = 1,
                     blocking = 0,
                 ),
             ),
         )
 
-        val rendered = when (rendererName) {
-            "text" -> TextReportRenderer().render(report)
-            "json" -> JsonReportRenderer().render(report)
-            else -> error("Unsupported renderer: $rendererName")
-        }
+    private fun inconclusiveReport(): AnalysisReport =
+        AnalysisReport(
+            result = AnalysisResult.INCONCLUSIVE,
+            summary = AnalysisSummary(
+                headline = "Dynamic include prevents a trustworthy equivalence claim",
+                counts = AggregateCounts(
+                    checked = 0,
+                    matched = 0,
+                    mismatched = 0,
+                ),
+                coverage = AggregateCoverage(
+                    covered = 0,
+                    total = 0,
+                ),
+                warnings = WarningTotals(
+                    total = 1,
+                    blocking = 1,
+                ),
+            ),
+            problems = listOf(
+                Problem(
+                    id = WarningIds.UNSUPPORTED_DYNAMIC_INCLUDE,
+                    severity = Severity.WARNING,
+                    category = ProblemCategory.UNSUPPORTED,
+                    summary = "Dynamic include path is not statically resolvable",
+                    locations = ProblemLocations(
+                        new = ProblemLocation(
+                            provenance = Provenance.forRoot(
+                                SourceDocument.fromPath(
+                                    side = AnalysisSide.NEW,
+                                    path = Path.of("refactored", "order.xhtml"),
+                                ),
+                            ),
+                            snippet = "src=#{bean.fragmentPath}",
+                        ),
+                    ),
+                    explanation = "The include src uses a dynamic expression (#{bean.fragmentPath}), so comparison beneath this node is not trustworthy.",
+                    hint = "Replace the dynamic include with a static path or keep the result inconclusive.",
+                ),
+            ),
+        )
 
-        assertThat(rendered).contains("NOT_EQUIVALENT")
-        assertThat(rendered).contains("Found one mismatch")
-        assertThat(rendered).contains("P-STRUCTURE-FORM_ANCESTRY_CHANGED")
-        assertThat(rendered).contains("legacy/order.xhtml")
-        assertThat(rendered).contains("refactored/order.xhtml")
-        assertThat(rendered).contains("Component moved outside form")
-        when (rendererName) {
-            "text" -> {
-                assertThat(rendered).contains("Counts: checked=4, matched=3, mismatched=1")
-                assertThat(rendered).contains("Warnings: total=0, blocking=0")
-            }
-
-            "json" -> {
-                assertThat(rendered).contains("\"counts\"")
-                assertThat(rendered).contains("\"warnings\"")
-                assertThat(rendered).contains("\"mismatched\": 1")
-            }
-        }
-    }
-
-    companion object {
-        @JvmStatic
-        fun renderers(): Stream<String> = Stream.of("text", "json")
+    private fun scaffoldWarning(): Problem =
+        Problem(
+            id = WarningIds.UNSUPPORTED_ANALYZER_PIPELINE_SCAFFOLD,
+            severity = Severity.WARNING,
+            category = ProblemCategory.UNSUPPORTED,
+            summary = "Analyzer pipeline is still scaffolded",
+            locations = ProblemLocations(
+                new = ProblemLocation(
+                    provenance = Provenance.forRoot(
+                        SourceDocument.fromPath(
+                            side = AnalysisSide.NEW,
+                            path = Path.of("refactored", "order.xhtml"),
+                        ),
+                    ),
+                ),
+            ),
+            explanation = "Current analysis stages still return a scaffold warning.",
+        )
     }
 }
