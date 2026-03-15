@@ -3,21 +3,21 @@
 >
 	<!-- System (algorithm-generated) yield estimate and two accuracy metrics -->
 
-	<ui:include src="../../_templates/grid/YIELD_ACCURACY_COLUMN.xhtml">
+	<ui:include src="../_templates/grid/YIELD_ACCURACY_COLUMN.xhtml">
 		<ui:param name="propertyName" value="yield.systemEstimate" />
 		<ui:param name="shortLabel"   value="#{dmBundle['Yield_short']}" />
 		<ui:param name="label"        value="#{dmBundle['Yield.systemEstimate_long']}" />
 		<ui:param name="outputId"     value="systemEstimate" />
 	</ui:include>
 
-	<ui:include src="../../_templates/grid/YIELD_ACCURACY_COLUMN.xhtml">
+	<ui:include src="../_templates/grid/YIELD_ACCURACY_COLUMN.xhtml">
 		<ui:param name="propertyName" value="yieldAccuracy.systemEstimateAccuracy.meanAbsoluteError" />
 		<ui:param name="shortLabel"   value="#{dmBundle['Yield.Accuracy.meanAbsoluteError_short']}" />
 		<ui:param name="label"        value="#{dmBundle['Yield.Accuracy.systemEstimateAccuracy.meanAbsoluteError_long']}" />
 		<ui:param name="outputId"     value="meanAbsoluteErrorSystem" />
 	</ui:include>
 
-	<ui:include src="../../_templates/grid/YIELD_ACCURACY_COLUMN.xhtml">
+	<ui:include src="../_templates/grid/YIELD_ACCURACY_COLUMN.xhtml">
 		<ui:param name="propertyName" value="yieldAccuracy.systemEstimateAccuracy.meanAbsoluteScaledError" />
 		<ui:param name="shortLabel"   value="#{dmBundle['Yield.Accuracy.meanAbsoluteScaledError_short']}" />
 		<ui:param name="label"        value="#{dmBundle['Yield.Accuracy.systemEstimateAccuracy.meanAbsoluteScaledError_long']}" />

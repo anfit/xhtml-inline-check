@@ -9,7 +9,7 @@ export TEMP="$repo_root/.tmp"
 export TMP="$repo_root/.tmp"
 export XHTML_INLINE_CHECK_PROFILE=1
 
-args_line='dummy/report.xhtml dummy/report-flattened.xhtml --base-old dummy --base-new dummy --format json'
+args_line='dummy/old/report.xhtml dummy/new/report-flattened.xhtml --base-old dummy --base-new dummy --format json'
 
 for ((iteration=1; iteration<=iterations; iteration++)); do
   echo "Iteration $iteration"

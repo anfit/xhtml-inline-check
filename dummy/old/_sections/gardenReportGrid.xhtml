@@ -16,7 +16,7 @@
 				label="#{dmBundle['Plant.plantCode']}" visible="always">
 			<custom:link id="#{idPrefix}plantFormLink" outcome="website:/plant/worksheet" target="worksheetTab">
 				<f:param name="plantId" value="#{row.plant.id}" />
-				<ui:include src="../../_templates/form/PLANT_CODE_AND_PREFIX.xhtml">
+				<ui:include src="../_templates/form/PLANT_CODE_AND_PREFIX.xhtml">
 					<ui:param name="plant"                 value="#{cell}" />
 					<ui:param name="plantCodeDefaultValue"  value="#{row.plant.plantCode}" />
 					<ui:param name="tooltip"               value="#{appBundle.OpenWorksheet}" />
@@ -36,13 +36,13 @@
 				<custom:outputText id="PERIOD_GRID" value="#{cell}" />
 			</custom:column>
 
-			<ui:include src="../../_templates/grid/HARVEST_PICKS_COLUMN.xhtml">
+			<ui:include src="../_templates/grid/HARVEST_PICKS_COLUMN.xhtml">
 				<ui:param name="harvestHistory" value="#{row.harvestHistory}" />
 				<ui:param name="plant"          value="#{row.plant}" />
 				<ui:param name="period"         value="#{row.period}" />
 			</ui:include>
 
-			<ui:include src="../../_templates/grid/HARVEST_QUANTITY_COLUMN.xhtml">
+			<ui:include src="../_templates/grid/HARVEST_QUANTITY_COLUMN.xhtml">
 				<ui:param name="harvestHistory"       value="#{row.harvestHistory}" />
 				<ui:param name="plant"                value="#{row.plant}" />
 				<ui:param name="showExcludeHarvestLink" value="false" />
@@ -50,7 +50,7 @@
 
 			<!-- Combined columns only present when propagation is active -->
 			<c:if test="#{AppConfiguration.propagationEnabled}">
-				<ui:include src="../../_templates/grid/HARVEST_COMBINED_QUANTITY_COLUMN.xhtml">
+				<ui:include src="../_templates/grid/HARVEST_COMBINED_QUANTITY_COLUMN.xhtml">
 					<ui:param name="harvestHistory" value="#{row.harvestHistory}" />
 					<ui:param name="plant"          value="#{row.plant}" />
 				</ui:include>
@@ -68,7 +68,7 @@
 		</custom:columnGroup>
 
 		<!-- Two representative accuracy columns (one with error-level styling, one plain) -->
-		<ui:include src="../../_templates/grid/YIELD_ACCURACY_COLUMN.xhtml">
+		<ui:include src="../_templates/grid/YIELD_ACCURACY_COLUMN.xhtml">
 			<ui:param name="propertyName" value="yieldAccuracy.yieldScore" />
 			<ui:param name="shortLabel"   value="#{dmBundle['Yield.Accuracy.yieldScore_short']}" />
 			<ui:param name="label"        value="#{dmBundle['Yield.Accuracy.yieldScore_long']}" />
@@ -78,7 +78,7 @@
 			<ui:param name="visible"      value="initiallyVisible" />
 		</ui:include>
 
-		<ui:include src="../../_templates/grid/YIELD_ACCURACY_COLUMN.xhtml">
+		<ui:include src="../_templates/grid/YIELD_ACCURACY_COLUMN.xhtml">
 			<ui:param name="propertyName" value="yieldAccuracy.totalYieldAccuracy.meanAbsoluteError" />
 			<ui:param name="shortLabel"   value="#{dmBundle['Yield.Accuracy.meanAbsoluteError_short']}" />
 			<ui:param name="label"        value="#{dmBundle['Yield.Accuracy.totalYieldAccuracy.meanAbsoluteError_long']}" />
@@ -87,10 +87,10 @@
 		</ui:include>
 
 		<!-- Totals footer: shows row count, falls back to limited count when summary disabled -->
-		<ui:decorate template="../../_templates/grid/total/complexTotals.xhtml">
+		<ui:decorate template="../_templates/grid/total/complexTotals.xhtml">
 			<ui:param name="summarySection" value="#{GardenReportViewBean.summarySection}" />
 			<ui:define name="fullTotals">
-				<ui:include src="../../_templates/grid/total/summarySectionTotalNumberOfRows.xhtml" />
+				<ui:include src="../_templates/grid/total/summarySectionTotalNumberOfRows.xhtml" />
 			</ui:define>
 		</ui:decorate>
 

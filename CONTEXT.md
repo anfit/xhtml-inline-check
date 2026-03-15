@@ -403,12 +403,12 @@
   semantic-node, target-resolution, matching, reporting, and release-hardening changes into vertical slices that should
   be finished with their most relevant tests and fixtures together.
 - The repository now treats `dummy/` as an unverified realistic sample corpus rather than a canonical fixture:
-  `dummy/report.xhtml` is the original page, `dummy/report-flattened.xhtml` is a refactored counterpart, and the pair
+  `dummy/old/report.xhtml` is the original page, `dummy/new/report-flattened.xhtml` is a refactored counterpart, and the pair
   must not be assigned an expected semantic verdict until it is reviewed explicitly.
 - When adding future canonical fixtures under `fixtures/`, prefer minimizing focused slices from `dummy/` instead of
   inventing toy examples first. Keep direct tests over `dummy/` at smoke coverage level unless a later task deliberately
   classifies the sample pair.
-- Treat `dummy/report.xhtml` and `dummy/report-flattened.xhtml` as the first realism source when selecting or minimizing
+- Treat `dummy/old/report.xhtml` and `dummy/new/report-flattened.xhtml` as the first realism source when selecting or minimizing
   canonical comparison fixtures. Start from that pair before inventing alternate examples, but keep the pair itself
   unclassified until a later task records an explicit trusted verdict.
 - `src/test/kotlin/dev/xhtmlinlinecheck/testing/DummySampleFixtureSmokeTest.kt` is the current guardrail for that sample
@@ -637,7 +637,7 @@
   `semantic`, and `compare`, and `SemanticAnalyzer` nests `semantic.old/new`, `scope`, `extract+normalize`, and
   `targets` timings underneath.
 - Repeatable larger-tree profiling helpers now live at `scripts/profile-analyzer.ps1` and
-  `scripts/profile-analyzer.bash`. They run the analyzer against `dummy/report.xhtml` vs `dummy/report-flattened.xhtml`
+  `scripts/profile-analyzer.bash`. They run the analyzer against `dummy/old/report.xhtml` vs `dummy/new/report-flattened.xhtml`
   with `--base-old dummy --base-new dummy` and print only `[profile]` timing lines for multiple iterations.
 - The semantic hot path no longer walks each syntax tree once for EL extraction and then again for semantic-node
   extraction. `SemanticTreeExtractor` now does one depth-first walk per tree, collects EL occurrences and base semantic
@@ -645,9 +645,20 @@
 - Iteration ancestry lookups should now use `ScopeStackModel.bindingById(...)` rather than scanning
   `ScopeStackModel.bindings` linearly. The previous `bindings.first { it.id == bindingId }` pattern sat inside the
   per-node semantic walk and became avoidable waste on larger trees with many iterator bindings.
-- The in-repo large sample still shows why parser/semantic work must be evidence-driven: `dummy/report.xhtml` references
+- The in-repo large sample still shows why parser/semantic work must be evidence-driven: `dummy/old/report.xhtml` references
   the same `YIELD_ACCURACY_COLUMN.xhtml` include seven times, so repeated full-tree passes add up quickly even before
   broader parser-template caching is considered.
+- The checked-in dummy sample now lives under `dummy/old/` and `dummy/new/`, and its include paths are normalized to
+  that split layout. Use `dummy/old/report.xhtml` plus `dummy/new/report-flattened.xhtml` (with repository-root
+  `baseOld` / `baseNew` or the equivalent `dummy`-anchored form) for smoke/profiling commands instead of the old
+  flattened `dummy/report.xhtml` paths.
+- EL-backed `id` attributes such as `id="#{outputId}"` are not trustworthy explicit-id anchors. Matching, duplicate-id
+  checks, and target resolution now ignore those dynamic ids instead of treating them as concrete structural anchors.
+- `ui:param`, `custom:failIfNotDefined`, and the common `l:*` layout wrappers (`field`, `fieldset`, `fieldlist`, `row`,
+  `cell`, `box`) are now treated as non-structural scaffolding for matching. Keep their binding/extraction behavior, but
+  do not let them create structural unmatched-node noise during include-flattening comparisons.
+- When one side accumulates many unmatched structural nodes, comparator output now collapses them into one
+  `P-STRUCTURE-UNMATCHED_NODE` summary per side with a short example list instead of dumping every node individually.
 - Representative registry coverage should now treat common dummy-sample wrappers and naming containers explicitly
   instead of relying on generic fallback alone: Facelets `ui:decorate` / `ui:define` / `ui:insert` / `ui:component`, JSF
   core `f:facet` / `f:metadata`, and third-party `custom:defaults` / `custom:injectAttributes` / `custom:with` are

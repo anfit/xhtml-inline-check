@@ -10,7 +10,7 @@ $env:TEMP = Join-Path $repoRoot ".tmp"
 $env:TMP = $env:TEMP
 $env:XHTML_INLINE_CHECK_PROFILE = "1"
 
-$argsLine = 'dummy/report.xhtml dummy/report-flattened.xhtml --base-old dummy --base-new dummy --format json'
+$argsLine = 'dummy/old/report.xhtml dummy/new/report-flattened.xhtml --base-old dummy --base-new dummy --format json'
 
 for ($iteration = 1; $iteration -le $Iterations; $iteration++) {
     Write-Host "Iteration $iteration"

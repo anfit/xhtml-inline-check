@@ -13,7 +13,7 @@ The fixture corpus is intended to:
 - make expected outcomes obvious to reviewers
 - support unit, comparison, and CLI golden testing
 
-The repository already includes one realistic sample tree under `dummy/`. Treat that directory as a reference corpus for carving out future fixtures and smoke tests, not as a canonical expected-outcome fixture on its own. `dummy/report.xhtml` is the original page and `dummy/report-flattened.xhtml` is a refactored counterpart whose semantic equivalence has not been verified yet.
+The repository already includes one realistic sample tree under `dummy/`. Treat that directory as a reference corpus for carving out future fixtures and smoke tests, not as a canonical expected-outcome fixture on its own. `dummy/old/report.xhtml` is the original page and `dummy/new/report-flattened.xhtml` is a refactored counterpart whose semantic equivalence has not been verified yet.
 
 ## Recommended Layout
 
