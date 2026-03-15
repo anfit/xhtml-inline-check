@@ -70,6 +70,8 @@ data class ScopeStackModel(
     ): ScopeBinding? =
         resolveNearestBinding(name, scopeIdAt(path, position))
 
+    fun bindingById(id: BindingId): ScopeBinding = bindingsById.getValue(id)
+
     private fun scopeIdAt(path: LogicalNodePath, position: ScopeLookupPosition): ScopeId {
         val snapshot = snapshotAt(path)
         return when (position) {
@@ -216,12 +218,16 @@ private class ScopeStackBuilder {
         rule: BindingCreationRule,
         currentScopeId: ScopeId,
     ): ScopeBinding? {
-        val nameAttribute = node.attributeNamed(rule.nameAttribute) ?: return null
+        val nameAttribute = attributeNamed(node, rule.nameAttribute) ?: return null
         val writtenName = nameAttribute.value.trim()
         if (writtenName.isEmpty()) {
             return null
         }
-        val valueExpression = rule.valueAttribute?.let(node::attributeNamed)?.value
+
+        val valueExpression = rule.valueAttribute
+            ?.let { attributeName -> attributeNamed(node, attributeName) }
+            ?.value
+
         return ScopeBinding(
             id = BindingId(nextBindingId++),
             scopeId = currentScopeId,
@@ -230,11 +236,10 @@ private class ScopeStackBuilder {
             kind = rule.kind,
             location = nameAttribute.location,
             provenance = node.provenance.atBindingLocation(nameAttribute.location),
-            origin =
-                BindingOrigin(
-                    descriptor = describeRuleOrigin(node, rule.kind, writtenName),
-                    provenance = node.provenance.atBindingLocation(nameAttribute.location),
-                ),
+            origin = BindingOrigin(
+                descriptor = describeRuleOrigin(node, rule.kind, writtenName),
+                provenance = node.provenance.atBindingLocation(nameAttribute.location),
+            ),
             valueExpression = valueExpression,
         )
     }
@@ -267,8 +272,8 @@ private class ScopeStackBuilder {
         }
     }
 
-    private fun LogicalElementNode.attributeNamed(localName: String): LogicalAttribute? =
-        attributes.firstOrNull { it.name.localName == localName }
+    private fun attributeNamed(node: LogicalElementNode, localName: String): LogicalAttribute? =
+        node.attributes.firstOrNull { it.name.localName == localName }
 }
 
 private data class ScopeTransition(

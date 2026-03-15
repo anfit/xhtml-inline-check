@@ -14,10 +14,12 @@ class FaceletsAnalyzer(
     private val comparator: EquivalenceComparator,
 ) {
     fun analyze(request: AnalysisRequest): AnalysisReport {
-        val loadedSources = sourceLoader.load(request)
-        val parsedTrees = syntaxParser.parse(loadedSources)
-        val semanticModels = semanticAnalyzer.analyze(parsedTrees)
-        return comparator.compare(semanticModels)
+        return AnalysisProfiler.measure("analyze") {
+            val loadedSources = AnalysisProfiler.measure("load") { sourceLoader.load(request) }
+            val parsedTrees = AnalysisProfiler.measure("parse") { syntaxParser.parse(loadedSources) }
+            val semanticModels = AnalysisProfiler.measure("semantic") { semanticAnalyzer.analyze(parsedTrees) }
+            AnalysisProfiler.measure("compare") { comparator.compare(semanticModels) }
+        }
     }
 
     companion object {
