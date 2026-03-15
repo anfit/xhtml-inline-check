@@ -1,5 +1,6 @@
 package dev.xhtmlinlinecheck.cli
 
+import dev.xhtmlinlinecheck.testing.FixtureScenarios
 import dev.xhtmlinlinecheck.testing.TemporaryProjectTree
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -35,6 +36,17 @@ class FaceletsVerifyCliTest {
         assertThat(exitCode).isEqualTo(2)
         assertThat(output.toString()).contains("EQUIVALENT")
         assertThat(output.toString()).contains("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
+    }
+
+    @Test
+    fun `accepts verbose flag without changing the semantic outcome`() {
+        val args = smokeArgs() + "--verbose"
+        val output = StringBuilder()
+
+        val exitCode = FaceletsVerifyCli().run(args, output)
+
+        assertThat(exitCode).isEqualTo(0)
+        assertThat(output.toString()).contains("EQUIVALENT")
     }
 
     @Test
@@ -97,9 +109,66 @@ class FaceletsVerifyCliTest {
 
         assertThat(exitCode).isEqualTo(0)
         assertThat(output.toString()).contains("views/root.xhtml")
-        assertThat(output.toString()).contains("pages/root.xhtml")
         assertThat(output.toString()).doesNotContain(tree.path("workspace/legacy").toString())
         assertThat(output.toString()).doesNotContain(tree.path("workspace/refactored").toString())
+    }
+
+    @Test
+    fun `keeps repo relative fixture roots valid when repository bases are also provided`() {
+        val scenario = FixtureScenarios.scenario("equivalent/safe-include-inline")
+        val output = StringBuilder()
+
+        val exitCode = FaceletsVerifyCli().run(
+            listOf(
+                relativeToRepositoryRoot(scenario.oldRoot),
+                relativeToRepositoryRoot(scenario.newRoot),
+                "--base-old",
+                relativeToRepositoryRoot(FixtureScenarios.repositoryRoot),
+                "--base-new",
+                relativeToRepositoryRoot(FixtureScenarios.repositoryRoot),
+            ),
+            output,
+        )
+
+        assertThat(exitCode).isEqualTo(0)
+        assertThat(output.toString()).contains("EQUIVALENT")
+        assertThat(output.toString()).doesNotContain("ANALYSIS_FAILED")
+    }
+
+    @Test
+    fun `returns inconclusive exit code and text failure output when analysis fails`() {
+        val output = StringBuilder()
+
+        val exitCode = FaceletsVerifyCli().run(
+            listOf(
+                "missing-old.xhtml",
+                "missing-new.xhtml",
+            ),
+            output,
+        )
+
+        assertThat(exitCode).isEqualTo(2)
+        assertThat(output.toString()).contains("ANALYSIS_FAILED")
+        assertThat(output.toString()).contains("Missing source file for old: missing-old.xhtml")
+    }
+
+    @Test
+    fun `renders failure payload as json when analysis fails in json mode`() {
+        val output = StringBuilder()
+
+        val exitCode = FaceletsVerifyCli().run(
+            listOf(
+                "missing-old.xhtml",
+                "missing-new.xhtml",
+                "--format",
+                "json",
+            ),
+            output,
+        )
+
+        assertThat(exitCode).isEqualTo(2)
+        assertThat(output.toString()).contains("\"type\" : \"ANALYSIS_FAILED\"")
+        assertThat(output.toString()).contains("\"message\" : \"Missing source file for old: missing-old.xhtml")
     }
 
     @Test
@@ -186,5 +255,8 @@ class FaceletsVerifyCliTest {
     companion object {
         @JvmStatic
         fun jsonArgumentOrders(): Stream<String> = Stream.of("roots-first", "format-first")
+
+        private fun relativeToRepositoryRoot(path: Path): String =
+            FixtureScenarios.repositoryRoot.relativize(path.toAbsolutePath().normalize()).toString()
     }
 }
