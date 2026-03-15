@@ -1,0 +1,19 @@
+NOT EQUIVALENT
+Detected scope mismatches and target-resolution mismatches; dynamic includes also limit trust in the remaining comparison.
+Checked: 7  Matched: 4  Mismatched: 3
+Coverage: 7/7 (100.0%)
+Warnings: 2 total (1 blocking)
+Problems: 2
+P-SCOPE-BINDING_MISMATCH Scope binding changed
+old: legacy/order.xhtml:14:11 @value (element fallback) -> #{row.total} [binding: ui:repeat var=row from legacy/fragments/grid.xhtml]
+new: refactored/order.xhtml:18:13 @value (element fallback) -> #{item.total} [binding: ui:repeat var=item from refactored/order.xhtml]
+The same expression now resolves against a different local binding.
+Hint: Restore the original repeat scope.
+P-TARGET-RESOLUTION_CHANGED Update target no longer resolves the same way
+old: legacy/order.xhtml:22:17 @update (element fallback) -> update="msgs panel"
+new: refactored/order.xhtml:28:21 @update (element fallback) -> update="panel"
+The command now resolves a different update target set.
+Hint: Restore the missing msgs target or adjust the refactor so both sides resolve identically.
+Warnings: 2
+W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD Analyzer pipeline is still scaffolded at refactored/order.xhtml
+W-UNSUPPORTED-DYNAMIC_INCLUDE Dynamic include path is not statically resolvable at refactored/fragments/toolbar.xhtml:4:5 @src (element fallback)

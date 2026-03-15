@@ -1,0 +1,227 @@
+{
+  "result" : "NOT_EQUIVALENT",
+  "summary" : {
+    "headline" : "Detected scope mismatches and target-resolution mismatches; dynamic includes also limit trust in the remaining comparison.",
+    "counts" : {
+      "checked" : 7,
+      "matched" : 4,
+      "mismatched" : 3
+    },
+    "coverage" : {
+      "covered" : 7,
+      "total" : 7,
+      "percent" : 100.0
+    },
+    "warnings" : {
+      "total" : 2,
+      "blocking" : 1
+    }
+  },
+  "problems" : [ {
+    "id" : "P-SCOPE-BINDING_MISMATCH",
+    "severity" : "ERROR",
+    "category" : "SCOPE",
+    "summary" : "Scope binding changed",
+    "locations" : {
+      "old" : {
+        "logicalLocation" : "legacy/order.xhtml:14:11 @value (element fallback)",
+        "logicalLocationDetails" : {
+          "document" : "legacy/order.xhtml",
+          "line" : 14,
+          "column" : 11,
+          "attributeName" : "value",
+          "attributeLocationPrecision" : "ELEMENT_FALLBACK"
+        },
+        "physicalLocation" : "legacy/fragments/grid.xhtml:7:9",
+        "physicalLocationDetails" : {
+          "document" : "legacy/fragments/grid.xhtml",
+          "line" : 7,
+          "column" : 9,
+          "attributeName" : null,
+          "attributeLocationPrecision" : null
+        },
+        "snippet" : "#{row.total}",
+        "bindingOrigin" : {
+          "descriptor" : "ui:repeat var=row",
+          "rendered" : "ui:repeat var=row from legacy/fragments/grid.xhtml",
+          "location" : {
+            "document" : "legacy/fragments/grid.xhtml",
+            "line" : null,
+            "column" : null,
+            "attributeName" : null,
+            "attributeLocationPrecision" : null
+          }
+        },
+        "includeStack" : [ {
+          "includeSite" : "legacy/order.xhtml:5:3 @src (element fallback)",
+          "includedDocument" : "legacy/fragments/grid.xhtml",
+          "parameterNames" : [ "rows", "status" ]
+        } ]
+      },
+      "new" : {
+        "logicalLocation" : "refactored/order.xhtml:18:13 @value (element fallback)",
+        "logicalLocationDetails" : {
+          "document" : "refactored/order.xhtml",
+          "line" : 18,
+          "column" : 13,
+          "attributeName" : "value",
+          "attributeLocationPrecision" : "ELEMENT_FALLBACK"
+        },
+        "physicalLocation" : "refactored/order.xhtml:18:13 @value (element fallback)",
+        "physicalLocationDetails" : {
+          "document" : "refactored/order.xhtml",
+          "line" : 18,
+          "column" : 13,
+          "attributeName" : "value",
+          "attributeLocationPrecision" : "ELEMENT_FALLBACK"
+        },
+        "snippet" : "#{item.total}",
+        "bindingOrigin" : {
+          "descriptor" : "ui:repeat var=item",
+          "rendered" : "ui:repeat var=item from refactored/order.xhtml",
+          "location" : {
+            "document" : "refactored/order.xhtml",
+            "line" : null,
+            "column" : null,
+            "attributeName" : null,
+            "attributeLocationPrecision" : null
+          }
+        },
+        "includeStack" : [ ]
+      }
+    },
+    "explanation" : "The same expression now resolves against a different local binding.",
+    "hint" : "Restore the original repeat scope."
+  }, {
+    "id" : "P-TARGET-RESOLUTION_CHANGED",
+    "severity" : "ERROR",
+    "category" : "TARGET",
+    "summary" : "Update target no longer resolves the same way",
+    "locations" : {
+      "old" : {
+        "logicalLocation" : "legacy/order.xhtml:22:17 @update (element fallback)",
+        "logicalLocationDetails" : {
+          "document" : "legacy/order.xhtml",
+          "line" : 22,
+          "column" : 17,
+          "attributeName" : "update",
+          "attributeLocationPrecision" : "ELEMENT_FALLBACK"
+        },
+        "physicalLocation" : "legacy/order.xhtml:22:17 @update (element fallback)",
+        "physicalLocationDetails" : {
+          "document" : "legacy/order.xhtml",
+          "line" : 22,
+          "column" : 17,
+          "attributeName" : "update",
+          "attributeLocationPrecision" : "ELEMENT_FALLBACK"
+        },
+        "snippet" : "update=\"msgs panel\"",
+        "bindingOrigin" : null,
+        "includeStack" : [ ]
+      },
+      "new" : {
+        "logicalLocation" : "refactored/order.xhtml:28:21 @update (element fallback)",
+        "logicalLocationDetails" : {
+          "document" : "refactored/order.xhtml",
+          "line" : 28,
+          "column" : 21,
+          "attributeName" : "update",
+          "attributeLocationPrecision" : "ELEMENT_FALLBACK"
+        },
+        "physicalLocation" : "refactored/order.xhtml:28:21 @update (element fallback)",
+        "physicalLocationDetails" : {
+          "document" : "refactored/order.xhtml",
+          "line" : 28,
+          "column" : 21,
+          "attributeName" : "update",
+          "attributeLocationPrecision" : "ELEMENT_FALLBACK"
+        },
+        "snippet" : "update=\"panel\"",
+        "bindingOrigin" : null,
+        "includeStack" : [ ]
+      }
+    },
+    "explanation" : "The command now resolves a different update target set.",
+    "hint" : "Restore the missing msgs target or adjust the refactor so both sides resolve identically."
+  } ],
+  "warnings" : [ {
+    "id" : "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+    "severity" : "WARNING",
+    "category" : "UNSUPPORTED",
+    "summary" : "Analyzer pipeline is still scaffolded",
+    "locations" : {
+      "old" : null,
+      "new" : {
+        "logicalLocation" : "refactored/order.xhtml",
+        "logicalLocationDetails" : {
+          "document" : "refactored/order.xhtml",
+          "line" : null,
+          "column" : null,
+          "attributeName" : null,
+          "attributeLocationPrecision" : null
+        },
+        "physicalLocation" : "refactored/order.xhtml",
+        "physicalLocationDetails" : {
+          "document" : "refactored/order.xhtml",
+          "line" : null,
+          "column" : null,
+          "attributeName" : null,
+          "attributeLocationPrecision" : null
+        },
+        "snippet" : null,
+        "bindingOrigin" : null,
+        "includeStack" : [ ]
+      }
+    },
+    "explanation" : "Current analysis stages still return a scaffold warning.",
+    "hint" : null
+  }, {
+    "id" : "W-UNSUPPORTED-DYNAMIC_INCLUDE",
+    "severity" : "WARNING",
+    "category" : "UNSUPPORTED",
+    "summary" : "Dynamic include path is not statically resolvable",
+    "locations" : {
+      "old" : null,
+      "new" : {
+        "logicalLocation" : "refactored/fragments/toolbar.xhtml:4:5 @src (element fallback)",
+        "logicalLocationDetails" : {
+          "document" : "refactored/fragments/toolbar.xhtml",
+          "line" : 4,
+          "column" : 5,
+          "attributeName" : "src",
+          "attributeLocationPrecision" : "ELEMENT_FALLBACK"
+        },
+        "physicalLocation" : "refactored/fragments/toolbar.xhtml:4:5 @src (element fallback)",
+        "physicalLocationDetails" : {
+          "document" : "refactored/fragments/toolbar.xhtml",
+          "line" : 4,
+          "column" : 5,
+          "attributeName" : "src",
+          "attributeLocationPrecision" : "ELEMENT_FALLBACK"
+        },
+        "snippet" : "src=#{bean.toolbarPath}",
+        "bindingOrigin" : null,
+        "includeStack" : [ ]
+      }
+    },
+    "explanation" : "The include src uses a dynamic expression (#{bean.toolbarPath}), so comparison beneath this node is not trustworthy.",
+    "hint" : "Replace the dynamic include with a static path or keep the result inconclusive."
+  } ],
+  "stats" : {
+    "headline" : "Detected scope mismatches and target-resolution mismatches; dynamic includes also limit trust in the remaining comparison.",
+    "counts" : {
+      "checked" : 7,
+      "matched" : 4,
+      "mismatched" : 3
+    },
+    "coverage" : {
+      "covered" : 7,
+      "total" : 7,
+      "percent" : 100.0
+    },
+    "warnings" : {
+      "total" : 2,
+      "blocking" : 1
+    }
+  }
+}

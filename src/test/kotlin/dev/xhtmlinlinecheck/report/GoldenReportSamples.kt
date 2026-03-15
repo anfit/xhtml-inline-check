@@ -180,6 +180,155 @@ internal object GoldenReportSamples {
         )
     }
 
+    fun orderedDiagnosticsReport(): AnalysisReport {
+        val oldRoot = document(AnalysisSide.OLD, "legacy", "order.xhtml")
+        val oldFragment = document(AnalysisSide.OLD, "legacy", "fragments", "grid.xhtml")
+        val newRoot = document(AnalysisSide.NEW, "refactored", "order.xhtml")
+        val newFragment = document(AnalysisSide.NEW, "refactored", "fragments", "toolbar.xhtml")
+        val oldIncludeSite =
+            SourceLocation(
+                document = oldRoot,
+                span = SourceSpan(SourcePosition(line = 5, column = 3)),
+                attributeName = "src",
+                attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
+            )
+        val oldValueLocation =
+            SourceLocation(
+                document = oldRoot,
+                span = SourceSpan(SourcePosition(line = 14, column = 11)),
+                attributeName = "value",
+                attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
+            )
+        val oldPhysicalLocation =
+            SourceLocation(
+                document = oldFragment,
+                span = SourceSpan(SourcePosition(line = 7, column = 9)),
+            )
+        val newValueLocation =
+            SourceLocation(
+                document = newRoot,
+                span = SourceSpan(SourcePosition(line = 18, column = 13)),
+                attributeName = "value",
+                attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
+            )
+        val oldTargetLocation =
+            SourceLocation(
+                document = oldRoot,
+                span = SourceSpan(SourcePosition(line = 22, column = 17)),
+                attributeName = "update",
+                attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
+            )
+        val newTargetLocation =
+            SourceLocation(
+                document = newRoot,
+                span = SourceSpan(SourcePosition(line = 28, column = 21)),
+                attributeName = "update",
+                attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
+            )
+        val dynamicIncludeLocation =
+            SourceLocation(
+                document = newFragment,
+                span = SourceSpan(SourcePosition(line = 4, column = 5)),
+                attributeName = "src",
+                attributeLocationPrecision = AttributeLocationPrecision.ELEMENT_FALLBACK,
+            )
+
+        return AnalysisReport(
+            result = AnalysisResult.NOT_EQUIVALENT,
+            summary = AnalysisSummary(
+                headline = "Detected scope mismatches and target-resolution mismatches; dynamic includes also limit trust in the remaining comparison.",
+                counts = AggregateCounts(checked = 7, matched = 4, mismatched = 3),
+                coverage = AggregateCoverage(covered = 7, total = 7),
+                warnings = WarningTotals(total = 2, blocking = 1),
+            ),
+            problems = listOf(
+                Problem(
+                    id = WarningIds.UNSUPPORTED_DYNAMIC_INCLUDE,
+                    severity = Severity.WARNING,
+                    category = ProblemCategory.UNSUPPORTED,
+                    summary = "Dynamic include path is not statically resolvable",
+                    locations = ProblemLocations(
+                        new =
+                            ProblemLocation(
+                                provenance = Provenance(dynamicIncludeLocation, dynamicIncludeLocation),
+                                snippet = "src=#{bean.toolbarPath}",
+                            ),
+                    ),
+                    explanation = "The include src uses a dynamic expression (#{bean.toolbarPath}), so comparison beneath this node is not trustworthy.",
+                    hint = "Replace the dynamic include with a static path or keep the result inconclusive.",
+                ),
+                Problem(
+                    id = ProblemIds.TARGET_RESOLUTION_CHANGED,
+                    severity = Severity.ERROR,
+                    category = ProblemCategory.TARGET,
+                    summary = "Update target no longer resolves the same way",
+                    locations = ProblemLocations(
+                        old =
+                            ProblemLocation(
+                                provenance = Provenance(oldTargetLocation, oldTargetLocation),
+                                snippet = "update=\"msgs panel\"",
+                            ),
+                        new =
+                            ProblemLocation(
+                                provenance = Provenance(newTargetLocation, newTargetLocation),
+                                snippet = "update=\"panel\"",
+                            ),
+                    ),
+                    explanation = "The command now resolves a different update target set.",
+                    hint = "Restore the missing msgs target or adjust the refactor so both sides resolve identically.",
+                ),
+                scaffoldWarning(newRoot),
+                Problem(
+                    id = ProblemIds.SCOPE_BINDING_MISMATCH,
+                    severity = Severity.ERROR,
+                    category = ProblemCategory.SCOPE,
+                    summary = "Scope binding changed",
+                    locations = ProblemLocations(
+                        old =
+                            ProblemLocation(
+                                provenance =
+                                    Provenance(
+                                        physicalLocation = oldPhysicalLocation,
+                                        logicalLocation = oldValueLocation,
+                                        includeStack =
+                                            listOf(
+                                                IncludeProvenanceStep(
+                                                    includeSite = oldIncludeSite,
+                                                    includedDocument = oldFragment,
+                                                    parameterNames = listOf("rows", "status"),
+                                                ),
+                                            ),
+                                    ),
+                                snippet = "#{row.total}",
+                                bindingOrigin =
+                                    BindingOrigin(
+                                        descriptor = "ui:repeat var=row",
+                                        provenance = Provenance.forRoot(oldFragment),
+                                    ),
+                            ),
+                        new =
+                            ProblemLocation(
+                                provenance = Provenance(newValueLocation, newValueLocation),
+                                snippet = "#{item.total}",
+                                bindingOrigin =
+                                    BindingOrigin(
+                                        descriptor = "ui:repeat var=item",
+                                        provenance = Provenance.forRoot(newRoot),
+                                    ),
+                            ),
+                    ),
+                    explanation = "The same expression now resolves against a different local binding.",
+                    hint = "Restore the original repeat scope.",
+                ),
+            ),
+            stats = AnalysisStats(
+                counts = AggregateCounts(checked = 7, matched = 4, mismatched = 3),
+                coverage = AggregateCoverage(covered = 7, total = 7),
+                warnings = WarningTotals(total = 2, blocking = 1),
+            ),
+        )
+    }
+
     private fun scaffoldWarning(newDocument: SourceDocument): Problem =
         Problem(
             id = WarningIds.UNSUPPORTED_ANALYZER_PIPELINE_SCAFFOLD,

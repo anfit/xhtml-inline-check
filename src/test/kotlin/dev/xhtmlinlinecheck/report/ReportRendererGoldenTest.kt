@@ -46,6 +46,12 @@ class ReportRendererGoldenTest {
                     textGoldenPath = goldenPath("inconclusive.txt"),
                     jsonGoldenPath = goldenPath("inconclusive.json"),
                 ),
+                ReporterGoldenCase(
+                    name = "ordered-diagnostics",
+                    report = GoldenReportSamples.orderedDiagnosticsReport(),
+                    textGoldenPath = goldenPath("ordered-diagnostics.txt"),
+                    jsonGoldenPath = goldenPath("ordered-diagnostics.json"),
+                ),
             )
 
         private fun goldenPath(fileName: String): Path =
