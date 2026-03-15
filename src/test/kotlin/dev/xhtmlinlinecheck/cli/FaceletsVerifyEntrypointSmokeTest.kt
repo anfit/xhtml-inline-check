@@ -9,7 +9,7 @@ import java.nio.file.Path
 
 class FaceletsVerifyEntrypointSmokeTest {
     @Test
-    fun `starts via main entrypoint and returns scaffold exit code`() {
+    fun `starts via main entrypoint and returns equivalent exit code when only scaffold warning remains`() {
         val scenario = FixtureScenarios.scenario("support/smoke")
         val process = ProcessBuilder(
             javaExecutable().toString(),
@@ -27,8 +27,8 @@ class FaceletsVerifyEntrypointSmokeTest {
         val exitCode = process.waitFor()
         val rendered = output.toString(StandardCharsets.UTF_8)
 
-        assertThat(exitCode).isEqualTo(2)
-        assertThat(rendered).contains("INCONCLUSIVE")
+        assertThat(exitCode).isEqualTo(0)
+        assertThat(rendered).contains("EQUIVALENT")
         assertThat(rendered).contains("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
     }
 

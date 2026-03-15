@@ -39,7 +39,7 @@ class FaceletsAnalyzerScaffoldTest {
         )
 
         assertThatReport(report)
-            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasResult(AnalysisResult.EQUIVALENT)
             .hasSummaryContaining("Scaffold")
             .hasProblemCount(1)
             .hasWarningCount(1)
@@ -93,7 +93,7 @@ class FaceletsAnalyzerScaffoldTest {
         )
 
         assertThatReport(report)
-            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasResult(AnalysisResult.EQUIVALENT)
             .hasProblemCount(1)
             .hasWarningCount(1)
             .hasProblemIds("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
@@ -140,7 +140,7 @@ class FaceletsAnalyzerScaffoldTest {
         )
 
         assertThatReport(report)
-            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasResult(AnalysisResult.EQUIVALENT)
             .hasProblemCount(1)
             .hasWarningCount(1)
             .hasProblemIds("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
@@ -445,7 +445,7 @@ class FaceletsAnalyzerScaffoldTest {
         )
 
         assertThatReport(report)
-            .hasResult(AnalysisResult.INCONCLUSIVE)
+            .hasResult(AnalysisResult.EQUIVALENT)
             .hasProblemCount(1)
             .hasWarningCount(1)
             .hasProblemIds("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")

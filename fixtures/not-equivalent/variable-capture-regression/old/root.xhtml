@@ -1,0 +1,8 @@
+<ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                xmlns:c="http://java.sun.com/jsp/jstl/core"
+                xmlns:h="http://xmlns.jcp.org/jsf/html">
+  <c:set var="row" value="#{bean.outer}" />
+  <ui:repeat var="row" value="#{bean.items}">
+    <h:outputText id="value" value="#{row.label}" />
+  </ui:repeat>
+</ui:composition>

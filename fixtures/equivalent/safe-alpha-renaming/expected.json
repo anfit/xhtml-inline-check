@@ -1,0 +1,6 @@
+{
+  "result": "EQUIVALENT",
+  "problemIds": [],
+  "warningIds": ["W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD"],
+  "notes": "Safe iterator alpha-renaming should stay equivalent; the scaffold warning is informational only."
+}

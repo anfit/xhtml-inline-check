@@ -39,4 +39,14 @@ class FixtureScenariosTest {
             "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
         )
     }
+
+    @Test
+    fun `resolves newly added equivalent and mismatch canonical fixtures`() {
+        val equivalentScenario = FixtureScenarios.scenario("equivalent/safe-alpha-renaming")
+        val mismatchScenario = FixtureScenarios.scenario("not-equivalent/changed-ajax-target")
+
+        assertThat(FixtureExpectations.read(equivalentScenario).result).isEqualTo("EQUIVALENT")
+        assertThat(FixtureExpectations.read(mismatchScenario).problemIds)
+            .containsExactly("P-TARGET-RESOLUTION_CHANGED")
+    }
 }

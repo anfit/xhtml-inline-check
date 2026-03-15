@@ -1,0 +1,6 @@
+{
+  "result": "NOT_EQUIVALENT",
+  "problemIds": ["P-STRUCTURE-FORM_ANCESTRY_CHANGED"],
+  "warningIds": ["W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD"],
+  "notes": "The button leaves its original h:form, which changes same-form behavior and submission semantics."
+}

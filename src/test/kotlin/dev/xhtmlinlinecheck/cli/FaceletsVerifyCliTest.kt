@@ -14,14 +14,14 @@ class FaceletsVerifyCliTest {
     lateinit var tempDir: Path
 
     @Test
-    fun `returns inconclusive exit code for scaffolded pipeline`() {
+    fun `returns equivalent exit code when only the informational scaffold warning remains`() {
         val args = smokeArgs()
         val output = StringBuilder()
 
         val exitCode = FaceletsVerifyCli().run(args, output)
 
-        assertThat(exitCode).isEqualTo(2)
-        assertThat(output.toString()).contains("INCONCLUSIVE")
+        assertThat(exitCode).isEqualTo(0)
+        assertThat(output.toString()).contains("EQUIVALENT")
         assertThat(output.toString()).contains("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
     }
 
@@ -50,8 +50,8 @@ class FaceletsVerifyCliTest {
 
         val exitCode = FaceletsVerifyCli().run(args, output)
 
-        assertThat(exitCode).isEqualTo(2)
-        assertThat(output.toString()).contains("\"result\": \"INCONCLUSIVE\"")
+        assertThat(exitCode).isEqualTo(0)
+        assertThat(output.toString()).contains("\"result\": \"EQUIVALENT\"")
     }
 
     @Test
@@ -83,7 +83,7 @@ class FaceletsVerifyCliTest {
             output,
         )
 
-        assertThat(exitCode).isEqualTo(2)
+        assertThat(exitCode).isEqualTo(0)
         assertThat(output.toString()).contains("views/root.xhtml")
         assertThat(output.toString()).contains("pages/root.xhtml")
         assertThat(output.toString()).doesNotContain(tree.path("workspace/legacy").toString())

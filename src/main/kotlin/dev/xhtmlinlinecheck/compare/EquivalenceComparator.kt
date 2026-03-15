@@ -41,15 +41,6 @@ fun interface EquivalenceComparator {
     companion object {
         fun scaffold(): EquivalenceComparator =
             EquivalenceComparator { semanticModels ->
-                val matchResult =
-                    SemanticNodeMatcher.matchStructuralCandidates(
-                        oldNodes = semanticModels.oldRoot.semanticNodes,
-                        newNodes = semanticModels.newRoot.semanticNodes,
-                    )
-                val treeInvariants = compareTreeInvariants(semanticModels)
-                val structuralAlignment = compareStructuralAlignment(semanticModels, matchResult)
-                val matchedNodeComparison = compareMatchedNodes(semanticModels, matchResult)
-                val globalSanity = compareGlobalSanity(semanticModels, matchResult)
                 val includeProblems =
                     buildList {
                         addAll(semanticModels.oldRoot.syntaxTree.collectIncludeProblems())
@@ -57,7 +48,37 @@ fun interface EquivalenceComparator {
                     }
                 val extractedElProblems =
                     semanticModels.oldRoot.elOccurrences.collectUnsupportedElProblems() +
-                        semanticModels.newRoot.elOccurrences.collectUnsupportedElProblems()
+                            semanticModels.newRoot.elOccurrences.collectUnsupportedElProblems()
+                val matchResult =
+                    SemanticNodeMatcher.matchStructuralCandidates(
+                        oldNodes = semanticModels.oldRoot.semanticNodes,
+                        newNodes = semanticModels.newRoot.semanticNodes,
+                    )
+                val treeInvariants = compareTreeInvariants(semanticModels)
+                val suppressStructuralFallout = includeProblems.isNotEmpty() || extractedElProblems.isNotEmpty()
+                val structuralAlignment =
+                    if (suppressStructuralFallout) {
+                        StructuralAlignmentResult(
+                            checked = matchResult.matches.size,
+                            matched = matchResult.matches.size,
+                            mismatched = 0,
+                            findings = emptyList(),
+                        )
+                    } else {
+                        compareStructuralAlignment(semanticModels, matchResult)
+                    }
+                val matchedNodeComparison = compareMatchedNodes(semanticModels, matchResult)
+                val globalSanity =
+                    if (suppressStructuralFallout) {
+                        InvariantCheckResult(
+                            checked = 0,
+                            matched = 0,
+                            mismatched = 0,
+                            findings = emptyList(),
+                        )
+                    } else {
+                        compareGlobalSanity(semanticModels, matchResult)
+                    }
                 val scaffoldWarning =
                     ComparatorFinding(
                         kind = ComparatorFindingKind.WARNING,
@@ -78,15 +99,18 @@ fun interface EquivalenceComparator {
                     )
                 val findings =
                     treeInvariants.findings +
-                        structuralAlignment.findings +
-                        matchedNodeComparison.findings +
-                        globalSanity.findings +
-                        includeProblems +
-                        extractedElProblems +
-                        scaffoldWarning
+                            structuralAlignment.findings +
+                            matchedNodeComparison.findings +
+                            globalSanity.findings +
+                            includeProblems +
+                            extractedElProblems +
+                            scaffoldWarning
                 val problems = translateFindings(findings)
-                val warningCount = problems.count { it.severity == Severity.WARNING }
-                val warningTotals = WarningTotals(total = warningCount, blocking = warningCount)
+                val warningTotals =
+                    WarningTotals(
+                        total = problems.count { it.severity == Severity.WARNING },
+                        blocking = problems.count(::isBlockingWarning),
+                    )
                 val counts =
                     AggregateCounts(
                         checked = treeInvariants.checked + structuralAlignment.checked + matchedNodeComparison.checked + globalSanity.checked,
@@ -97,7 +121,7 @@ fun interface EquivalenceComparator {
                 AnalysisReport(
                     result = AnalysisResult.derive(
                         hasMismatch = counts.mismatched > 0,
-                        blocksEquivalenceClaim = true,
+                        blocksEquivalenceClaim = warningTotals.blocking > 0,
                     ),
                     summary = AnalysisSummary(
                         headline = summaryHeadline(problems, structuralAlignment, matchedNodeComparison),
@@ -290,14 +314,14 @@ private fun compareResolvedTargets(
     oldNode: SemanticNode,
     newNode: SemanticNode,
 ): FactComparisonResult {
-    val findings = mutableListOf<ComparatorFinding>()
+    val mismatchedAttributes = mutableListOf<Pair<List<ComponentTargetAttribute>, List<ComponentTargetAttribute>>>()
     var checked = 0
     var matched = 0
     var mismatched = 0
 
     val allKinds =
         (oldNode.componentTargetAttributes.map(ComponentTargetAttribute::kind) +
-            newNode.componentTargetAttributes.map(ComponentTargetAttribute::kind))
+                newNode.componentTargetAttributes.map(ComponentTargetAttribute::kind))
             .distinct()
 
     allKinds.forEach { kind ->
@@ -311,9 +335,18 @@ private fun compareResolvedTargets(
             matched++
         } else {
             mismatched++
-            findings += targetResolutionFinding(oldNode, oldAttributes, newNode, newAttributes)
+            mismatchedAttributes += oldAttributes to newAttributes
         }
     }
+
+    val findings =
+        if (mismatchedAttributes.isEmpty()) {
+            emptyList()
+        } else {
+            val oldAttributes = mismatchedAttributes.flatMap { it.first }
+            val newAttributes = mismatchedAttributes.flatMap { it.second }
+            listOf(targetResolutionFinding(oldNode, oldAttributes, newNode, newAttributes))
+        }
 
     return FactComparisonResult(
         checked = checked,
@@ -523,17 +556,28 @@ private fun summaryHeadline(
     matchedNodeComparison: MatchedNodeComparisonResult,
 ): String =
     when {
+        mismatchSignals(problems).isNotEmpty() && blockingWarningSignals(problems).isNotEmpty() ->
+            "Detected ${mismatchSignals(problems).joinForHeadline()}; ${blockingWarningSignals(problems).joinForHeadline()} also limit trust in the remaining comparison."
+
         mismatchSignals(problems).isNotEmpty() ->
             "Detected ${mismatchSignals(problems).joinForHeadline()}; broader semantic comparison is still scaffolded."
+
         matchedNodeComparison.uncertain > 0 ->
             "Matched semantic nodes still depend on unresolved global roots, so bean-level equivalence remains uncertain."
+
         matchedNodeComparison.checked > 0 ->
             "Matched semantic-node checks agreed for structural alignment, EL normalization, ancestry, rendered guards, and target resolution; broader semantic comparison is still scaffolded."
+
         structuralAlignment.checked > 0 ->
             "Structural node alignment matched for all candidates; broader semantic comparison is still scaffolded."
+
         else ->
             "Scaffolded analyzer pipeline only; semantic comparison is not implemented yet."
     }
+
+private fun isBlockingWarning(problem: Problem): Boolean =
+    problem.severity == Severity.WARNING &&
+            problem.id != WarningIds.UNSUPPORTED_ANALYZER_PIPELINE_SCAFFOLD
 
 private fun mismatchSignals(problems: List<Problem>): List<String> =
     problems
@@ -542,6 +586,24 @@ private fun mismatchSignals(problems: List<Problem>): List<String> =
         .mapNotNull(::mismatchSignalFor)
         .distinct()
         .toList()
+
+private fun blockingWarningSignals(problems: List<Problem>): List<String> =
+    problems
+        .asSequence()
+        .filter(::isBlockingWarning)
+        .mapNotNull(::blockingWarningSignalFor)
+        .distinct()
+        .toList()
+
+private fun blockingWarningSignalFor(problem: Problem): String? =
+    when (problem.id) {
+        WarningIds.UNSUPPORTED_MISSING_INCLUDE -> "missing includes"
+        WarningIds.UNSUPPORTED_DYNAMIC_INCLUDE -> "dynamic includes"
+        WarningIds.UNSUPPORTED_INCLUDE_CYCLE -> "include cycles"
+        WarningIds.UNSUPPORTED_EXTRACTED_EL -> "unsupported EL facts"
+        WarningIds.UNSUPPORTED_UNRESOLVED_GLOBAL_ROOT -> "unresolved global roots"
+        else -> null
+    }
 
 private fun List<String>.joinForHeadline(): String =
     when (size) {
@@ -552,8 +614,109 @@ private fun List<String>.joinForHeadline(): String =
     }
 
 private fun translateFindings(findings: List<ComparatorFinding>): List<Problem> {
-    val visibleFindings = findings.filterNot { finding -> shouldSuppress(finding, findings) }
+    val visibleFindings =
+        collapseUnmatchedNodeFlood(
+            findings.filterNot { finding -> shouldSuppress(finding, findings) },
+        )
     return visibleFindings.map { it.renderProblem() }
+}
+
+private fun collapseUnmatchedNodeFlood(findings: List<ComparatorFinding>): List<ComparatorFinding> {
+    val collapseThreshold = 6
+    val unmatchedBySide =
+        findings
+            .filter { it.kind == ComparatorFindingKind.STRUCTURE_UNMATCHED_NODE }
+            .groupBy(::unmatchedFindingSide)
+
+    if (unmatchedBySide.values.none { it.size > collapseThreshold }) {
+        return findings
+    }
+
+    val collapsed = mutableListOf<ComparatorFinding>()
+    val emittedSides = mutableSetOf<AnalysisSide>()
+
+    findings.forEach { finding ->
+        if (finding.kind != ComparatorFindingKind.STRUCTURE_UNMATCHED_NODE) {
+            collapsed += finding
+            return@forEach
+        }
+
+        val side = unmatchedFindingSide(finding)
+        val sideFindings = unmatchedBySide.getValue(side)
+        if (sideFindings.size <= collapseThreshold) {
+            collapsed += finding
+            return@forEach
+        }
+
+        if (emittedSides.add(side)) {
+            collapsed += aggregateUnmatchedNodeFinding(sideFindings, side)
+        }
+    }
+
+    return collapsed
+}
+
+private fun unmatchedFindingSide(finding: ComparatorFinding): AnalysisSide =
+    finding.newNode?.provenance?.logicalLocation?.document?.side
+        ?: finding.oldNode?.provenance?.logicalLocation?.document?.side
+        ?: AnalysisSide.OLD
+
+private fun aggregateUnmatchedNodeFinding(
+    findings: List<ComparatorFinding>,
+    side: AnalysisSide,
+): ComparatorFinding {
+    val sampleNodes =
+        findings.mapNotNull { it.newNode ?: it.oldNode }
+            .sortedBy { it.provenance.logicalLocation.render() }
+            .take(8)
+    val primaryNode = sampleNodes.first()
+    val sideLabel = if (side == AnalysisSide.NEW) "refactored" else "legacy"
+    val counterpartLabel = if (side == AnalysisSide.NEW) "legacy" else "refactored"
+    val snippet = primaryNode.describeForProblem()
+    val exampleList =
+        sampleNodes.joinToString(separator = "; ") { node ->
+            "${node.describeForProblem()} at ${node.provenance.logicalLocation.render()}"
+        }
+    val remainingCount = findings.size - sampleNodes.size
+
+    return ComparatorFinding(
+        kind = ComparatorFindingKind.STRUCTURE_UNMATCHED_NODE,
+        signal = "unmatched structural nodes",
+        oldNode = if (side == AnalysisSide.OLD) primaryNode else null,
+        newNode = if (side == AnalysisSide.NEW) primaryNode else null,
+        explicitIds = sampleNodes.mapNotNull { it.explicitIdAttribute?.takeIf { attr -> attr.isStaticLiteral }?.rawValue }.toSet(),
+        renderProblem = {
+            Problem(
+                id = ProblemIds.STRUCTURE_UNMATCHED_NODE,
+                severity = Severity.ERROR,
+                category = ProblemCategory.STRUCTURE,
+                summary =
+                    if (side == AnalysisSide.NEW) {
+                        "Refactored tree has many unmatched structural nodes"
+                    } else {
+                        "Legacy tree has many unmatched structural nodes"
+                    },
+                locations = sideSpecificLocations(primaryNode.provenance, snippet),
+                explanation =
+                    buildString {
+                        append("The structural matcher could not align ")
+                        append(findings.size)
+                        append(" structural nodes from the ")
+                        append(sideLabel)
+                        append(" tree with trustworthy counterparts in the ")
+                        append(counterpartLabel)
+                        append(" tree. Examples: ")
+                        append(exampleList)
+                        if (remainingCount > 0) {
+                            append("; ... and ")
+                            append(remainingCount)
+                            append(" more.")
+                        }
+                    },
+                hint = "Start with the first listed unmatched nodes, or rerun with --max-problems for a narrower view while fixing structural anchors.",
+            )
+        },
+    )
 }
 
 private fun shouldSuppress(
@@ -564,42 +727,48 @@ private fun shouldSuppress(
         ComparatorFindingKind.STRUCTURE_ID_SANITY_CHANGED ->
             allFindings.any { other ->
                 other !== finding &&
-                    other.kind == ComparatorFindingKind.STRUCTURE_ID_COLLISION
+                        (
+                                other.kind == ComparatorFindingKind.STRUCTURE_ID_COLLISION ||
+                                        other.kind == ComparatorFindingKind.STRUCTURE_FORM_ANCESTRY_CHANGED ||
+                                        other.kind == ComparatorFindingKind.STRUCTURE_NAMING_CONTAINER_ANCESTRY_CHANGED ||
+                                        other.kind == ComparatorFindingKind.STRUCTURE_ITERATION_ANCESTRY_CHANGED ||
+                                        other.kind == ComparatorFindingKind.SCOPE_BINDING_MISMATCH
+                                )
             }
 
         ComparatorFindingKind.STRUCTURE_ANCESTRY_SANITY_CHANGED ->
             allFindings.any { other ->
                 other !== finding &&
-                    (
-                        other.kind == ComparatorFindingKind.STRUCTURE_UNMATCHED_NODE ||
-                            other.kind == ComparatorFindingKind.STRUCTURE_FORM_ANCESTRY_CHANGED ||
-                            other.kind == ComparatorFindingKind.STRUCTURE_NAMING_CONTAINER_ANCESTRY_CHANGED ||
-                            other.kind == ComparatorFindingKind.STRUCTURE_ITERATION_ANCESTRY_CHANGED
-                    )
+                        (
+                                other.kind == ComparatorFindingKind.STRUCTURE_UNMATCHED_NODE ||
+                                        other.kind == ComparatorFindingKind.STRUCTURE_FORM_ANCESTRY_CHANGED ||
+                                        other.kind == ComparatorFindingKind.STRUCTURE_NAMING_CONTAINER_ANCESTRY_CHANGED ||
+                                        other.kind == ComparatorFindingKind.STRUCTURE_ITERATION_ANCESTRY_CHANGED
+                                )
             }
 
         ComparatorFindingKind.TARGET_SANITY_CHANGED ->
             allFindings.any { other ->
                 other !== finding &&
-                    other.kind == ComparatorFindingKind.TARGET_RESOLUTION_CHANGED
+                        other.kind == ComparatorFindingKind.TARGET_RESOLUTION_CHANGED
             }
 
         ComparatorFindingKind.STRUCTURE_NAMING_CONTAINER_ANCESTRY_CHANGED ->
             allFindings.any { other ->
                 other !== finding &&
-                    other.kind == ComparatorFindingKind.STRUCTURE_FORM_ANCESTRY_CHANGED &&
-                    other.oldNode?.nodeId == finding.oldNode?.nodeId &&
-                    other.newNode?.nodeId == finding.newNode?.nodeId
+                        other.kind == ComparatorFindingKind.STRUCTURE_FORM_ANCESTRY_CHANGED &&
+                        other.oldNode?.nodeId == finding.oldNode?.nodeId &&
+                        other.newNode?.nodeId == finding.newNode?.nodeId
             }
 
         ComparatorFindingKind.STRUCTURE_UNMATCHED_NODE ->
             allFindings.any { other ->
                 other !== finding &&
-                    (
-                        other.explainsUnmatchedSubtree(finding) ||
-                            other.explainsUnmatchedTargetFinding(finding) ||
-                            other.explainsUnmatchedDuplicateId(finding)
-                    )
+                        (
+                                other.explainsUnmatchedSubtree(finding) ||
+                                        other.explainsUnmatchedTargetFinding(finding) ||
+                                        other.explainsUnmatchedDuplicateId(finding)
+                                )
             }
 
         else -> false
@@ -611,6 +780,7 @@ private fun ComparatorFinding.explainsUnmatchedSubtree(other: ComparatorFinding)
     }
     if (
         kind != ComparatorFindingKind.STRUCTURE_FORM_ANCESTRY_CHANGED &&
+        kind != ComparatorFindingKind.STRUCTURE_NAMING_CONTAINER_ANCESTRY_CHANGED &&
         kind != ComparatorFindingKind.STRUCTURE_ITERATION_ANCESTRY_CHANGED &&
         kind != ComparatorFindingKind.SCOPE_BINDING_MISMATCH &&
         kind != ComparatorFindingKind.STRUCTURE_RENDERED_GUARD_CHANGED
@@ -685,7 +855,7 @@ private fun bindingMismatchProblem(
                     ),
                 explanation =
                     "A matched semantic node no longer carries equivalent normalized EL after resolving local bindings. " +
-                        "Old: ${oldFact.renderNormalizedOrMissing()} New: ${newFact.renderNormalizedOrMissing()}",
+                            "Old: ${oldFact.renderNormalizedOrMissing()} New: ${newFact.renderNormalizedOrMissing()}",
                 hint = "Preserve the original local binding scope or keep the matched node's EL-bearing facts normalized to the same local origins.",
             )
         },
@@ -715,7 +885,7 @@ private fun renderedGuardProblem(
                     ),
                 explanation =
                     "The matched node's effective rendered guard changed after normalization. " +
-                        "Old: ${oldFact.renderNormalizedOrMissing()} New: ${newFact.renderNormalizedOrMissing()}",
+                            "Old: ${oldFact.renderNormalizedOrMissing()} New: ${newFact.renderNormalizedOrMissing()}",
                 hint = "Keep the same rendered condition, or preserve equivalent local-binding capture if the guard moved.",
             )
         },
@@ -747,8 +917,8 @@ private fun unresolvedGlobalRootFinding(
                     ),
                 explanation =
                     "The matched semantic-node fact still depends on symbolic global roots, so the EL layer can only compare local-binding shape here. " +
-                        "Old globals: [$oldGlobals] -> ${oldFact.normalizedTemplate!!.render()} " +
-                        "New globals: [$newGlobals] -> ${newFact.normalizedTemplate!!.render()}",
+                            "Old globals: [$oldGlobals] -> ${oldFact.normalizedTemplate!!.render()} " +
+                            "New globals: [$newGlobals] -> ${newFact.normalizedTemplate!!.render()}",
                 hint = "Treat bean-level equivalence for these unresolved roots as unknown until broader EL or bean analysis exists.",
             )
         },
@@ -794,7 +964,7 @@ private fun ancestryFinding(
                     ),
                 explanation =
                     "The matched node's $kindLabel changed after the refactor. " +
-                        "Old: $oldRendered New: $newRendered",
+                            "Old: $oldRendered New: $newRendered",
                 hint = "Keep the matched node inside the same behavioral container chain so $kindLabel stays stable.",
             )
         },
@@ -825,7 +995,7 @@ private fun iterationAncestryFinding(
                     ),
                 explanation =
                     "The matched node's enclosing iteration context changed after the refactor. " +
-                        "Old: $oldRendered New: $newRendered",
+                            "Old: $oldRendered New: $newRendered",
                 hint = "Keep the matched node under the same repeat or forEach layers so local iteration semantics stay stable.",
             )
         },
@@ -839,10 +1009,14 @@ private fun targetResolutionFinding(
 ): ComparatorFinding {
     val oldAttribute = oldAttributes.firstOrNull()
     val newAttribute = newAttributes.firstOrNull()
-    val oldSnippet = oldAttributes.joinToString(separator = ", ") { attribute -> attribute.render() }.takeIf { it.isNotBlank() }
-    val newSnippet = newAttributes.joinToString(separator = ", ") { attribute -> attribute.render() }.takeIf { it.isNotBlank() }
-    val oldResolved = oldAttributes.joinToString(separator = ", ") { attribute -> attribute.renderResolved() }.ifBlank { "<missing>" }
-    val newResolved = newAttributes.joinToString(separator = ", ") { attribute -> attribute.renderResolved() }.ifBlank { "<missing>" }
+    val oldSnippet =
+        oldAttributes.joinToString(separator = ", ") { attribute -> attribute.render() }.takeIf { it.isNotBlank() }
+    val newSnippet =
+        newAttributes.joinToString(separator = ", ") { attribute -> attribute.render() }.takeIf { it.isNotBlank() }
+    val oldResolved =
+        oldAttributes.joinToString(separator = ", ") { attribute -> attribute.renderResolved() }.ifBlank { "<missing>" }
+    val newResolved =
+        newAttributes.joinToString(separator = ", ") { attribute -> attribute.renderResolved() }.ifBlank { "<missing>" }
 
     return ComparatorFinding(
         kind = ComparatorFindingKind.TARGET_RESOLUTION_CHANGED,
@@ -870,7 +1044,7 @@ private fun targetResolutionFinding(
                     ),
                 explanation =
                     "The matched node's target-bearing attributes no longer resolve to the same semantic targets. " +
-                        "Old: $oldResolved New: $newResolved",
+                            "Old: $oldResolved New: $newResolved",
                 hint = "Keep the component in the same form or preserve the target component ids so the resolved target meaning stays the same.",
             )
         },
@@ -899,7 +1073,7 @@ private fun unmatchedStructuralNodeFinding(
                 locations = locations,
                 explanation =
                     "The structural matcher could not align ${node.describeForProblem()} from the $explanationSide tree " +
-                        "with any node in the $counterpartSide tree after explicit id, explicit target-relationship, and semantic-signature matching.",
+                            "with any node in the $counterpartSide tree after explicit id, explicit target-relationship, and semantic-signature matching.",
                 hint = "Preserve a stable structural anchor such as explicit ids, resolved targets, or equivalent ancestry/context around this node.",
             )
         },
@@ -907,9 +1081,9 @@ private fun unmatchedStructuralNodeFinding(
 
 private fun SemanticModel.collectIdCollisionFindings(): List<ComparatorFinding> =
     semanticNodes
-        .filter { it.participatesInStructuralMatching && it.explicitIdAttribute != null }
-        .groupBy { it.explicitIdAttribute!!.rawValue }
-        .toSortedMap()
+        .filter { it.participatesInStructuralMatching && it.explicitIdAttribute?.isStaticLiteral == true }
+        .groupBy { node -> node.namingContainerCollisionKey() to node.explicitIdAttribute!!.rawValue }
+        .toSortedMap(compareBy<Pair<String, String>>({ it.first }, { it.second }))
         .values
         .filter { it.size > 1 }
         .map(::idCollisionFinding)
@@ -959,8 +1133,8 @@ private fun globalIdSanityFinding(
         return null
     }
 
-    val oldLocation = oldNodes.firstOrNull { it.explicitIdAttribute != null }
-    val newLocation = newNodes.firstOrNull { it.explicitIdAttribute != null }
+    val oldLocation = oldNodes.firstOrNull { it.explicitIdAttribute?.isStaticLiteral == true }
+    val newLocation = newNodes.firstOrNull { it.explicitIdAttribute?.isStaticLiteral == true }
 
     return ComparatorFinding(
         kind = ComparatorFindingKind.STRUCTURE_ID_SANITY_CHANGED,
@@ -980,12 +1154,22 @@ private fun globalIdSanityFinding(
                 summary = "Unmatched explicit-id inventory changed after refactor",
                 locations =
                     ProblemLocations(
-                        old = oldLocation?.let { ProblemLocation(it.provenance, "id=\"${it.explicitIdAttribute!!.rawValue}\"") },
-                        new = newLocation?.let { ProblemLocation(it.provenance, "id=\"${it.explicitIdAttribute!!.rawValue}\"") },
+                        old = oldLocation?.let {
+                            ProblemLocation(
+                                it.provenance,
+                                "id=\"${it.explicitIdAttribute!!.rawValue}\""
+                            )
+                        },
+                        new = newLocation?.let {
+                            ProblemLocation(
+                                it.provenance,
+                                "id=\"${it.explicitIdAttribute!!.rawValue}\""
+                            )
+                        },
                     ),
                 explanation =
                     "Explicit-id anchors that remain outside trustworthy one-to-one matches no longer line up globally. " +
-                        "Old unmatched ids: ${oldEntries.renderInventory()} New unmatched ids: ${newEntries.renderInventory()}",
+                            "Old unmatched ids: ${oldEntries.renderInventory()} New unmatched ids: ${newEntries.renderInventory()}",
                 hint = "Preserve the same unmatched explicit-id inventory, or fix the structural alignment issue that prevented those ids from pairing cleanly.",
             )
         },
@@ -1018,12 +1202,22 @@ private fun globalTargetSanityFinding(
                 summary = "Unmatched target relationships changed after refactor",
                 locations =
                     ProblemLocations(
-                        old = oldLocation?.let { ProblemLocation(it.provenance, it.componentTargetAttributes.first().render()) },
-                        new = newLocation?.let { ProblemLocation(it.provenance, it.componentTargetAttributes.first().render()) },
+                        old = oldLocation?.let {
+                            ProblemLocation(
+                                it.provenance,
+                                it.componentTargetAttributes.first().render()
+                            )
+                        },
+                        new = newLocation?.let {
+                            ProblemLocation(
+                                it.provenance,
+                                it.componentTargetAttributes.first().render()
+                            )
+                        },
                     ),
                 explanation =
                     "Resolved target-bearing attributes that remain outside trustworthy one-to-one matches no longer line up globally. " +
-                        "Old unmatched targets: ${oldEntries.renderInventory()} New unmatched targets: ${newEntries.renderInventory()}",
+                            "Old unmatched targets: ${oldEntries.renderInventory()} New unmatched targets: ${newEntries.renderInventory()}",
                 hint = "Preserve the same unresolved or target-bearing relationships, or fix the structural alignment issue that left these nodes unmatched.",
             )
         },
@@ -1061,7 +1255,7 @@ private fun globalAncestrySanityFinding(
                     ),
                 explanation =
                     "Form, naming-container, and iteration context for unmatched structural nodes no longer line up globally. " +
-                        "Old unmatched ancestry: ${oldEntries.renderInventory()} New unmatched ancestry: ${newEntries.renderInventory()}",
+                            "Old unmatched ancestry: ${oldEntries.renderInventory()} New unmatched ancestry: ${newEntries.renderInventory()}",
                 hint = "Preserve the same unmatched structural context, or fix the alignment issue that left these nodes outside one-to-one comparison.",
             )
         },
@@ -1087,7 +1281,7 @@ private fun List<SemanticElOccurrence>.collectUnsupportedElProblems(): List<Comp
                     locations = locations,
                     explanation =
                         "$carrierDescription uses extracted EL that the MVP parser does not support yet: ${failure.message}. " +
-                            "The affected semantic fact is treated as unknown, so equivalence remains inconclusive.",
+                                "The affected semantic fact is treated as unknown, so equivalence remains inconclusive.",
                     hint = "Rewrite the EL into the documented MVP subset or keep the result inconclusive until support is added.",
                 )
             },
@@ -1241,6 +1435,9 @@ private fun SemanticNode.structuralContextFingerprint(): String =
         append(iterationAncestry.renderIterationAncestry())
     }
 
+private fun SemanticNode.namingContainerCollisionKey(): String =
+    namingContainerAncestry.lastOrNull()?.nodeId?.value ?: "<root>"
+
 private fun SemanticNodeElFact?.toProblemLocation(
     node: SemanticNode,
     fallbackSnippet: String? = null,
@@ -1251,11 +1448,8 @@ private fun SemanticNodeElFact?.toProblemLocation(
         ProblemLocation(provenance, rawValue, firstBindingOrigin())
     }
 
-private fun SemanticNodeElFact.renderNormalizedOrMissing(): String =
-    normalizedTemplate?.render() ?: rawValue
-
 private fun SemanticNodeElFact?.renderNormalizedOrMissing(): String =
-    this?.renderNormalizedOrMissing() ?: "<missing>"
+    this?.normalizedTemplate?.render() ?: this?.rawValue ?: "<missing>"
 
 private fun SemanticNodeElFact.firstBindingOrigin(): BindingOrigin? =
     bindingReferences.firstOrNull()?.binding?.origin
@@ -1305,7 +1499,7 @@ private fun semanticIdentity(
     }
 
 private fun List<SemanticNode>.explicitIdInventory(): List<String> =
-    filter { it.explicitIdAttribute != null }
+    filter { it.explicitIdAttribute?.isStaticLiteral == true }
         .map { node -> "${node.explicitIdAttribute!!.rawValue}@${node.nodeName}" }
         .sorted()
 

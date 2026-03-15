@@ -1,0 +1,6 @@
+{
+  "result": "NOT_EQUIVALENT",
+  "problemIds": ["P-TARGET-RESOLUTION_CHANGED"],
+  "warningIds": ["W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD"],
+  "notes": "The matched button still exists, but its AJAX update target changes from the panel to the whole form."
+}

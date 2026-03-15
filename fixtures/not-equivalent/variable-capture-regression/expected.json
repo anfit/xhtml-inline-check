@@ -1,0 +1,11 @@
+{
+  "result": "NOT_EQUIVALENT",
+  "problemIds": [
+    "P-SCOPE-BINDING_MISMATCH",
+    "P-STRUCTURE-ITERATION_ANCESTRY_CHANGED"
+  ],
+  "warningIds": [
+    "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD"
+  ],
+  "notes": "Flattening removes the inner ui:repeat scope and changes which local binding row resolves to."
+}

@@ -1,0 +1,11 @@
+{
+  "result": "NOT_EQUIVALENT",
+  "problemIds": [
+    "P-STRUCTURE-ITERATION_ANCESTRY_CHANGED"
+  ],
+  "warningIds": [
+    "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+    "W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT"
+  ],
+  "notes": "The unresolved global-root warning remains, but the removed ui:repeat now gives the comparator a separate proven iteration-ancestry mismatch."
+}
