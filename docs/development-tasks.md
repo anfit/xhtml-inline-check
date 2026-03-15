@@ -1,4 +1,3 @@
-Use `dummy/report.xhtml` and `dummy/report-flattened.xhtml` as the first realism source when selecting or minimizing those canonical fixtures, but keep that pair unclassified until it has an explicit trusted verdict.
 Ensure the canonical fixture corpus includes at minimum safe include inlining, safe iterator alpha-renaming, variable capture, lost `ui:param`, moved components outside `h:form`, changed naming-container ancestry, changed `for` target resolution, changed AJAX target resolution, and dynamic include paths.
 Implement reporter behavior together, including concise equivalent text output, detailed mismatch text output, visible inconclusive text output, deterministic problem ordering, stable JSON output, and shared summary/statistics rendering.
 Add golden tests for both text and JSON reporters once ordering, ids, provenance, and statistics are stable so human-facing and machine-facing output contracts stop drifting accidentally.
