@@ -1,0 +1,70 @@
+{
+  "result" : "EQUIVALENT",
+  "summary" : {
+    "headline" : "All checked facts matched",
+    "counts" : {
+      "checked" : 4,
+      "matched" : 4,
+      "mismatched" : 0
+    },
+    "coverage" : {
+      "covered" : 4,
+      "total" : 4,
+      "percent" : 100.0
+    },
+    "warnings" : {
+      "total" : 1,
+      "blocking" : 0
+    }
+  },
+  "problems" : [ ],
+  "warnings" : [ {
+    "id" : "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+    "severity" : "WARNING",
+    "category" : "UNSUPPORTED",
+    "summary" : "Analyzer pipeline is still scaffolded",
+    "locations" : {
+      "old" : null,
+      "new" : {
+        "logicalLocation" : "refactored/order.xhtml",
+        "logicalLocationDetails" : {
+          "document" : "refactored/order.xhtml",
+          "line" : null,
+          "column" : null,
+          "attributeName" : null,
+          "attributeLocationPrecision" : null
+        },
+        "physicalLocation" : "refactored/order.xhtml",
+        "physicalLocationDetails" : {
+          "document" : "refactored/order.xhtml",
+          "line" : null,
+          "column" : null,
+          "attributeName" : null,
+          "attributeLocationPrecision" : null
+        },
+        "snippet" : null,
+        "bindingOrigin" : null,
+        "includeStack" : [ ]
+      }
+    },
+    "explanation" : "Current analysis stages still return a scaffold warning.",
+    "hint" : null
+  } ],
+  "stats" : {
+    "headline" : "All checked facts matched",
+    "counts" : {
+      "checked" : 4,
+      "matched" : 4,
+      "mismatched" : 0
+    },
+    "coverage" : {
+      "covered" : 4,
+      "total" : 4,
+      "percent" : 100.0
+    },
+    "warnings" : {
+      "total" : 1,
+      "blocking" : 0
+    }
+  }
+}

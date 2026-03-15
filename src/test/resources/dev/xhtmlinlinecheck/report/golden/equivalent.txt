@@ -1,0 +1,7 @@
+EQUIVALENT
+All checked facts matched
+Checked: 4  Matched: 4  Mismatched: 0
+Coverage: 4/4 (100.0%)
+Warnings: 1 total (0 blocking)
+Warnings:
+W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD Analyzer pipeline is still scaffolded at refactored/order.xhtml

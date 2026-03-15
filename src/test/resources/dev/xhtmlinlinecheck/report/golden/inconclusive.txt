@@ -1,0 +1,10 @@
+INCONCLUSIVE
+Dynamic include prevents a trustworthy equivalence claim
+Checked: 0  Matched: 0  Mismatched: 0
+Coverage: 0/0 (n/a)
+Warnings: 1 total (1 blocking)
+Warnings:
+W-UNSUPPORTED-DYNAMIC_INCLUDE Dynamic include path is not statically resolvable
+new: refactored/order.xhtml:6:9 @src (element fallback) -> src=#{bean.fragmentPath}
+The include src uses a dynamic expression (#{bean.fragmentPath}), so comparison beneath this node is not trustworthy.
+Hint: Replace the dynamic include with a static path or keep the result inconclusive.

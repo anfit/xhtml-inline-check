@@ -1,0 +1,70 @@
+{
+  "result" : "INCONCLUSIVE",
+  "summary" : {
+    "headline" : "Dynamic include prevents a trustworthy equivalence claim",
+    "counts" : {
+      "checked" : 0,
+      "matched" : 0,
+      "mismatched" : 0
+    },
+    "coverage" : {
+      "covered" : 0,
+      "total" : 0,
+      "percent" : null
+    },
+    "warnings" : {
+      "total" : 1,
+      "blocking" : 1
+    }
+  },
+  "problems" : [ ],
+  "warnings" : [ {
+    "id" : "W-UNSUPPORTED-DYNAMIC_INCLUDE",
+    "severity" : "WARNING",
+    "category" : "UNSUPPORTED",
+    "summary" : "Dynamic include path is not statically resolvable",
+    "locations" : {
+      "old" : null,
+      "new" : {
+        "logicalLocation" : "refactored/order.xhtml:6:9 @src (element fallback)",
+        "logicalLocationDetails" : {
+          "document" : "refactored/order.xhtml",
+          "line" : 6,
+          "column" : 9,
+          "attributeName" : "src",
+          "attributeLocationPrecision" : "ELEMENT_FALLBACK"
+        },
+        "physicalLocation" : "refactored/order.xhtml:6:9 @src (element fallback)",
+        "physicalLocationDetails" : {
+          "document" : "refactored/order.xhtml",
+          "line" : 6,
+          "column" : 9,
+          "attributeName" : "src",
+          "attributeLocationPrecision" : "ELEMENT_FALLBACK"
+        },
+        "snippet" : "src=#{bean.fragmentPath}",
+        "bindingOrigin" : null,
+        "includeStack" : [ ]
+      }
+    },
+    "explanation" : "The include src uses a dynamic expression (#{bean.fragmentPath}), so comparison beneath this node is not trustworthy.",
+    "hint" : "Replace the dynamic include with a static path or keep the result inconclusive."
+  } ],
+  "stats" : {
+    "headline" : "Dynamic include prevents a trustworthy equivalence claim",
+    "counts" : {
+      "checked" : 0,
+      "matched" : 0,
+      "mismatched" : 0
+    },
+    "coverage" : {
+      "covered" : 0,
+      "total" : 0,
+      "percent" : null
+    },
+    "warnings" : {
+      "total" : 1,
+      "blocking" : 1
+    }
+  }
+}

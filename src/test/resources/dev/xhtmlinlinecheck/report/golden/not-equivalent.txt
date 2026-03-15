@@ -1,0 +1,13 @@
+NOT EQUIVALENT
+Comparison found mismatches
+Checked: 5  Matched: 4  Mismatched: 1
+Coverage: 5/5 (100.0%)
+Warnings: 1 total (0 blocking)
+Problems: 1
+P-SCOPE-BINDING_MISMATCH Scope binding changed
+old: legacy/order.xhtml:12:17 @value (element fallback) -> #{row.label} [binding: ui:repeat var=row from legacy/fragments/table.xhtml]
+new: refactored/order.xhtml:15:19 @value (element fallback) -> #{item.label} [binding: ui:repeat var=item from refactored/order.xhtml]
+The same expression now resolves against a different local binding.
+Hint: Restore the original repeat scope.
+Warnings: 1
+W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD Analyzer pipeline is still scaffolded at refactored/order.xhtml

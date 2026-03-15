@@ -1,0 +1,145 @@
+{
+  "result" : "NOT_EQUIVALENT",
+  "summary" : {
+    "headline" : "Comparison found mismatches",
+    "counts" : {
+      "checked" : 5,
+      "matched" : 4,
+      "mismatched" : 1
+    },
+    "coverage" : {
+      "covered" : 5,
+      "total" : 5,
+      "percent" : 100.0
+    },
+    "warnings" : {
+      "total" : 1,
+      "blocking" : 0
+    }
+  },
+  "problems" : [ {
+    "id" : "P-SCOPE-BINDING_MISMATCH",
+    "severity" : "ERROR",
+    "category" : "SCOPE",
+    "summary" : "Scope binding changed",
+    "locations" : {
+      "old" : {
+        "logicalLocation" : "legacy/order.xhtml:12:17 @value (element fallback)",
+        "logicalLocationDetails" : {
+          "document" : "legacy/order.xhtml",
+          "line" : 12,
+          "column" : 17,
+          "attributeName" : "value",
+          "attributeLocationPrecision" : "ELEMENT_FALLBACK"
+        },
+        "physicalLocation" : "legacy/fragments/table.xhtml:4:9",
+        "physicalLocationDetails" : {
+          "document" : "legacy/fragments/table.xhtml",
+          "line" : 4,
+          "column" : 9,
+          "attributeName" : null,
+          "attributeLocationPrecision" : null
+        },
+        "snippet" : "#{row.label}",
+        "bindingOrigin" : {
+          "descriptor" : "ui:repeat var=row",
+          "rendered" : "ui:repeat var=row from legacy/fragments/table.xhtml",
+          "location" : {
+            "document" : "legacy/fragments/table.xhtml",
+            "line" : null,
+            "column" : null,
+            "attributeName" : null,
+            "attributeLocationPrecision" : null
+          }
+        },
+        "includeStack" : [ {
+          "includeSite" : "legacy/order.xhtml:8:5 @src (element fallback)",
+          "includedDocument" : "legacy/fragments/table.xhtml",
+          "parameterNames" : [ "rows" ]
+        } ]
+      },
+      "new" : {
+        "logicalLocation" : "refactored/order.xhtml:15:19 @value (element fallback)",
+        "logicalLocationDetails" : {
+          "document" : "refactored/order.xhtml",
+          "line" : 15,
+          "column" : 19,
+          "attributeName" : "value",
+          "attributeLocationPrecision" : "ELEMENT_FALLBACK"
+        },
+        "physicalLocation" : "refactored/order.xhtml:15:19 @value (element fallback)",
+        "physicalLocationDetails" : {
+          "document" : "refactored/order.xhtml",
+          "line" : 15,
+          "column" : 19,
+          "attributeName" : "value",
+          "attributeLocationPrecision" : "ELEMENT_FALLBACK"
+        },
+        "snippet" : "#{item.label}",
+        "bindingOrigin" : {
+          "descriptor" : "ui:repeat var=item",
+          "rendered" : "ui:repeat var=item from refactored/order.xhtml",
+          "location" : {
+            "document" : "refactored/order.xhtml",
+            "line" : null,
+            "column" : null,
+            "attributeName" : null,
+            "attributeLocationPrecision" : null
+          }
+        },
+        "includeStack" : [ ]
+      }
+    },
+    "explanation" : "The same expression now resolves against a different local binding.",
+    "hint" : "Restore the original repeat scope."
+  } ],
+  "warnings" : [ {
+    "id" : "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+    "severity" : "WARNING",
+    "category" : "UNSUPPORTED",
+    "summary" : "Analyzer pipeline is still scaffolded",
+    "locations" : {
+      "old" : null,
+      "new" : {
+        "logicalLocation" : "refactored/order.xhtml",
+        "logicalLocationDetails" : {
+          "document" : "refactored/order.xhtml",
+          "line" : null,
+          "column" : null,
+          "attributeName" : null,
+          "attributeLocationPrecision" : null
+        },
+        "physicalLocation" : "refactored/order.xhtml",
+        "physicalLocationDetails" : {
+          "document" : "refactored/order.xhtml",
+          "line" : null,
+          "column" : null,
+          "attributeName" : null,
+          "attributeLocationPrecision" : null
+        },
+        "snippet" : null,
+        "bindingOrigin" : null,
+        "includeStack" : [ ]
+      }
+    },
+    "explanation" : "Current analysis stages still return a scaffold warning.",
+    "hint" : null
+  } ],
+  "stats" : {
+    "headline" : "Comparison found mismatches",
+    "counts" : {
+      "checked" : 5,
+      "matched" : 4,
+      "mismatched" : 1
+    },
+    "coverage" : {
+      "covered" : 5,
+      "total" : 5,
+      "percent" : 100.0
+    },
+    "warnings" : {
+      "total" : 1,
+      "blocking" : 0
+    }
+  }
+}
