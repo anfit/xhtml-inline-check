@@ -105,6 +105,11 @@ For a single baseline check that matches the current Gradle app, entrypoint, and
 
 Both scripts execute `gradle test`, `gradle installDist`, and `gradle runFaceletsVerify` against `fixtures/support/smoke/`.
 
+For the release-readiness deterministic-output gate that reruns the real CLI entrypoint and asserts byte-stable text, JSON, and `--explain` output across repeated executions:
+
+- on Unix-like shells, run `scripts/verify-deterministic-output.bash`
+- on Windows PowerShell, run `scripts/verify-deterministic-output.ps1`
+
 On Windows, the PowerShell helper pins `GRADLE_USER_HOME`, `TEMP`, and `TMP` inside the repository before invoking Gradle. That avoids failures caused by inaccessible profile or temp directories in restricted environments while still using the installed Gradle executable. The first run still needs network access or a pre-populated Gradle cache so the Kotlin plugin and dependencies can be resolved.
 
 ## Near-Term Roadmap
