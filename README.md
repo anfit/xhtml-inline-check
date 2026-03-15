@@ -66,6 +66,7 @@ facelets-verify legacy/order.xhtml refactored/order.xhtml --base-old legacy --ba
 - [Specification](SPEC.md)
 - [Execution Plan](docs/execution-plan.md)
 - [Architecture Overview](docs/architecture.md)
+- [Build, Run, And Release](docs/build-run-release.md)
 - [MVP EL Grammar Subset](docs/el-grammar-subset.md)
 - [Fixture Corpus Plan](docs/fixture-corpus.md)
 - [Release Readiness](docs/release-readiness.md)

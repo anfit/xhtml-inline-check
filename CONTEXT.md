@@ -1,178 +1,705 @@
 # CONTEXT
 
-- The repository now has a single-module Gradle Kotlin CLI scaffold rooted at `build.gradle.kts` and `settings.gradle.kts`.
-- The Gradle build is configured as a JVM application named `facelets-verify`; `gradle run`, `installDist`, `distZip`, and `distTar` should all target that executable/distribution name.
-- Use `gradle runFaceletsVerify --args="old.xhtml new.xhtml"` as the dedicated Gradle-backed CLI entrypoint; `installDist` now installs a stable launcher under `build/facelets-verify/bin/`.
-- Main source packages are split by responsibility under `src/main/kotlin/dev/xhtmlinlinecheck`: `cli`, `domain`, `loader`, `syntax`, `semantic`, `compare`, and `report`.
-- The current analyzer stages are placeholders that intentionally return an `INCONCLUSIVE` result with warning `W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD`; later tasks should replace stage internals without collapsing those package boundaries.
-- `AnalysisResult` is the stable top-level outcome vocabulary: it owns the only three semantic outcomes (`EQUIVALENT`, `NOT_EQUIVALENT`, `INCONCLUSIVE`), their CLI exit codes, and the shared derivation rule (`mismatch -> NOT_EQUIVALENT`, otherwise blocker -> `INCONCLUSIVE`, otherwise `EQUIVALENT`).
-- Final result derivation now uses `WarningTotals.blocking` rather than "any warning at all": the generic scaffold warning `W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD` is informational and must not block an `EQUIVALENT` result when all checked facts match, while unsupported include/EL/global-root warnings still keep the report `INCONCLUSIVE` unless a mismatch was already proven.
-- Baseline tests live under `src/test/kotlin`; reusable helpers are under `src/test/kotlin/dev/xhtmlinlinecheck/testing` with `FixtureScenarios` for repository fixtures, `TemporaryProjectTree` for per-test XHTML trees, and `assertThatReport(...)` for concise report assertions.
-- Core library choices are now wired in `build.gradle.kts`: use `Clikt` for CLI parsing, `Woodstox` for namespace-aware StAX parsing and location capture, and `Jackson Kotlin` for deterministic JSON reporting plus fixture-contract loading.
-- Namespace-aware XML entry is now centralized in `src/main/kotlin/dev/xhtmlinlinecheck/xml/NamespaceAwareXml.kt`, which explicitly instantiates `WstxInputFactory` with namespaces on, DTD/external entities off, and character coalescing on. Loader include discovery and syntax-tree parsing should keep sharing that helper instead of creating new ad hoc `XMLInputFactory` instances.
-- Test infrastructure now includes JUnit Jupiter parameterized tests and AssertJ in addition to `kotlin("test")`; prefer those for fixture matrices, golden-output assertions, and concise domain-model checks. The shared smoke fixture currently lives at `fixtures/support/smoke/`.
-- The executable jar manifest is wired to `dev.xhtmlinlinecheck.cli.MainKt` so the plain jar remains directly runnable outside Gradle-managed distributions.
-- Real CLI entrypoint coverage now lives in `src/test/kotlin/dev/xhtmlinlinecheck/cli/FaceletsVerifyEntrypointSmokeTest.kt`; it runs `dev.xhtmlinlinecheck.cli.MainKt` in a child JVM against representative equivalent and not-equivalent fixtures, invalid CLI usage, and malformed-XHTML analysis failure paths. Extend that file when the documented CLI contract changes, because it is the closest test seam to the actual `facelets-verify` process without relying on an installed distribution.
-- The current local baseline verification entrypoint is `scripts/verify-baseline.bash`; it intentionally wraps `gradle test`, `gradle installDist`, and `gradle runFaceletsVerify --args="<repo>/fixtures/support/smoke/old/root.xhtml <repo>/fixtures/support/smoke/new/root.xhtml"` so packaging, the named CLI task, and smoke fixtures stay exercised together.
-- Shared source metadata now lives in `src/main/kotlin/dev/xhtmlinlinecheck/domain/LocationModels.kt` as a reusable chain: `SourceDocument` identifies the analyzed file and side (`OLD` or `NEW`), `SourceLocation` adds span and optional attribute context, and `Provenance` ties physical and logical locations together with an include stack.
-- Shared source-graph models now live in `src/main/kotlin/dev/xhtmlinlinecheck/domain/SourceGraphModels.kt`: `SourceGraphFile` represents a loaded or expanded file, `SourceGraphEdge` captures include relationships, `SourceGraphParameter` preserves include-site parameter provenance, and `SourceGraphStack` wraps include-stack steps so loader and parser work can reuse the existing `Provenance` model instead of inventing parallel origin tracking.
-- Structured diagnostics now build on that same provenance chain: `ProblemLocation` wraps `Provenance` plus an optional snippet, `ProblemLocations` groups old/new sides, and `Problem` owns severity/category/summary/locations/explanation/hint so comparator output and report renderers share one location language.
-- The scaffolded loader, syntax, and semantic stages now pass `LoadedSource`, `ParsedSourceTree`, and `SemanticModel` wrappers instead of bare `Path` values so future implementation work can add include expansion and node-level provenance without redefining stage contracts.
-- `LoadedSource`, `ParsedSourceTree`, and `SemanticModel` now also carry the same `SourceGraphFile` instance end to end, with constructor guards that require `provenance` to come from that shared graph object. Future include-discovery and expansion work should extend that graph in the loader instead of recomputing provenance separately in later stages.
-- `SourceLoader.scaffold()` now performs a namespace-aware discovery pass for Facelets `ui:include` elements and records them on each root `SourceGraphFile.includeEdges`. Those discovered edges intentionally preserve the raw `src` string and include-site location before resolution; later include-resolution and expansion tasks should populate `includedDocument` on the same edge model rather than replacing the discovery mechanism.
-- Static include `src` values are now resolved immediately onto each discovered `SourceGraphEdge.includedDocument` via `SourceDocument.resolveIncludeSource(...)`. Resolution rules are: root-anchored paths like `/fragments/table.xhtml` resolve from the analysis base/root directory, relative paths resolve from the including file's parent directory, and EL-bearing or blank `src` values remain unresolved for later unsupported-diagnostic handling.
-- Source-graph include discovery now also extracts direct Facelets `ui:param` children from each `ui:include` into `SourceGraphEdge.parameters`, preserving declaration order plus parameter provenance. The extracted `SourceGraphParameter.provenance` currently points at the `value` attribute when present, otherwise falls back to the `name` attribute, so later include-expansion and scope-binding tasks can inherit include-site parameter flow without inventing a second parameter-origin model.
-- `SourceLoader.scaffold()` now recursively materializes the resolved include graph into nested `SourceGraphFile` instances on `SourceGraphEdge.includedFile`, while keeping unresolved, missing, or cycle-blocked includes as edges with only `includedDocument`. `SourceGraphFile` now also carries the loaded file contents so later syntax/semantic stages can reuse loader-owned bytes instead of rereading files.
-- Recursive include detection is now explicit in the source graph: cycle-blocked edges carry `SourceGraphEdge.includeFailure` with kind `INCLUDE_CYCLE` plus the ordered repeated document chain, and the loader stops expansion at that edge instead of recursing further.
-- The syntax layer now builds a first logical XHTML tree in `src/main/kotlin/dev/xhtmlinlinecheck/syntax/LogicalTreeModels.kt`. `XhtmlSyntaxTree` wraps `LogicalElementNode`, `LogicalTextNode`, and `LogicalIncludeNode` values so old/new trees can already be compared over the same include-expanded structure.
-- Every `LogicalNode` in the syntax tree now carries an explicit shared `SourceLocation` as `location` in addition to `provenance`; later semantic extraction and diagnostics should use that node field for element/text/include positions rather than reconstructing locations from `Provenance`.
-- The expanded parser output is now wrapped in `XhtmlSyntaxTree`, exposed as `ParsedSourceTree.syntaxTree`, and carried into `SemanticModel.syntaxTree`. Later semantic and comparison work should consume that syntax-tree object rather than reaching back into loader internals for expanded XHTML structure.
-- `XhtmlSyntaxTree.walkDepthFirst(...)` is the shared traversal helper for downstream syntax-tree walks. Reuse it for semantic extraction and syntax-level diagnostics instead of duplicating recursive include/element traversal in each stage.
-- The syntax model now exposes a normalized structural view that flattens transparent wrappers without deleting the raw provenance-bearing nodes: use `XhtmlSyntaxTree.normalizedStructureRoots()`, `LogicalNode.normalizedStructureChildren()`, or `XhtmlSyntaxTree.walkNormalizedStructureDepthFirst(...)` when semantic extraction or matching should ignore include inlining, `ui:composition`, and `ui:fragment` wrapper-only structure. Keep using the raw tree (`root`, `children`, `LogicalIncludeNode`) when diagnostics need explicit include boundaries or exact parsed wrapper nodes.
-- `LogicalElementNode` now also preserves `namespaceBindings` declared on each element alongside qualified element and attribute names. Future namespace-rule or tag-registry work should consume those declarations from the syntax tree rather than reparsing raw `xmlns:*` text.
-- Namespace preservation is now explicitly covered at the loader/syntax seam: `SourceLoaderIncludeDiscoveryTest` locks include discovery to the Facelets namespace URI rather than the literal `ui` prefix, and `XhtmlSyntaxParserNamespaceAwareTest` locks namespace bindings and qualified names across include expansion, including default-namespace rebinding inside included fragments. Keep future parser or registry work compatible with those expectations.
-- Treat the raw syntax tree as stable semantic input: parser changes must preserve qualified element names, namespace URIs/prefixes, attribute lists and values, and original child ordering so rule-registry, semantic-extraction, and comparator work all consume the same deterministic structure.
-- `XhtmlSyntaxParser.scaffold()` now expands resolved `ui:include` edges into explicit `LogicalIncludeNode` boundaries whose `children` contain the recursively parsed included subtree and whose provenance/include-stack comes from the source graph. Unresolved include paths and cycle-blocked includes remain as empty include-boundary nodes instead of disappearing, and `LogicalIncludeNode.includeFailure` preserves source-graph failures for downstream diagnostics.
-- Expanded syntax nodes now split provenance cleanly: `physicalLocation` stays on the included fragment file/node, while `logicalLocation` stays at the include site that injected that expanded subtree. Future diagnostics, semantic nodes, and reporters should preserve that distinction instead of collapsing expanded-node provenance back to the fragment file only.
-- Root-level provenance should be created with `Provenance.forRoot(document)` so diagnostics, semantic nodes, and reporters all start from the same baseline physical/logical location shape before include expansion lands.
-- `SourceDocument.fromPath(...)` resolves root XHTML inputs to absolute normalized paths and stores a slash-stable `displayPath`; future diagnostics and renderers should prefer that display field for deterministic cross-platform output instead of calling `Path.toString()` ad hoc.
-- `SourceDocument.fromPath(...)` now resolves every root XHTML path to an absolute normalized filesystem location and also stores the normalized `rootDirectory` used to anchor it. When a base directory is supplied, `displayPath` becomes root-relative; otherwise it stays relative to the current working directory for relative inputs.
-- `SourceLoader.scaffold()` now applies `AnalysisRequest.baseOld` and `baseNew` directly when constructing old/new root `SourceDocument`s, so include-expansion and provenance work can rely on those root anchors instead of reconstructing base resolution later in the pipeline.
-- `SourceLoader.scaffold()` now reads file contents through each root `SourceDocument.absolutePath` and stores them on `LoadedSource.contents`; future include discovery or expansion work should reuse that normalized document path instead of re-reading raw CLI `Path` inputs.
-- Missing-root file failures now surface as `SourceLoadException`, which carries the normalized `SourceDocument` and formats slash-stable diagnostics from `displayPath` plus normalized absolute path. Future missing-include diagnostics should build on that same document-first path handling for cross-platform consistency.
-- Reusable include-expansion fixture coverage now lives at `fixtures/support/include-expansion/` with `src/test/kotlin/dev/xhtmlinlinecheck/testing/SimpleIncludeFixturePipelineTest.kt`. That fixture intentionally exercises one static `ui:include` end to end across root-path normalization, loader file reads, include discovery/resolution, parameter capture, and syntax-layer logical expansion; prefer extending that scenario when future tasks need a fixture-first regression around the include pipeline.
-- Nested include fixture coverage now also lives at `fixtures/support/include-expansion-nested/` and extends `SimpleIncludeFixturePipelineTest` with a two-hop include tree. Use it when future work needs a reusable regression for include-stack provenance and ordered `ui:param` propagation across deeper expansion rather than only a single include boundary.
-- Expanded syntax-node provenance is now also locked by `fixtures/support/include-provenance-syntax/` in `SimpleIncludeFixturePipelineTest`. Reuse that fixture when changing include expansion, `SourceGraphFile.provenance`, or syntax-tree node construction; it proves that expanded element and text nodes keep fragment-file physical locations while their logical provenance still points at the include site that injected them.
-- Missing-include fixture coverage now lives at `fixtures/support/missing-include/` and is exercised both by `SimpleIncludeFixturePipelineTest` and `FaceletsAnalyzerScaffoldTest`. Use that fixture when changing missing-file diagnostics or include provenance; it locks the include-site `@src` location, the resolved-but-absent target document path, and the fact that no expanded child content is produced.
-- Include-cycle fixture coverage now lives at `fixtures/support/include-cycle/` and is exercised by `SimpleIncludeFixturePipelineTest` plus `FaceletsAnalyzerScaffoldTest`. Reuse that scenario when changing cycle detection, source-graph stacks, or recursive include provenance; it locks the ordered cycle document chain, the parent include-stack step that survives onto the recursive logical boundary, and the dedicated warning's stable file-linked location/snippet.
-- The first canonical comparison fixture now lives at `fixtures/inconclusive/dynamic-include/` with `expected.json` and `notes.md`. `FixtureExpectations.read(...)` loads that compact contract for tests, and `FaceletsAnalyzerScaffoldTest` uses it to lock the dedicated `W-UNSUPPORTED-DYNAMIC_INCLUDE` warning together with the derived top-level `INCONCLUSIVE` result; future comparison fixtures should follow that same `result` + `problemIds` + `warningIds` pattern instead of asserting renderer text only.
-- Canonical result-derivation fixtures now also live under `fixtures/equivalent/safe-alpha-renaming/`, `fixtures/not-equivalent/variable-capture-regression/`, `fixtures/not-equivalent/form-ancestry-drift/`, `fixtures/not-equivalent/changed-ajax-target/`, and `fixtures/inconclusive/inconclusive-but-not-proven-wrong/`. `CanonicalFixtureComparisonTest` is the shared regression seam for those cases: keep new canonical fixtures small, drive them through `expected.json`, and use them to prove the final result derivation across mismatch-vs-unsupported combinations rather than only checking individual diagnostics in ad hoc temp-tree tests.
-- `FaceletsVerifyCli` now accepts `--base-old <dir>` and `--base-new <dir>` in any option order and forwards them into `AnalysisRequest`; future CLI work should preserve that contract so loader-side path resolution stays deterministic.
-- `JsonReportRenderer` now emits structured `problems[*].locations.{old,new}` objects with logical location, physical location, snippet, and include-stack fields; keep new reporting work aligned to that shape instead of introducing parallel ad hoc payloads.
-- JSON reporter contract coverage now includes `src/test/kotlin/dev/xhtmlinlinecheck/report/JsonReportRendererOrderingTest.kt`, which locks down stable key ordering for top-level report fields, summary aggregates, and per-problem fields, plus string-form diagnostic ids; keep future JSON changes deliberate and update those assertions when the machine-readable contract intentionally changes.
-- Comparison/report aggregate state now lives in shared domain value objects under `src/main/kotlin/dev/xhtmlinlinecheck/domain/AnalysisReport.kt`: `AggregateCounts`, `AggregateCoverage`, and `WarningTotals` feed both `AnalysisSummary` and `AnalysisStats`, so comparator and reporters should reuse those models instead of inventing reporter-local count fields.
-- `AggregateCoverage.from(counts)` treats covered facts as `matched + mismatched` out of `checked`; use that shared derivation when future comparison work starts incrementing checked fact totals so text and JSON coverage stay aligned.
-- Stable diagnostic ids now live in `src/main/kotlin/dev/xhtmlinlinecheck/domain/DiagnosticIds.kt` and use kind/category/slug strings such as `P-SCOPE-BINDING_MISMATCH` and `W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD`; future comparison, `--explain`, JSON, and fixture-assertion work should reuse those exact ids instead of report-local ordinals like `P01`.
-- `Problem.id` is now a typed `DiagnosticId` instead of a raw string; new diagnostics should be added through `ProblemIds` and `WarningIds` so severity/category consistency is enforced in the domain model before rendering or fixture assertion code sees them.
-- The scaffold comparator now walks logical include boundaries for source-graph failures and emits blocking warning `W-UNSUPPORTED-INCLUDE_CYCLE` with the recursive document chain before the generic scaffold warning. Later include-related diagnostics should extend that same failure-to-problem path instead of special-casing loader exceptions.
-- Static `ui:include` paths that resolve to a normalized `SourceDocument` but do not exist on disk now carry `SourceGraphIncludeFailureKind.MISSING_FILE` plus the resolved target document. The scaffold comparator turns those boundaries into blocking warning `W-UNSUPPORTED-MISSING_INCLUDE`, reusing the include-site provenance and the raw `src` value as the actionable snippet.
-- Dynamic `ui:include src` expressions are now first-class include failures: the loader tags EL-bearing `src` values as `SourceGraphIncludeFailureKind.DYNAMIC_PATH`, syntax preserves that failure on `LogicalIncludeNode`, and the scaffold comparator turns it into blocking warning `W-UNSUPPORTED-DYNAMIC_INCLUDE` so result derivation can later keep using the shared unsupported-to-`INCONCLUSIVE` path.
-- Attribute-bearing `SourceLocation`s now carry explicit `AttributeLocationPrecision` metadata. With the current Woodstox/StAX reader path, attribute locations are preserved as `attributeName + ELEMENT_FALLBACK` on the owning element coordinates rather than being treated as silently exact; later EL/target extraction should keep threading that precision through diagnostics instead of assuming attribute column fidelity that the parser does not provide yet.
-- Low-level XML location capture is now covered directly in `src/test/kotlin/dev/xhtmlinlinecheck/xml/NamespaceAwareXmlTest.kt`. Extend that seam first when changing `NamespaceAwareXml.toSourceLocation(...)`, because loader and syntax tests above it already assume Woodstox line capture for elements and explicit `ELEMENT_FALLBACK` attribute context on the same coordinates.
-- `JsonReportRenderer` now emits both the rendered location strings and structured `logicalLocationDetails` / `physicalLocationDetails` objects with `document`, `line`, `column`, `attributeName`, and `attributeLocationPrecision`. Extend that existing payload if reporters or editor integrations need richer navigation instead of inventing a parallel location schema.
-- Built-in tag semantics now live in `src/main/kotlin/dev/xhtmlinlinecheck/rules/TagRules.kt`. `TagRule` is the shared interface for binding creation, transparency, naming-container status, EL-bearing attributes, and target-bearing attributes; extend that registry before adding tag-specific semantic extraction or comparator behavior anywhere else.
-- Generic component semantics now split cleanly between syntax attributes and registry metadata: treat `id` as a universal structural anchor read directly from `LogicalElementNode.attributes`, while `TagRule.targetAttributeNames` and `TagRule.elAttributeNames` define which companion attributes (`for`, `update`, `render`, `process`, `execute`, and `rendered`) must be extracted into semantic facts for later comparison. Future semantic extraction should derive one deterministic per-node view from that combination instead of introducing separate hardcoded attribute scanners in scope or compare code.
-- `h:form` is already an explicit built-in JSF HTML rule in `TagRules.kt`: it marks the tag as a naming container and merges the shared JSF HTML/default target semantics (`for`, `update`, `render`, `process`, `execute`) plus `rendered`. Form-ancestry, target-resolution, and moved-component diagnostics should reuse that existing registry entry instead of reintroducing `h:form` checks elsewhere.
-- `TagRule` now also carries an explicit `syntaxRole` (`ELEMENT`, `INCLUDE`, `INCLUDE_PARAMETER`), and `TagRuleRegistry.resolve(...)` returns a non-null deterministic rule. Loader include discovery, syntax parsing, syntax-node transparency, and semantic-model handoff should all consume that same registry path instead of re-hardcoding namespace/local-name checks.
-- Facelets include-family built-ins are now intentionally explicit instead of inheriting the generic fallback rule: `ui:include` is the only include syntax node and only exposes EL on `src`; `ui:param` is the only include-parameter syntax node and only exposes its binding rule plus EL on `value`; `ui:composition` and `ui:fragment` are explicit transparent wrappers with no generic `rendered` or target-attribute semantics. Future include, scope, or transparent-wrapper work should preserve that split so parser and matcher behavior stays aligned.
-- Shared binding vocabulary now lives in `src/main/kotlin/dev/xhtmlinlinecheck/domain/BindingModels.kt`, not in `TagRules.kt`. Future scope-stack, binding-origin, and EL-normalization work should consume `BindingKind` from that domain model so rule-registry metadata and later semantic/scope models stay on one enum with explicit support for `UI_PARAM`, `ITERATION_VAR`, `VAR_STATUS`, `C_SET`, and `IMPLICIT_GLOBAL`.
-- `ui:repeat` is already a first-class built-in tag rule in `TagRules.kt`: it introduces `ITERATION_VAR` and `VAR_STATUS` bindings from `var` / `varStatus`, inherits generic component target attributes, and marks `value`, `offset`, `size`, `step`, and fallback `rendered` as EL-bearing. Binding, iteration-ancestry, EL-normalization, and variable-capture tasks should build on that existing registry contract rather than adding ad hoc repeat handling elsewhere.
-- JSTL core tags now share that same built-in registry path: `c:set` introduces `C_SET` from `var`, `c:forEach` introduces the shared `ITERATION_VAR` from `var` plus shared `VAR_STATUS` from `varStatus`, and `c:if` models its guard through EL on `test`. Because these rules still inherit the fallback contract, they also keep generic `rendered` EL and component-target attributes; future JSTL scope or guard analysis should read those semantics from `LogicalElementNode.tagRule` instead of rechecking namespace/local-name pairs.
-- Repository-local git commands may need `git -c safe.directory=C:/projects/xhtml-inline-check ...` in this environment because plain `git` rejects the worktree as dubious ownership under the current user SID.
-- The built-in registry layers generic JSF/component target behavior deliberately: the fallback rule covers `rendered` plus `for`, `update`, `render`, `process`, and `execute`, while the JSF HTML namespace default narrows that namespace-specific overlay to `rendered` plus `for`. Semantic extraction should preserve which target-bearing attributes were actually present on a node, and target comparison should resolve and compare those extracted references through the same normalized node facts that also carry `id`, naming-container ancestry, and form ancestry.
-- `LogicalElementNode` now stores its resolved `tagRule`, and `SemanticModel` carries the shared `tagRules` instance used to build it. Future scope-building and structural-analyzer tasks should read tag semantics from those existing fields so later rule changes stay centralized and deterministic.
-- Tree-position-aware scope state now lives in `src/main/kotlin/dev/xhtmlinlinecheck/semantic/ScopeStackModel.kt` and is built automatically into `SemanticModel.scopeModel`. Use `ScopeStackModel.snapshotAt(path)` plus `resolve(name, path, ScopeLookupPosition.NODE|DESCENDANT)` when later EL extraction or normalization needs to distinguish a tag's own attribute scope from the bindings visible inside its subtree.
-- `XhtmlSyntaxTree.walkDepthFirstWithPath(...)` is the shared way to obtain stable `LogicalNodePath` values while traversing the raw syntax tree. Reuse that helper when later semantic, EL, or comparison work needs to attach facts to precise tree positions instead of re-deriving child-index paths ad hoc.
-- The scope builder currently applies binding lifetimes intentionally by construct: `ui:param`, `ui:repeat`, `varStatus`, and `c:forEach` bindings are descendant-only and pop when their node exits, while `c:set` persists for later sibling positions within the current enclosing scope. Preserve that distinction unless the JSTL/Facelets semantics are being changed deliberately with matching tests.
-- `c:forEach` now mirrors `ui:repeat` iterator semantics in the shared registry-to-scope path: both tags emit `ITERATION_VAR` for `var`, both emit `VAR_STATUS` for `varStatus`, and `ScopeStackModelTest` locks that the JSTL loop still keeps its own `c:forEach var=...` origin descriptor while shadowing and popping like a descendant-only iterator scope.
-- Scope traversal now models entry and exit explicitly through per-node transitions in `ScopeStackBuilder`: registry-defined bindings are pushed into a descendant scope when entering a node, then popped on exit unless the node introduced `c:set`, which intentionally persists into later siblings. Keep later scope or EL work aligned with that enter/leave contract instead of reintroducing implicit return-value-only lifetime rules.
-- `c:set` lifetime is now locked more precisely by `ScopeStackModelTest`: the binding is not visible at the `c:set` node's own `NODE` position, is visible for descendant lookups and later siblings in the same enclosing scope, and does not leak past the enclosing branch that contained a nested shadowing `c:set`. Future JSTL scope changes should preserve those sibling-persistence and branch-exit expectations unless the semantics are being changed deliberately.
-- Binding provenance for scope entries now stays explicit: element-introduced bindings use the binding-name attribute `SourceLocation` plus the syntax node's provenance, while include-parameter bindings reuse `SourceGraphParameter.provenance`. Future binding-origin or scope-mismatch diagnostics should build on `ScopeBinding.origin`, `location`, and `provenance` instead of inventing a second origin descriptor path.
-- `BindingOrigin` now reuses the shared provenance model directly instead of carrying only a free-form descriptor string. `ScopeBinding.origin` should be the canonical way to explain where a resolved binding came from, and comparison diagnostics should surface it through `ProblemLocation.bindingOrigin` rather than inventing side-channel binding-location fields.
-- Reporter contracts now expose binding-origin details when present: text output appends `[binding: <descriptor> from <logical location>]`, and JSON emits `locations.{old,new}.bindingOrigin` with `descriptor`, `rendered`, and provenance-backed `location`. Keep future scope-mismatch diagnostics aligned with that shape so binding explanations stay consistent across text, JSON, and fixture assertions.
-- `ui:param` binding creation is already implemented in `ScopeStackModel`: `LogicalIncludeNode.parameters` become descendant-only `BindingKind.UI_PARAM` entries via `bindingFromParameter(...)`, and `ScopeStackModelTest` locks both visibility and include-site logical provenance for expanded include descendants. Treat follow-up `ui:param` work as EL-normalization/comparison work unless that scope contract itself needs to change.
-- Registry-driven semantic EL extraction now lives in `src/main/kotlin/dev/xhtmlinlinecheck/semantic/SemanticElExtractor.kt` and is exposed on `SemanticModel.elOccurrences`. Treat `TagRule.elAttributeNames` as the only source of truth for which element/include/include-parameter attributes feed the EL pipeline; do not add parallel hardcoded attribute scanners in semantic or compare code.
-- `SemanticElOccurrence` is the shared semantic handoff for extracted EL facts. It records the owning syntax path, carrier kind, optional attribute name, raw value, provenance/location, and either a parsed `ElTemplate` or a `SemanticElParseFailure`; unsupported EL should stay represented there instead of being dropped or normalized implicitly.
-- Unsupported extracted EL now surfaces through the scaffold comparator as file-linked warning `W-UNSUPPORTED-EXTRACTED_EL` instead of remaining only an internal `SemanticElParseFailure`. That warning reuses the occurrence provenance/snippet, names the owning carrier (`tag @attribute`, include param, or text node), and explicitly states that the affected fact is treated as unknown so the result remains `INCONCLUSIVE`.
-- Include-site EL is intentionally covered even though `ui:param` elements are not preserved as syntax nodes after expansion: `LogicalIncludeNode.sourcePath` feeds the same EL extraction model as the registry-declared `ui:include src`, and `LogicalIncludeNode.parameters[*].valueExpression` feeds it for the registry-declared `ui:param value`. Later normalization/comparison work should consume those extracted occurrences rather than reparsing include metadata separately.
-- `src/test/kotlin/dev/xhtmlinlinecheck/semantic/SemanticElExtractionTest.kt` is the regression suite for this seam. Extend it when changing which attributes are registry-declared EL sources, include-parameter EL capture, or unsupported-EL propagation from semantic extraction.
-- Semantic EL extraction now also emits `SemanticElCarrierKind.TEXT_NODE` occurrences for nonblank `LogicalTextNode`s that actually contain `#{...}` or `${...}` containers. Those mixed-content text nodes reuse the same `ElParser.parseTemplate(...)` / `SemanticElParseFailure` path as attributes, keep text-node `SourceLocation`s with no synthetic attribute name, and fall back to the parent element tag name as `ownerTagName` for diagnostics and later comparison work.
-- Supported semantic EL now has a second-stage normalization pass in `src/main/kotlin/dev/xhtmlinlinecheck/semantic/SemanticElNormalizer.kt`. It rewrites resolved local root identifiers to canonical ids derived from `ScopeBinding.id` (`binding#<n>`), leaves unresolved roots as symbolic globals (`global(name)`), and records the resolved `BindingOrigin` on each normalized occurrence for diagnostics.
-- `SemanticModel.normalizedElOccurrences` is now the comparison-facing handoff for supported EL. Future matcher/comparator work should consume that list instead of reparsing `SemanticElOccurrence.template`, especially when alpha-renames or shadowing-sensitive scope behavior matter.
-- The current comparator only uses normalized EL for a narrow scope slice: it compares same-shape old/new occurrences that involve at least one local binding and emits `P-SCOPE-BINDING_MISMATCH` when canonical local-binding normalization differs. Plain global-only EL equality, node matching, and broader structural checks are still scaffolded and should not be inferred from this pass.
-- Normalized EL occurrences now also carry explicit `globalReferences` for unresolved root identifiers. Comparator work must treat any occurrence that still depends on those symbolic globals as bean-level uncertainty, not as a proven local-binding match or a local-binding mismatch; the current scaffold comparator surfaces that case as warning `W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT` and keeps the top-level result on the shared inconclusive path.
-- `src/test/kotlin/dev/xhtmlinlinecheck/semantic/SemanticElNormalizationTest.kt` is the normalization contract for this seam. Extend it first when changing canonical binding ids, local-vs-global root handling, or shadowing behavior, because `FaceletsAnalyzerScaffoldTest` now depends on it for comparison-facing alpha-rename and capture regressions.
-- `SemanticElNormalizationTest` now also locks three comparison-facing cases beyond the basic single-binding rename: composite EL with multiple alpha-renamed local bindings must normalize identically, preserved inner shadowing must stay equivalent even if an outer shadowed binding is renamed, and removing an inner iterator shadowing layer must change the canonical captured binding for otherwise identical EL text. Keep future node-matching and comparator work aligned with those normalization expectations instead of reinterpreting capture at compare time.
-- Reusable fixture coverage for early include-parameter scope regressions now lives at `fixtures/support/include-param-scope/` and is exercised by `src/test/kotlin/dev/xhtmlinlinecheck/semantic/IncludeParameterFixtureScopeTest.kt`. Use that support fixture when changing include expansion, scope snapshots, or binding provenance for `ui:param`; it locks that expanded descendants still resolve the include parameter with include-site logical provenance from the `ui:param` value attribute, while an inline rewrite with identical-looking `#{label}` markup but no replacement binding does not silently keep that scope.
-- `fixtures/support/include-param-scope/` now also carries a semantic-node-visible `rendered="#{label}"` regression and is exercised by `src/test/kotlin/dev/xhtmlinlinecheck/semantic/IncludeParameterFixtureSemanticNodeTest.kt`. Use that seam before deeper matcher/comparator work: it locks that include expansion preserves `ui:param` visibility all the way into descendant semantic-node EL normalization (`#{binding#1}` on the expanded old node) while the inline rewrite of the same markup stays unresolved as `#{global(label)}`.
-- `ui:repeat` iterator binding creation is also already implemented through the shared registry-to-scope path: `TagRules.kt` emits `ITERATION_VAR` and `VAR_STATUS` rules from `var` / `varStatus`, `ScopeStackModel.elementBindings(...)` turns them into descendant-only scope entries, and `ScopeStackModelTest` locks both repeat visibility and nested shadowing. Future EL normalization should consume `SemanticModel.scopeModel.resolve(...)`/`visibleBindingsAt(...)` rather than adding separate repeat-variable handling.
-- `ScopeStackModelTest` now includes a combined nested-scope regression that asserts actual `ScopeSnapshot` transitions and per-frame bindings across `c:set`, `ui:param`, `ui:repeat`, and `c:forEach` together. Use that test when changing scope traversal or binding lifetimes; it locks the intended push/pop behavior where include params and iterator vars create descendant-only frames, `c:set` persists into later siblings inside the current branch, and descendant bindings do not leak back outside the include/repeat boundary.
-- Local shadowing is now an explicit scope-stack contract, not just an emergent property of `visibleBindingsAt(...)` ordering: `ScopeStackModel.resolve(...)` walks the active scope chain directly and returns the nearest matching binding, while `visibleBindingsAt(...)` still returns the full inner-to-outer stack for diagnostics. Variable-capture and alpha-renaming work should depend on `resolve(...)` for semantic lookup and reserve `visibleBindingsAt(...)` for explanation/reporting paths.
-- `ScopeStackModelTest` now also locks two comparison-facing shadowing scenarios: preserved inner shadowing must keep the same EL root bound to the innermost iterator across old/new trees, while flattening that removes the inner shadowing must make the same root name resolve from `ITERATION_VAR` to the outer `c:set`. When EL normalization/comparison lands, treat those tests as the prerequisite capture-regression contract.
-- `XhtmlSyntaxTree.normalizedStructureRoots()` and `LogicalNode.isTransparentStructureWrapper` now resolve element transparency through `TagRuleRegistry.builtIns()` instead of hardcoded facelets tag-name checks. Keep future wrapper or component semantics centralized in the registry so syntax, semantic extraction, and comparison stay aligned.
-- Custom tag-rule injection is now exercised end to end in `XhtmlSyntaxParserIncludeExpansionTest`: if later work needs alternate or project-specific Facelets semantics, thread the registry through `FaceletsAnalyzer.scaffold(tagRules)` so loader, parser, and semantic stages stay on the same rule set.
-- `src/test/kotlin/dev/xhtmlinlinecheck/rules/TagRuleRegistryTest.kt` now locks two registry contracts needed by upcoming semantic work: repeated lookup must be deterministic across exact-rule, namespace-default, and fallback overlays, and same-local-name collisions across namespaces must not leak Facelets include semantics onto unrelated tags.
-- System Gradle 9.4.0 is now installed and can bootstrap the repository, but restricted environments may need `GRADLE_USER_HOME`, `TEMP`, and `TMP` redirected to writable repository-local directories before Gradle can extract native libraries reliably on Windows.
-- Repository baseline verification scripts now split by shell: use `scripts/verify-baseline.bash` on Unix-like shells and `scripts/verify-baseline.ps1` on Windows PowerShell; both run `gradle test`, `gradle installDist`, and `gradle runFaceletsVerify` against `fixtures/support/smoke/`.
-- On locked-down Windows shells, `scripts/verify-baseline.ps1` may need to be invoked via `powershell -ExecutionPolicy Bypass -File scripts/verify-baseline.ps1` because direct script execution can be blocked by local execution-policy settings even when the script itself is correct.
-- The first Gradle run still needs network access or a prewarmed cache for the Kotlin plugin and Maven dependencies. In this sandbox, plugin resolution remained blocked after fixing the temp-directory issue, so compile/test execution could not be completed end to end here.
-- Verification remains blocked the same way for semantic EL work: even targeted `gradle test --tests dev.xhtmlinlinecheck.semantic.SemanticElExtractionTest ...` fails before compilation because Gradle cannot resolve `org.jetbrains.kotlin.jvm` `2.1.10` from the plugin portal in this sandbox. If the cache is prewarmed or network access is restored, rerun the semantic test slice first before broader fixture suites.
-- `docs/development-tasks.md` is now organized as larger completion-oriented work packages rather than a flat task queue. Use it as the primary sequencing guide for remaining MVP work: it intentionally groups tightly coupled EL, semantic-node, target-resolution, matching, reporting, and release-hardening changes into vertical slices that should be finished with their most relevant tests and fixtures together.
-- The repository now treats `dummy/` as an unverified realistic sample corpus rather than a canonical fixture: `dummy/report.xhtml` is the original page, `dummy/report-flattened.xhtml` is a refactored counterpart, and the pair must not be assigned an expected semantic verdict until it is reviewed explicitly.
-- When adding future canonical fixtures under `fixtures/`, prefer minimizing focused slices from `dummy/` instead of inventing toy examples first. Keep direct tests over `dummy/` at smoke coverage level unless a later task deliberately classifies the sample pair.
-- Treat `dummy/report.xhtml` and `dummy/report-flattened.xhtml` as the first realism source when selecting or minimizing canonical comparison fixtures. Start from that pair before inventing alternate examples, but keep the pair itself unclassified until a later task records an explicit trusted verdict.
-- `src/test/kotlin/dev/xhtmlinlinecheck/testing/DummySampleFixtureSmokeTest.kt` is the current guardrail for that sample corpus. It only asserts that the current loader/parser pipeline can load and parse the `dummy/` roots and that the original page still contains include boundaries; it intentionally does not assert equivalence or non-equivalence.
-- The MVP EL parser boundary is now documented in `docs/el-grammar-subset.md` and referenced from `SPEC.md`, `docs/execution-plan.md`, `docs/architecture.md`, and `README.md`. Future EL tokenization, normalization, semantic extraction, and unsupported-diagnostic work should treat that document as the single source of truth: supported forms include container templates, identifiers, property/index access, method-call shape, boolean/equality/relational guards, ternaries, parentheses, and scalar literals; unsupported forms such as namespaced functions, collection literals, lambdas, assignments, arithmetic/concatenation beyond unary minus, selection/projection operators, and invalid containers must produce explicit unsupported handling that feeds `INCONCLUSIVE`.
-- The first concrete EL implementation now lives under `src/main/kotlin/dev/xhtmlinlinecheck/el/` as a standalone deterministic tokenizer/parser seam. `ElParser.parseTemplate(...)` preserves mixed literal plus `#{...}` / `${...}` container segments, `parseExpression(...)` covers the documented MVP subset, and unsupported forms currently surface as `ElParseException` with source offsets rather than being normalized implicitly.
-- `src/test/kotlin/dev/xhtmlinlinecheck/el/ElParserTest.kt` is the grammar-boundary regression suite for EL work. Extend it first when changing operators, suffix parsing, or unsupported-form handling, because later semantic-node and normalization code should build on this AST instead of reparsing EL ad hoc from attributes or text nodes.
-- `ElParserTest` now explicitly locks nested property/index parsing, boolean literals inside ternaries and method arguments, and unsupported collection-literal / assignment / semicolon forms. Treat that file as the contract for where the MVP EL grammar stops before deeper semantic comparison work extends normalization or unsupported diagnostics.
-- Gradle verification for the new EL tests still cannot run in this sandbox because the Kotlin Gradle plugin cannot be resolved from the network. The intended command remains `gradle test --tests dev.xhtmlinlinecheck.el.ElParserTest` with `GRADLE_USER_HOME`, `TEMP`, and `TMP` redirected inside the repository on Windows.
-- Comparison-ready semantic nodes now live in `src/main/kotlin/dev/xhtmlinlinecheck/semantic/SemanticNodeModels.kt` and are built by `SemanticNodeExtractor`. `SemanticModel.semanticNodes` is the semantic-layer handoff for stable path-derived node ids, explicit component `id`, rendered EL facts, target-bearing attributes, transparency flags, ancestry stacks, and node-level provenance/location; future matcher and structural-comparison work should consume that list instead of reading raw syntax nodes directly.
-- `SemanticNodeExtractor` is the shared raw-tree walker for that handoff: it traverses element, include, and text nodes once, derives stable ids from `LogicalNodePath` (`node:/...`), and joins raw plus normalized EL facts back onto the same node record by syntax path. Future matcher/comparator work should extend that semantic-node model rather than rewalking syntax nodes to rediscover ids, rendered facts, targets, or provenance.
-- `SemanticNodeExtractor` intentionally joins raw extracted EL and normalized EL back onto the same syntax-path-based node facts. Include `src` / `ui:param value`, text-node EL, and rendered attributes all surface through `SemanticNode.elFacts`, while `renderedAttribute` is just the node-local shortcut for `@rendered`; keep new semantic-node facts aligned to that path-based handoff instead of inventing separate compare-time EL lookups.
-- Component-target references now have one shared semantic representation in `src/main/kotlin/dev/xhtmlinlinecheck/semantic/SemanticTargetModels.kt`: `ComponentTargetAttributeKind` fixes the supported attribute vocabulary (`for`, `update`, `render`, `process`, `execute`), `ComponentTargetAttribute` wraps the captured `SemanticNodeAttribute` for source text/location, and `ComponentTargetReference` tokenizes the value into deterministic `COMPONENT_ID` or `SEARCH_EXPRESSION` entries. Semantic extraction, future target resolution, structural matching, and target diagnostics should all use `SemanticNode.componentTargetAttributes` instead of rescanning raw attribute strings.
-- `ComponentTargetAttribute` is now explicitly built on the shared `SemanticNodeAttribute` capture rather than carrying its own duplicate raw-string fields. Keep target-bearing attributes token-first: use `attribute.rawValue` only when exact source text matters, and use `references` as the semantic payload for `for`, `update`, `render`, `process`, and `execute`.
-- Semantic target resolution now runs as a dedicated post-extraction pass in `src/main/kotlin/dev/xhtmlinlinecheck/semantic/SemanticTargetResolver.kt` before comparison or structural matching use target-bearing attributes. It rewrites each `ComponentTargetAttribute` with `resolvedReferences`, resolving `@this`, `@form`, and component-id tokens against semantic nodes instead of leaving matcher/comparator code to infer target meaning from raw strings.
-- Same-form target lookup is now the current contract for component-id references when the source node is inside an `h:form`: a unique same-form target resolves, duplicate same-form matches stay unresolved/ambiguous, and a target that only exists in another form is treated as unresolved rather than silently falling back across forms. When the source node has no form ancestry, a globally unique explicit id still resolves.
-- `SemanticNodeMatcher` now builds structural signatures from `ComponentTargetAttribute.renderResolved()` instead of raw token strings. Preserve that ordering so reordering duplicate forms with repeated local ids can still match buttons/labels by resolved target meaning rather than by document order.
-- `EquivalenceComparator.scaffold()` now compares resolved target-bearing attributes on structurally matched nodes and emits `P-TARGET-RESOLUTION_CHANGED` when the matched node's semantic target meaning drifts across old/new trees. The diagnostic currently points at the first target-bearing attribute of the affected node and explains the old/new resolved target renderings.
-- Structural ancestry is now intentionally modeled as one semantic-node value object: `SemanticNode.structuralContext` owns `formAncestry`, `namingContainerAncestry`, and `iterationAncestry`, and `SemanticNodeExtractor` computes all three together in one pass before recursing. Future matcher/comparator work should consume that combined context as the behaviorally relevant structural envelope instead of rebuilding separate ancestry stacks from syntax nodes.
-- Form ancestry is now registry-driven through `TagRule.isForm` rather than hardcoded tag-name checks. If future work adds other form-like containers or alternate rule registries, update the tag rule and let semantic-node ancestry reuse that signal.
-- `src/test/kotlin/dev/xhtmlinlinecheck/semantic/SemanticNodeExtractionTest.kt` is the regression seam for this layer. Extend it when changing semantic-node ids, ancestry stacking, target-attribute capture, wrapper transparency, or expanded provenance before touching matcher/comparator logic.
-- `SemanticNodeExtractionTest` now also locks the stronger canonical-model contract: `SemanticModel.semanticNodes` must stay in stable depth-first path order, derive `nodeId` directly from `LogicalNodePath`, and be the deterministic join point for extracted EL facts plus target-bearing attributes. Future matcher, target-resolution, or comparator work should consume `semanticNodes` as the single source of truth for those facts instead of regrouping `elOccurrences` or rescanning raw syntax attributes.
-- `SemanticNode.participatesInStructuralMatching` is now the semantic-layer gate for wrapper-free alignment: only non-transparent `ELEMENT` nodes participate, while transparent Facelets wrappers, include boundaries, and text nodes remain explicit semantic records but are intentionally excluded from structural matching.
-- Structural-context regressions are now locked in two layers: `SemanticNodeExtractionTest` asserts form ancestry, naming-container ancestry, and iteration ancestry evolve together across multiple nodes in one traversal, and `SemanticNodeMatcherTest` asserts the matcher consumes that combined context to distinguish otherwise similar nodes. Future matcher/comparator work should treat `SemanticNode.structuralContext` as the single contract for ancestry-sensitive behavior instead of recomputing separate stacks.
-- Early structural alignment now lives in `src/main/kotlin/dev/xhtmlinlinecheck/compare/SemanticNodeMatcher.kt`. The matcher now runs in three explicit stages that future comparison work should preserve in that order: unique explicit `id` anchors first, then unique explicit target-relationship anchors (`for`, `update`, `render`, `process`, `execute`) that resolve to explicit target ids/forms, then semantic-signature fallback.
-- Semantic-signature fallback is no longer allowed to zip equal-size groups by document order. It only pairs mutually unique candidates and requires nearest already matched structural ancestors to agree, which keeps anonymous descendant alignment stable when include flattening or wrapper churn changes path order under already matched parents.
-- `src/test/kotlin/dev/xhtmlinlinecheck/compare/SemanticNodeMatcherTest.kt` is the regression seam for include-only and wrapper-only rewrites. Use it before broadening comparator behavior; it locks that transparent wrapper differences change semantic-node paths but do not leave unmatched structural candidates or invent false structural drift.
-- `SemanticNodeMatcher` fallback alignment now uses an explicit semantic-signature model instead of a coarse node-name string. The signature combines namespace-aware tag identity, syntax role, ancestor explicit ids, iteration binding kinds, rendered guards, resolved target attributes, and node-local EL fact fingerprints with occurrence-local binding renumbering (`binding#1`, `binding#2`, ...) so safe alpha-renames and unrelated earlier bindings do not destabilize matching.
-- `EquivalenceComparator.scaffold()` now treats structural alignment as a first-class counted comparison pass before deeper mismatch rules land: every matcher pair contributes one matched structural fact, and each leftover unmatched structural candidate now becomes `P-STRUCTURE-UNMATCHED_NODE` with side-specific provenance/snippet plus a stable "no trustworthy match" explanation. Keep later form/naming-container/rendered mismatch rules layered on top of this pass instead of bypassing matcher leftovers.
-- `FaceletsAnalyzerScaffoldTest` now locks the comparator-level alignment contract for include-inlined pages and wrapper-only rewrites: both scenarios must stay free of `P-STRUCTURE-UNMATCHED_NODE` and keep structural counts fully matched even though broader comparison still ends as scaffolded `INCONCLUSIVE`.
-- For matcher-related verification on Windows, set `GRADLE_USER_HOME=C:/projects/xhtml-inline-check/.gradle-user-home` and `TEMP` / `TMP` to `C:/projects/xhtml-inline-check/.tmp` first; that avoids the `native-platform.dll` startup failure, but this sandbox still cannot execute the tests because the Kotlin Gradle plugin must be fetched from the plugin portal and network access is unavailable.
-- Matched-node semantic comparison now lives in `src/main/kotlin/dev/xhtmlinlinecheck/compare/EquivalenceComparator.kt` rather than a global zip over `normalizedElOccurrences`. For structurally matched nodes it checks, in order, non-`rendered` normalized EL facts, normalized `rendered` guards, form ancestry, naming-container ancestry, iteration ancestry, and resolved target attributes.
-- `EquivalenceComparator` now emits internal compare findings first and translates them into final `Problem`s only after duplicate/cascade suppression. Keep future compare work on that two-step seam instead of creating reportable `Problem`s inline from each raw mismatch, otherwise aggregate sanity checks and wrapper fallout will become noisy again.
-- Structural ancestry drift now has dedicated comparator diagnostics beyond unmatched nodes: `P-STRUCTURE-FORM_ANCESTRY_CHANGED`, `P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED`, `P-STRUCTURE-ITERATION_ANCESTRY_CHANGED`, and `P-STRUCTURE-RENDERED_GUARD_CHANGED`. Use those ids for fixture expectations and report assertions instead of overloading `P-STRUCTURE-UNMATCHED_NODE`.
-- The matched-node comparator remains intentionally conservative about bean-level meaning: if a matched EL fact on either side still contains unresolved global roots, it emits `W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT` for that matched fact and does not count the fact as checked, even when the nodes themselves are already structurally aligned.
-- `FaceletsAnalyzerScaffoldTest` now covers matched-node drift for explicit-id-anchored nodes across form ancestry, naming-container ancestry, iteration ancestry, rendered guards, and target resolution. Extend that file first when changing compare-time mismatch ordering or summary headlines, because `AnalysisReportAssert.hasProblemIds(...)` locks problem order exactly.
-- The compare layer now has a second structural-validation seam beyond one-to-one node pairs. `EquivalenceComparator.scaffold()` first emits per-tree `P-STRUCTURE-ID_COLLISION` diagnostics for duplicate explicit ids on either side, then after structural matching runs aggregate unmatched-node sanity checks for explicit-id inventory (`P-STRUCTURE-ID_SANITY_CHANGED`), target-bearing attributes (`P-TARGET-SANITY_CHANGED`), and structural ancestry inventory (`P-STRUCTURE-ANCESTRY_SANITY_CHANGED`).
-- Current suppression rules intentionally prefer the most navigable local explanation over aggregate fallout: duplicate-id collisions suppress duplicate-id unmatched/sanity noise, unmatched target-bearing nodes collapse into `P-TARGET-SANITY_CHANGED`, form-ancestry drift suppresses the same node's naming-container drift, and ancestor wrapper fallout is suppressed when a matched descendant already proves the structural change more directly.
-- Those global sanity checks intentionally look only at unmatched structural nodes, so matched nodes still use the dedicated pairwise ancestry/target diagnostics while unmatched regions keep broader id/target/ancestry drift visible. When changing matcher behavior or problem ordering, re-check `FaceletsAnalyzerScaffoldTest` cases for unmatched-node fallout, duplicate ids, and unmatched target drift.
-- The first-pass canonical comparison corpus now covers `safe-include-inline`, `safe-alpha-renaming`, `lost-ui-param`, `variable-capture-regression`, `form-ancestry-drift`, `naming-container-ancestry-drift`, `changed-for-target`, `changed-ajax-target`, `dynamic-include`, and `inconclusive-but-not-proven-wrong`. Keep new analyzer, reporter, and CLI tests anchored to those fixture directories before inventing ad hoc inline trees.
-- The built-in tag registry now treats `h:dataTable` as a non-form naming container. Use it when a fixture or temp-tree test needs to prove `P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED` without also triggering `P-STRUCTURE-FORM_ANCESTRY_CHANGED`; iteration semantics for `h:dataTable` are still not modeled separately.
-- Reporter output is now driven through shared report-view helpers in `src/main/kotlin/dev/xhtmlinlinecheck/report/ReportRenderingModels.kt` rather than renderer-local aggregate formatting. Keep text and JSON changes on that seam so counts, coverage, warning totals, location detail payloads, and binding-origin/include-stack rendering stay aligned.
-- `AnalysisReport` now exposes deterministic reporter-facing diagnostic views through `orderedProblems`, `errors`, and `warnings`. Prefer those over raw constructor order when asserting output contracts or rendering reports, so stable ordering remains `errors before warnings`, then category/id/location.
-- `TextReportRenderer` is now result-shaped instead of one-size-fits-all: `EQUIVALENT` stays concise with visible warning one-liners, `NOT_EQUIVALENT` renders detailed problem blocks plus separate warning summaries, and `INCONCLUSIVE` renders warning details prominently even when no mismatch was proven.
-- `JsonReportRenderer` now emits top-level `problems` and `warnings` arrays separately and builds JSON through Jackson over ordered linked maps instead of hand-built string concatenation. Keep field order deliberate (`result`, `summary`, `problems`, `warnings`, `stats`) and update `JsonReportRendererOrderingTest` when the machine-readable contract intentionally changes.
-- Full reporter snapshot coverage now lives in `src/test/kotlin/dev/xhtmlinlinecheck/report/ReportRendererGoldenTest.kt` with checked-in goldens under `src/test/resources/dev/xhtmlinlinecheck/report/golden/`. Use those snapshots for deliberate text/JSON contract changes across result states; keep the narrower renderer tests for metadata-specific assertions like attribute fallback and binding-origin rendering.
-- Reporter golden coverage now also includes an `ordered-diagnostics` snapshot that feeds both renderers an intentionally unsorted mixed-diagnostic report with multiple errors and warnings, include provenance, binding origins, and nontrivial counts. Use that case when changing reporter ordering or payload shape: it locks the full text/JSON contract for diagnostic ordering, stable ids, provenance rendering, and aggregate statistics in one end-to-end fixture instead of relying only on narrower ordering assertions.
-- CLI/reporting controls now hang off stable diagnostic ids and the shared report-view layer instead of ad hoc string post-processing. `FaceletsVerifyCli` supports `--max-problems <n>`, `--fail-on-warning`, and standalone `--explain <problem-id>` in both text and JSON modes; keep future control flags on that same seam so text/json behavior stays aligned.
-- `FaceletsVerifyCli` now has two explicit execution modes: analysis mode requires exactly two root XHTML paths, while `--explain <problem-id>` is standalone and rejects analysis-only flags. Unknown `--flag` tokens are treated as usage errors instead of being misparsed as root paths.
-- CLI-to-analyzer wiring now normalizes root paths minimally and base directories eagerly before building `AnalysisRequest`: roots keep relative-vs-absolute intent, but `baseOld` / `baseNew` are converted to absolute normalized anchors at the CLI boundary so loader-side include resolution stays deterministic.
-- Analysis failures are now a first-class CLI outcome distinct from semantic comparison results: the CLI catches analyzer exceptions, renders a deterministic `ANALYSIS_FAILED` payload in the selected `--format` (`text` or `json`), and exits with code `2` per the spec instead of leaking an uncaught exception path.
-- The intended targeted verification command for that real-entrypoint seam on Windows remains `gradle test --tests dev.xhtmlinlinecheck.cli.FaceletsVerifyEntrypointSmokeTest` with `GRADLE_USER_HOME=C:/projects/xhtml-inline-check/.gradle-user-home` and `TEMP` / `TMP` set to `C:/projects/xhtml-inline-check/.tmp`; in this sandbox it still fails before execution if the Kotlin Gradle plugin is not already cached locally because network access is unavailable.
-- `ReportRenderOptions.maxProblems` caps displayed diagnostics only after `AnalysisReport.orderedProblems` has already established stable ordering, and the cap applies across the combined ordered diagnostic stream before renderers split it back into `problems` and `warnings`. `JsonReportRenderer` now adds a top-level `display` object only when truncation is requested, while `TextReportRenderer` surfaces the same limit as a single summary line.
-- `--fail-on-warning` is intentionally an exit-code-only control: it does not rewrite `AnalysisReport.result` or reporter text. If warnings are present, the CLI exits `2` unless a proven mismatch already forces exit `1`; informational scaffold warnings therefore still render under `EQUIVALENT` output but fail CI when the flag is set.
-- The documented `--verbose` flag is now accepted as a no-op compatibility switch. Preserve that parsing contract unless a later task intentionally introduces richer verbose-only output.
-- Stable diagnostic help for `--explain` now lives in `src/main/kotlin/dev/xhtmlinlinecheck/domain/DiagnosticIds.kt` under `DiagnosticCatalog`. Add new diagnostic ids together with their catalog definition so CLI explain mode, future docs, and test assertions all share the same summary/explanation/hint metadata.
-- Analyzer profiling is now available without changing normal CLI output: set `XHTML_INLINE_CHECK_PROFILE=1` or `-Ddev.xhtmlinlinecheck.profile=true` to emit stage timings to stderr. `FaceletsAnalyzer` reports `load`, `parse`, `semantic`, and `compare`, and `SemanticAnalyzer` nests `semantic.old/new`, `scope`, `extract+normalize`, and `targets` timings underneath.
-- Repeatable larger-tree profiling helpers now live at `scripts/profile-analyzer.ps1` and `scripts/profile-analyzer.bash`. They run the analyzer against `dummy/report.xhtml` vs `dummy/report-flattened.xhtml` with `--base-old dummy --base-new dummy` and print only `[profile]` timing lines for multiple iterations.
-- The semantic hot path no longer walks each syntax tree once for EL extraction and then again for semantic-node extraction. `SemanticTreeExtractor` now does one depth-first walk per tree, collects EL occurrences and base semantic nodes together, then materializes normalized EL facts onto those already visited nodes before target resolution.
-- Iteration ancestry lookups should now use `ScopeStackModel.bindingById(...)` rather than scanning `ScopeStackModel.bindings` linearly. The previous `bindings.first { it.id == bindingId }` pattern sat inside the per-node semantic walk and became avoidable waste on larger trees with many iterator bindings.
-- The in-repo large sample still shows why parser/semantic work must be evidence-driven: `dummy/report.xhtml` references the same `YIELD_ACCURACY_COLUMN.xhtml` include seven times, so repeated full-tree passes add up quickly even before broader parser-template caching is considered.
-- Verification remains environment-sensitive here: `gradle` can start with the repository-local `GRADLE_USER_HOME`, but this sandbox still cannot complete compilation if `org.codehaus.woodstox:woodstox-core:6.6.2` is absent from cache because network access is disabled. Use the profiling scripts only where that dependency is already cached or network access is available.
-- Representative registry coverage should now treat common dummy-sample wrappers and naming containers explicitly instead of relying on generic fallback alone: Facelets `ui:decorate` / `ui:define` / `ui:insert` / `ui:component`, JSF core `f:facet` / `f:metadata`, and third-party `custom:defaults` / `custom:injectAttributes` / `custom:with` are transparent wrappers, while `custom:dataTable` and `custom:modalPanel` are naming containers.
-- When reducing mismatch noise, prefer fixture-backed cases that prove a better primary diagnostic instead of broader compare-time suppression. The current regression seams are third-party wrapper flattening (should not emit unmatched-node or global sanity fallout) and third-party data-table ancestry drift (should emit `P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED` rather than passing silently).
-- Release-readiness deterministic-output coverage now lives in `src/test/kotlin/dev/xhtmlinlinecheck/cli/FaceletsVerifyDeterministicOutputTest.kt`. It reruns the real `MainKt` process three times per case from the repository root and asserts byte-identical stdout/stderr plus stable exit codes for representative equivalent, mismatch, inconclusive, capped-output, and `--explain` invocations. Use `scripts/verify-deterministic-output.ps1` or `scripts/verify-deterministic-output.bash` for the focused gate outside the full baseline run.
-- Release-prep workflow is now documented in `docs/release-readiness.md`. Use that file as the canonical operator-facing checklist for packaging (`installDist`, `distZip`, `distTar`), fixture/integration gates, deterministic-output verification, and first-MVP release notes structure instead of scattering release instructions across ad hoc task threads.
-- `CHANGELOG.md` now exists as the repository-level release log and starter template for the first `0.1.0` cut. Update it together with `docs/release-readiness.md` when release-significant behavior, fixture contracts, packaging steps, or operator-visible diagnostics change.
-- Repository-facing status docs now reflect the implemented MVP rather than the original scaffold state: treat `README.md` as operator-facing current-state documentation, keep `docs/architecture.md` and `docs/fixture-corpus.md` aligned to the implemented pipeline/corpus, and treat `docs/execution-plan.md` as historical rationale unless a new plan supersedes it.
+- The repository now has a single-module Gradle Kotlin CLI scaffold rooted at `build.gradle.kts` and
+  `settings.gradle.kts`.
+- The Gradle build is configured as a JVM application named `facelets-verify`; `gradle run`, `installDist`, `distZip`,
+  and `distTar` should all target that executable/distribution name.
+- Main source packages are split by responsibility under `src/main/kotlin/dev/xhtmlinlinecheck`: `cli`, `domain`,
+  `loader`, `syntax`, `semantic`, `compare`, and `report`.
+- The current analyzer stages are placeholders that intentionally return an `INCONCLUSIVE` result with warning
+  `W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD`; later tasks should replace stage internals without collapsing those
+  package boundaries.
+- `AnalysisResult` is the stable top-level outcome vocabulary: it owns the only three semantic outcomes (`EQUIVALENT`,
+  `NOT_EQUIVALENT`, `INCONCLUSIVE`), their CLI exit codes, and the shared derivation rule (`mismatch -> NOT_EQUIVALENT`,
+  otherwise blocker -> `INCONCLUSIVE`, otherwise `EQUIVALENT`).
+- Final result derivation now uses `WarningTotals.blocking` rather than "any warning at all": the generic scaffold
+  warning `W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD` is informational and must not block an `EQUIVALENT` result when all
+  checked facts match, while unsupported include/EL/global-root warnings still keep the report `INCONCLUSIVE` unless a
+  mismatch was already proven.
+- Baseline tests live under `src/test/kotlin`; reusable helpers are under `src/test/kotlin/dev/xhtmlinlinecheck/testing`
+  with `FixtureScenarios` for repository fixtures, `TemporaryProjectTree` for per-test XHTML trees, and
+  `assertThatReport(...)` for concise report assertions.
+- Core library choices are now wired in `build.gradle.kts`: use `Clikt` for CLI parsing, `Woodstox` for namespace-aware
+  StAX parsing and location capture, and `Jackson Kotlin` for deterministic JSON reporting plus fixture-contract
+  loading.
+- Namespace-aware XML entry is now centralized in `src/main/kotlin/dev/xhtmlinlinecheck/xml/NamespaceAwareXml.kt`, which
+  explicitly instantiates `WstxInputFactory` with namespaces on, DTD/external entities off, and character coalescing on.
+  Loader include discovery and syntax-tree parsing should keep sharing that helper instead of creating new ad hoc
+  `XMLInputFactory` instances.
+- Test infrastructure now includes JUnit Jupiter parameterized tests and AssertJ in addition to `kotlin("test")`; prefer
+  those for fixture matrices, golden-output assertions, and concise domain-model checks. The shared smoke fixture
+  currently lives at `fixtures/support/smoke/`.
+- The executable jar manifest is wired to `dev.xhtmlinlinecheck.cli.MainKt` so the plain jar remains directly runnable
+  outside Gradle-managed distributions.
+- Real CLI entrypoint coverage now lives in
+  `src/test/kotlin/dev/xhtmlinlinecheck/cli/FaceletsVerifyEntrypointSmokeTest.kt`; it runs
+  `dev.xhtmlinlinecheck.cli.MainKt` in a child JVM against representative equivalent and not-equivalent fixtures,
+  invalid CLI usage, and malformed-XHTML analysis failure paths. Extend that file when the documented CLI contract
+  changes, because it is the closest test seam to the actual `facelets-verify` process without relying on an installed
+  distribution.
+- The current local baseline verification entrypoint is `scripts/verify-baseline.bash`; it intentionally wraps
+  `gradle test`, `gradle installDist`, and
+  `gradle runFaceletsVerify --args="<repo>/fixtures/support/smoke/old/root.xhtml <repo>/fixtures/support/smoke/new/root.xhtml"`
+  so packaging, the named CLI task, and smoke fixtures stay exercised together.
+- Shared source metadata now lives in `src/main/kotlin/dev/xhtmlinlinecheck/domain/LocationModels.kt` as a reusable
+  chain: `SourceDocument` identifies the analyzed file and side (`OLD` or `NEW`), `SourceLocation` adds span and
+  optional attribute context, and `Provenance` ties physical and logical locations together with an include stack.
+- Shared source-graph models now live in `src/main/kotlin/dev/xhtmlinlinecheck/domain/SourceGraphModels.kt`:
+  `SourceGraphFile` represents a loaded or expanded file, `SourceGraphEdge` captures include relationships,
+  `SourceGraphParameter` preserves include-site parameter provenance, and `SourceGraphStack` wraps include-stack steps
+  so loader and parser work can reuse the existing `Provenance` model instead of inventing parallel origin tracking.
+- Structured diagnostics now build on that same provenance chain: `ProblemLocation` wraps `Provenance` plus an optional
+  snippet, `ProblemLocations` groups old/new sides, and `Problem` owns
+  severity/category/summary/locations/explanation/hint so comparator output and report renderers share one location
+  language.
+- The scaffolded loader, syntax, and semantic stages now pass `LoadedSource`, `ParsedSourceTree`, and `SemanticModel`
+  wrappers instead of bare `Path` values so future implementation work can add include expansion and node-level
+  provenance without redefining stage contracts.
+- `LoadedSource`, `ParsedSourceTree`, and `SemanticModel` now also carry the same `SourceGraphFile` instance end to end,
+  with constructor guards that require `provenance` to come from that shared graph object. Future include-discovery and
+  expansion work should extend that graph in the loader instead of recomputing provenance separately in later stages.
+- `SourceLoader.scaffold()` now performs a namespace-aware discovery pass for Facelets `ui:include` elements and records
+  them on each root `SourceGraphFile.includeEdges`. Those discovered edges intentionally preserve the raw `src` string
+  and include-site location before resolution; later include-resolution and expansion tasks should populate
+  `includedDocument` on the same edge model rather than replacing the discovery mechanism.
+- Static include `src` values are now resolved immediately onto each discovered `SourceGraphEdge.includedDocument` via
+  `SourceDocument.resolveIncludeSource(...)`. Resolution rules are: root-anchored paths like `/fragments/table.xhtml`
+  resolve from the analysis base/root directory, relative paths resolve from the including file's parent directory, and
+  EL-bearing or blank `src` values remain unresolved for later unsupported-diagnostic handling.
+- Source-graph include discovery now also extracts direct Facelets `ui:param` children from each `ui:include` into
+  `SourceGraphEdge.parameters`, preserving declaration order plus parameter provenance. The extracted
+  `SourceGraphParameter.provenance` currently points at the `value` attribute when present, otherwise falls back to the
+  `name` attribute, so later include-expansion and scope-binding tasks can inherit include-site parameter flow without
+  inventing a second parameter-origin model.
+- `SourceLoader.scaffold()` now recursively materializes the resolved include graph into nested `SourceGraphFile`
+  instances on `SourceGraphEdge.includedFile`, while keeping unresolved, missing, or cycle-blocked includes as edges
+  with only `includedDocument`. `SourceGraphFile` now also carries the loaded file contents so later syntax/semantic
+  stages can reuse loader-owned bytes instead of rereading files.
+- Recursive include detection is now explicit in the source graph: cycle-blocked edges carry
+  `SourceGraphEdge.includeFailure` with kind `INCLUDE_CYCLE` plus the ordered repeated document chain, and the loader
+  stops expansion at that edge instead of recursing further.
+- The syntax layer now builds a first logical XHTML tree in
+  `src/main/kotlin/dev/xhtmlinlinecheck/syntax/LogicalTreeModels.kt`. `XhtmlSyntaxTree` wraps `LogicalElementNode`,
+  `LogicalTextNode`, and `LogicalIncludeNode` values so old/new trees can already be compared over the same
+  include-expanded structure.
+- Every `LogicalNode` in the syntax tree now carries an explicit shared `SourceLocation` as `location` in addition to
+  `provenance`; later semantic extraction and diagnostics should use that node field for element/text/include positions
+  rather than reconstructing locations from `Provenance`.
+- The expanded parser output is now wrapped in `XhtmlSyntaxTree`, exposed as `ParsedSourceTree.syntaxTree`, and carried
+  into `SemanticModel.syntaxTree`. Later semantic and comparison work should consume that syntax-tree object rather than
+  reaching back into loader internals for expanded XHTML structure.
+- `XhtmlSyntaxTree.walkDepthFirst(...)` is the shared traversal helper for downstream syntax-tree walks. Reuse it for
+  semantic extraction and syntax-level diagnostics instead of duplicating recursive include/element traversal in each
+  stage.
+- The syntax model now exposes a normalized structural view that flattens transparent wrappers without deleting the raw
+  provenance-bearing nodes: use `XhtmlSyntaxTree.normalizedStructureRoots()`,
+  `LogicalNode.normalizedStructureChildren()`, or `XhtmlSyntaxTree.walkNormalizedStructureDepthFirst(...)` when semantic
+  extraction or matching should ignore include inlining, `ui:composition`, and `ui:fragment` wrapper-only structure.
+  Keep using the raw tree (`root`, `children`, `LogicalIncludeNode`) when diagnostics need explicit include boundaries
+  or exact parsed wrapper nodes.
+- `LogicalElementNode` now also preserves `namespaceBindings` declared on each element alongside qualified element and
+  attribute names. Future namespace-rule or tag-registry work should consume those declarations from the syntax tree
+  rather than reparsing raw `xmlns:*` text.
+- Namespace preservation is now explicitly covered at the loader/syntax seam: `SourceLoaderIncludeDiscoveryTest` locks
+  include discovery to the Facelets namespace URI rather than the literal `ui` prefix, and
+  `XhtmlSyntaxParserNamespaceAwareTest` locks namespace bindings and qualified names across include expansion, including
+  default-namespace rebinding inside included fragments. Keep future parser or registry work compatible with those
+  expectations.
+- Treat the raw syntax tree as stable semantic input: parser changes must preserve qualified element names, namespace
+  URIs/prefixes, attribute lists and values, and original child ordering so rule-registry, semantic-extraction, and
+  comparator work all consume the same deterministic structure.
+- `XhtmlSyntaxParser.scaffold()` now expands resolved `ui:include` edges into explicit `LogicalIncludeNode` boundaries
+  whose `children` contain the recursively parsed included subtree and whose provenance/include-stack comes from the
+  source graph. Unresolved include paths and cycle-blocked includes remain as empty include-boundary nodes instead of
+  disappearing, and `LogicalIncludeNode.includeFailure` preserves source-graph failures for downstream diagnostics.
+- Expanded syntax nodes now split provenance cleanly: `physicalLocation` stays on the included fragment file/node, while
+  `logicalLocation` stays at the include site that injected that expanded subtree. Future diagnostics, semantic nodes,
+  and reporters should preserve that distinction instead of collapsing expanded-node provenance back to the fragment
+  file only.
+- Root-level provenance should be created with `Provenance.forRoot(document)` so diagnostics, semantic nodes, and
+  reporters all start from the same baseline physical/logical location shape before include expansion lands.
+- `SourceDocument.fromPath(...)` resolves root XHTML inputs to absolute normalized paths and stores a slash-stable
+  `displayPath`; future diagnostics and renderers should prefer that display field for deterministic cross-platform
+  output instead of calling `Path.toString()` ad hoc.
+- `SourceDocument.fromPath(...)` now resolves every root XHTML path to an absolute normalized filesystem location and
+  also stores the normalized `rootDirectory` used to anchor it. When a base directory is supplied, `displayPath` becomes
+  root-relative; otherwise it stays relative to the current working directory for relative inputs.
+- `SourceLoader.scaffold()` now applies `AnalysisRequest.baseOld` and `baseNew` directly when constructing old/new root
+  `SourceDocument`s, so include-expansion and provenance work can rely on those root anchors instead of reconstructing
+  base resolution later in the pipeline.
+- `SourceLoader.scaffold()` now reads file contents through each root `SourceDocument.absolutePath` and stores them on
+  `LoadedSource.contents`; future include discovery or expansion work should reuse that normalized document path instead
+  of re-reading raw CLI `Path` inputs.
+- Missing-root file failures now surface as `SourceLoadException`, which carries the normalized `SourceDocument` and
+  formats slash-stable diagnostics from `displayPath` plus normalized absolute path. Future missing-include diagnostics
+  should build on that same document-first path handling for cross-platform consistency.
+- Reusable include-expansion fixture coverage now lives at `fixtures/support/include-expansion/` with
+  `src/test/kotlin/dev/xhtmlinlinecheck/testing/SimpleIncludeFixturePipelineTest.kt`. That fixture intentionally
+  exercises one static `ui:include` end to end across root-path normalization, loader file reads, include
+  discovery/resolution, parameter capture, and syntax-layer logical expansion; prefer extending that scenario when
+  future tasks need a fixture-first regression around the include pipeline.
+- Nested include fixture coverage now also lives at `fixtures/support/include-expansion-nested/` and extends
+  `SimpleIncludeFixturePipelineTest` with a two-hop include tree. Use it when future work needs a reusable regression
+  for include-stack provenance and ordered `ui:param` propagation across deeper expansion rather than only a single
+  include boundary.
+- Expanded syntax-node provenance is now also locked by `fixtures/support/include-provenance-syntax/` in
+  `SimpleIncludeFixturePipelineTest`. Reuse that fixture when changing include expansion, `SourceGraphFile.provenance`,
+  or syntax-tree node construction; it proves that expanded element and text nodes keep fragment-file physical locations
+  while their logical provenance still points at the include site that injected them.
+- Missing-include fixture coverage now lives at `fixtures/support/missing-include/` and is exercised both by
+  `SimpleIncludeFixturePipelineTest` and `FaceletsAnalyzerScaffoldTest`. Use that fixture when changing missing-file
+  diagnostics or include provenance; it locks the include-site `@src` location, the resolved-but-absent target document
+  path, and the fact that no expanded child content is produced.
+- Include-cycle fixture coverage now lives at `fixtures/support/include-cycle/` and is exercised by
+  `SimpleIncludeFixturePipelineTest` plus `FaceletsAnalyzerScaffoldTest`. Reuse that scenario when changing cycle
+  detection, source-graph stacks, or recursive include provenance; it locks the ordered cycle document chain, the parent
+  include-stack step that survives onto the recursive logical boundary, and the dedicated warning's stable file-linked
+  location/snippet.
+- The first canonical comparison fixture now lives at `fixtures/inconclusive/dynamic-include/` with `expected.json` and
+  `notes.md`. `FixtureExpectations.read(...)` loads that compact contract for tests, and `FaceletsAnalyzerScaffoldTest`
+  uses it to lock the dedicated `W-UNSUPPORTED-DYNAMIC_INCLUDE` warning together with the derived top-level
+  `INCONCLUSIVE` result; future comparison fixtures should follow that same `result` + `problemIds` + `warningIds`
+  pattern instead of asserting renderer text only.
+- Canonical result-derivation fixtures now also live under `fixtures/equivalent/safe-alpha-renaming/`,
+  `fixtures/not-equivalent/variable-capture-regression/`, `fixtures/not-equivalent/form-ancestry-drift/`,
+  `fixtures/not-equivalent/changed-ajax-target/`, and `fixtures/inconclusive/inconclusive-but-not-proven-wrong/`.
+  `CanonicalFixtureComparisonTest` is the shared regression seam for those cases: keep new canonical fixtures small,
+  drive them through `expected.json`, and use them to prove the final result derivation across mismatch-vs-unsupported
+  combinations rather than only checking individual diagnostics in ad hoc temp-tree tests.
+- `FaceletsVerifyCli` now accepts `--base-old <dir>` and `--base-new <dir>` in any option order and forwards them into
+  `AnalysisRequest`; future CLI work should preserve that contract so loader-side path resolution stays deterministic.
+- `JsonReportRenderer` now emits structured `problems[*].locations.{old,new}` objects with logical location, physical
+  location, snippet, and include-stack fields; keep new reporting work aligned to that shape instead of introducing
+  parallel ad hoc payloads.
+- JSON reporter contract coverage now includes
+  `src/test/kotlin/dev/xhtmlinlinecheck/report/JsonReportRendererOrderingTest.kt`, which locks down stable key ordering
+  for top-level report fields, summary aggregates, and per-problem fields, plus string-form diagnostic ids; keep future
+  JSON changes deliberate and update those assertions when the machine-readable contract intentionally changes.
+- Comparison/report aggregate state now lives in shared domain value objects under
+  `src/main/kotlin/dev/xhtmlinlinecheck/domain/AnalysisReport.kt`: `AggregateCounts`, `AggregateCoverage`, and
+  `WarningTotals` feed both `AnalysisSummary` and `AnalysisStats`, so comparator and reporters should reuse those models
+  instead of inventing reporter-local count fields.
+- `AggregateCoverage.from(counts)` treats covered facts as `matched + mismatched` out of `checked`; use that shared
+  derivation when future comparison work starts incrementing checked fact totals so text and JSON coverage stay aligned.
+- Stable diagnostic ids now live in `src/main/kotlin/dev/xhtmlinlinecheck/domain/DiagnosticIds.kt` and use
+  kind/category/slug strings such as `P-SCOPE-BINDING_MISMATCH` and `W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD`; future
+  comparison, `--explain`, JSON, and fixture-assertion work should reuse those exact ids instead of report-local
+  ordinals like `P01`.
+- `Problem.id` is now a typed `DiagnosticId` instead of a raw string; new diagnostics should be added through
+  `ProblemIds` and `WarningIds` so severity/category consistency is enforced in the domain model before rendering or
+  fixture assertion code sees them.
+- The scaffold comparator now walks logical include boundaries for source-graph failures and emits blocking warning
+  `W-UNSUPPORTED-INCLUDE_CYCLE` with the recursive document chain before the generic scaffold warning. Later
+  include-related diagnostics should extend that same failure-to-problem path instead of special-casing loader
+  exceptions.
+- Static `ui:include` paths that resolve to a normalized `SourceDocument` but do not exist on disk now carry
+  `SourceGraphIncludeFailureKind.MISSING_FILE` plus the resolved target document. The scaffold comparator turns those
+  boundaries into blocking warning `W-UNSUPPORTED-MISSING_INCLUDE`, reusing the include-site provenance and the raw
+  `src` value as the actionable snippet.
+- Dynamic `ui:include src` expressions are now first-class include failures: the loader tags EL-bearing `src` values as
+  `SourceGraphIncludeFailureKind.DYNAMIC_PATH`, syntax preserves that failure on `LogicalIncludeNode`, and the scaffold
+  comparator turns it into blocking warning `W-UNSUPPORTED-DYNAMIC_INCLUDE` so result derivation can later keep using
+  the shared unsupported-to-`INCONCLUSIVE` path.
+- Attribute-bearing `SourceLocation`s now carry explicit `AttributeLocationPrecision` metadata. With the current
+  Woodstox/StAX reader path, attribute locations are preserved as `attributeName + ELEMENT_FALLBACK` on the owning
+  element coordinates rather than being treated as silently exact; later EL/target extraction should keep threading that
+  precision through diagnostics instead of assuming attribute column fidelity that the parser does not provide yet.
+- Low-level XML location capture is now covered directly in
+  `src/test/kotlin/dev/xhtmlinlinecheck/xml/NamespaceAwareXmlTest.kt`. Extend that seam first when changing
+  `NamespaceAwareXml.toSourceLocation(...)`, because loader and syntax tests above it already assume Woodstox line
+  capture for elements and explicit `ELEMENT_FALLBACK` attribute context on the same coordinates.
+- `JsonReportRenderer` now emits both the rendered location strings and structured `logicalLocationDetails` /
+  `physicalLocationDetails` objects with `document`, `line`, `column`, `attributeName`, and
+  `attributeLocationPrecision`. Extend that existing payload if reporters or editor integrations need richer navigation
+  instead of inventing a parallel location schema.
+- Built-in tag semantics now live in `src/main/kotlin/dev/xhtmlinlinecheck/rules/TagRules.kt`. `TagRule` is the shared
+  interface for binding creation, transparency, naming-container status, EL-bearing attributes, and target-bearing
+  attributes; extend that registry before adding tag-specific semantic extraction or comparator behavior anywhere else.
+- Generic component semantics now split cleanly between syntax attributes and registry metadata: treat `id` as a
+  universal structural anchor read directly from `LogicalElementNode.attributes`, while `TagRule.targetAttributeNames`
+  and `TagRule.elAttributeNames` define which companion attributes (`for`, `update`, `render`, `process`, `execute`, and
+  `rendered`) must be extracted into semantic facts for later comparison. Future semantic extraction should derive one
+  deterministic per-node view from that combination instead of introducing separate hardcoded attribute scanners in
+  scope or compare code.
+- `h:form` is already an explicit built-in JSF HTML rule in `TagRules.kt`: it marks the tag as a naming container and
+  merges the shared JSF HTML/default target semantics (`for`, `update`, `render`, `process`, `execute`) plus `rendered`.
+  Form-ancestry, target-resolution, and moved-component diagnostics should reuse that existing registry entry instead of
+  reintroducing `h:form` checks elsewhere.
+- `TagRule` now also carries an explicit `syntaxRole` (`ELEMENT`, `INCLUDE`, `INCLUDE_PARAMETER`), and
+  `TagRuleRegistry.resolve(...)` returns a non-null deterministic rule. Loader include discovery, syntax parsing,
+  syntax-node transparency, and semantic-model handoff should all consume that same registry path instead of
+  re-hardcoding namespace/local-name checks.
+- Facelets include-family built-ins are now intentionally explicit instead of inheriting the generic fallback rule:
+  `ui:include` is the only include syntax node and only exposes EL on `src`; `ui:param` is the only include-parameter
+  syntax node and only exposes its binding rule plus EL on `value`; `ui:composition` and `ui:fragment` are explicit
+  transparent wrappers with no generic `rendered` or target-attribute semantics. Future include, scope, or
+  transparent-wrapper work should preserve that split so parser and matcher behavior stays aligned.
+- Shared binding vocabulary now lives in `src/main/kotlin/dev/xhtmlinlinecheck/domain/BindingModels.kt`, not in
+  `TagRules.kt`. Future scope-stack, binding-origin, and EL-normalization work should consume `BindingKind` from that
+  domain model so rule-registry metadata and later semantic/scope models stay on one enum with explicit support for
+  `UI_PARAM`, `ITERATION_VAR`, `VAR_STATUS`, `C_SET`, and `IMPLICIT_GLOBAL`.
+- `ui:repeat` is already a first-class built-in tag rule in `TagRules.kt`: it introduces `ITERATION_VAR` and
+  `VAR_STATUS` bindings from `var` / `varStatus`, inherits generic component target attributes, and marks `value`,
+  `offset`, `size`, `step`, and fallback `rendered` as EL-bearing. Binding, iteration-ancestry, EL-normalization, and
+  variable-capture tasks should build on that existing registry contract rather than adding ad hoc repeat handling
+  elsewhere.
+- JSTL core tags now share that same built-in registry path: `c:set` introduces `C_SET` from `var`, `c:forEach`
+  introduces the shared `ITERATION_VAR` from `var` plus shared `VAR_STATUS` from `varStatus`, and `c:if` models its
+  guard through EL on `test`. Because these rules still inherit the fallback contract, they also keep generic `rendered`
+  EL and component-target attributes; future JSTL scope or guard analysis should read those semantics from
+  `LogicalElementNode.tagRule` instead of rechecking namespace/local-name pairs.
+- Repository-local git commands may need `git -c safe.directory=C:/projects/xhtml-inline-check ...` in this environment
+  because plain `git` rejects the worktree as dubious ownership under the current user SID.
+- The built-in registry layers generic JSF/component target behavior deliberately: the fallback rule covers `rendered`
+  plus `for`, `update`, `render`, `process`, and `execute`, while the JSF HTML namespace default narrows that
+  namespace-specific overlay to `rendered` plus `for`. Semantic extraction should preserve which target-bearing
+  attributes were actually present on a node, and target comparison should resolve and compare those extracted
+  references through the same normalized node facts that also carry `id`, naming-container ancestry, and form ancestry.
+- `LogicalElementNode` now stores its resolved `tagRule`, and `SemanticModel` carries the shared `tagRules` instance
+  used to build it. Future scope-building and structural-analyzer tasks should read tag semantics from those existing
+  fields so later rule changes stay centralized and deterministic.
+- Tree-position-aware scope state now lives in `src/main/kotlin/dev/xhtmlinlinecheck/semantic/ScopeStackModel.kt` and is
+  built automatically into `SemanticModel.scopeModel`. Use `ScopeStackModel.snapshotAt(path)` plus
+  `resolve(name, path, ScopeLookupPosition.NODE|DESCENDANT)` when later EL extraction or normalization needs to
+  distinguish a tag's own attribute scope from the bindings visible inside its subtree.
+- `XhtmlSyntaxTree.walkDepthFirstWithPath(...)` is the shared way to obtain stable `LogicalNodePath` values while
+  traversing the raw syntax tree. Reuse that helper when later semantic, EL, or comparison work needs to attach facts to
+  precise tree positions instead of re-deriving child-index paths ad hoc.
+- The scope builder currently applies binding lifetimes intentionally by construct: `ui:param`, `ui:repeat`,
+  `varStatus`, and `c:forEach` bindings are descendant-only and pop when their node exits, while `c:set` persists for
+  later sibling positions within the current enclosing scope. Preserve that distinction unless the JSTL/Facelets
+  semantics are being changed deliberately with matching tests.
+- `c:forEach` now mirrors `ui:repeat` iterator semantics in the shared registry-to-scope path: both tags emit
+  `ITERATION_VAR` for `var`, both emit `VAR_STATUS` for `varStatus`, and `ScopeStackModelTest` locks that the JSTL loop
+  still keeps its own `c:forEach var=...` origin descriptor while shadowing and popping like a descendant-only iterator
+  scope.
+- Scope traversal now models entry and exit explicitly through per-node transitions in `ScopeStackBuilder`:
+  registry-defined bindings are pushed into a descendant scope when entering a node, then popped on exit unless the node
+  introduced `c:set`, which intentionally persists into later siblings. Keep later scope or EL work aligned with that
+  enter/leave contract instead of reintroducing implicit return-value-only lifetime rules.
+- `c:set` lifetime is now locked more precisely by `ScopeStackModelTest`: the binding is not visible at the `c:set`
+  node's own `NODE` position, is visible for descendant lookups and later siblings in the same enclosing scope, and does
+  not leak past the enclosing branch that contained a nested shadowing `c:set`. Future JSTL scope changes should
+  preserve those sibling-persistence and branch-exit expectations unless the semantics are being changed deliberately.
+- Binding provenance for scope entries now stays explicit: element-introduced bindings use the binding-name attribute
+  `SourceLocation` plus the syntax node's provenance, while include-parameter bindings reuse
+  `SourceGraphParameter.provenance`. Future binding-origin or scope-mismatch diagnostics should build on
+  `ScopeBinding.origin`, `location`, and `provenance` instead of inventing a second origin descriptor path.
+- `BindingOrigin` now reuses the shared provenance model directly instead of carrying only a free-form descriptor
+  string. `ScopeBinding.origin` should be the canonical way to explain where a resolved binding came from, and
+  comparison diagnostics should surface it through `ProblemLocation.bindingOrigin` rather than inventing side-channel
+  binding-location fields.
+- Reporter contracts now expose binding-origin details when present: text output appends
+  `[binding: <descriptor> from <logical location>]`, and JSON emits `locations.{old,new}.bindingOrigin` with
+  `descriptor`, `rendered`, and provenance-backed `location`. Keep future scope-mismatch diagnostics aligned with that
+  shape so binding explanations stay consistent across text, JSON, and fixture assertions.
+- `ui:param` binding creation is already implemented in `ScopeStackModel`: `LogicalIncludeNode.parameters` become
+  descendant-only `BindingKind.UI_PARAM` entries via `bindingFromParameter(...)`, and `ScopeStackModelTest` locks both
+  visibility and include-site logical provenance for expanded include descendants. Treat follow-up `ui:param` work as
+  EL-normalization/comparison work unless that scope contract itself needs to change.
+- Registry-driven semantic EL extraction now lives in
+  `src/main/kotlin/dev/xhtmlinlinecheck/semantic/SemanticElExtractor.kt` and is exposed on
+  `SemanticModel.elOccurrences`. Treat `TagRule.elAttributeNames` as the only source of truth for which
+  element/include/include-parameter attributes feed the EL pipeline; do not add parallel hardcoded attribute scanners in
+  semantic or compare code.
+- `SemanticElOccurrence` is the shared semantic handoff for extracted EL facts. It records the owning syntax path,
+  carrier kind, optional attribute name, raw value, provenance/location, and either a parsed `ElTemplate` or a
+  `SemanticElParseFailure`; unsupported EL should stay represented there instead of being dropped or normalized
+  implicitly.
+- Unsupported extracted EL now surfaces through the scaffold comparator as file-linked warning
+  `W-UNSUPPORTED-EXTRACTED_EL` instead of remaining only an internal `SemanticElParseFailure`. That warning reuses the
+  occurrence provenance/snippet, names the owning carrier (`tag @attribute`, include param, or text node), and
+  explicitly states that the affected fact is treated as unknown so the result remains `INCONCLUSIVE`.
+- Include-site EL is intentionally covered even though `ui:param` elements are not preserved as syntax nodes after
+  expansion: `LogicalIncludeNode.sourcePath` feeds the same EL extraction model as the registry-declared
+  `ui:include src`, and `LogicalIncludeNode.parameters[*].valueExpression` feeds it for the registry-declared
+  `ui:param value`. Later normalization/comparison work should consume those extracted occurrences rather than reparsing
+  include metadata separately.
+- `src/test/kotlin/dev/xhtmlinlinecheck/semantic/SemanticElExtractionTest.kt` is the regression suite for this seam.
+  Extend it when changing which attributes are registry-declared EL sources, include-parameter EL capture, or
+  unsupported-EL propagation from semantic extraction.
+- Semantic EL extraction now also emits `SemanticElCarrierKind.TEXT_NODE` occurrences for nonblank `LogicalTextNode`s
+  that actually contain `#{...}` or `${...}` containers. Those mixed-content text nodes reuse the same
+  `ElParser.parseTemplate(...)` / `SemanticElParseFailure` path as attributes, keep text-node `SourceLocation`s with no
+  synthetic attribute name, and fall back to the parent element tag name as `ownerTagName` for diagnostics and later
+  comparison work.
+- Supported semantic EL now has a second-stage normalization pass in
+  `src/main/kotlin/dev/xhtmlinlinecheck/semantic/SemanticElNormalizer.kt`. It rewrites resolved local root identifiers
+  to canonical ids derived from `ScopeBinding.id` (`binding#<n>`), leaves unresolved roots as symbolic globals (
+  `global(name)`), and records the resolved `BindingOrigin` on each normalized occurrence for diagnostics.
+- `SemanticModel.normalizedElOccurrences` is now the comparison-facing handoff for supported EL. Future
+  matcher/comparator work should consume that list instead of reparsing `SemanticElOccurrence.template`, especially when
+  alpha-renames or shadowing-sensitive scope behavior matter.
+- The current comparator only uses normalized EL for a narrow scope slice: it compares same-shape old/new occurrences
+  that involve at least one local binding and emits `P-SCOPE-BINDING_MISMATCH` when canonical local-binding
+  normalization differs. Plain global-only EL equality, node matching, and broader structural checks are still
+  scaffolded and should not be inferred from this pass.
+- Normalized EL occurrences now also carry explicit `globalReferences` for unresolved root identifiers. Comparator work
+  must treat any occurrence that still depends on those symbolic globals as bean-level uncertainty, not as a proven
+  local-binding match or a local-binding mismatch; the current scaffold comparator surfaces that case as warning
+  `W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT` and keeps the top-level result on the shared inconclusive path.
+- `src/test/kotlin/dev/xhtmlinlinecheck/semantic/SemanticElNormalizationTest.kt` is the normalization contract for this
+  seam. Extend it first when changing canonical binding ids, local-vs-global root handling, or shadowing behavior,
+  because `FaceletsAnalyzerScaffoldTest` now depends on it for comparison-facing alpha-rename and capture regressions.
+- `SemanticElNormalizationTest` now also locks three comparison-facing cases beyond the basic single-binding rename:
+  composite EL with multiple alpha-renamed local bindings must normalize identically, preserved inner shadowing must
+  stay equivalent even if an outer shadowed binding is renamed, and removing an inner iterator shadowing layer must
+  change the canonical captured binding for otherwise identical EL text. Keep future node-matching and comparator work
+  aligned with those normalization expectations instead of reinterpreting capture at compare time.
+- Reusable fixture coverage for early include-parameter scope regressions now lives at
+  `fixtures/support/include-param-scope/` and is exercised by
+  `src/test/kotlin/dev/xhtmlinlinecheck/semantic/IncludeParameterFixtureScopeTest.kt`. Use that support fixture when
+  changing include expansion, scope snapshots, or binding provenance for `ui:param`; it locks that expanded descendants
+  still resolve the include parameter with include-site logical provenance from the `ui:param` value attribute, while an
+  inline rewrite with identical-looking `#{label}` markup but no replacement binding does not silently keep that scope.
+- `fixtures/support/include-param-scope/` now also carries a semantic-node-visible `rendered="#{label}"` regression and
+  is exercised by `src/test/kotlin/dev/xhtmlinlinecheck/semantic/IncludeParameterFixtureSemanticNodeTest.kt`. Use that
+  seam before deeper matcher/comparator work: it locks that include expansion preserves `ui:param` visibility all the
+  way into descendant semantic-node EL normalization (`#{binding#1}` on the expanded old node) while the inline rewrite
+  of the same markup stays unresolved as `#{global(label)}`.
+- `ui:repeat` iterator binding creation is also already implemented through the shared registry-to-scope path:
+  `TagRules.kt` emits `ITERATION_VAR` and `VAR_STATUS` rules from `var` / `varStatus`,
+  `ScopeStackModel.elementBindings(...)` turns them into descendant-only scope entries, and `ScopeStackModelTest` locks
+  both repeat visibility and nested shadowing. Future EL normalization should consume
+  `SemanticModel.scopeModel.resolve(...)`/`visibleBindingsAt(...)` rather than adding separate repeat-variable handling.
+- `ScopeStackModelTest` now includes a combined nested-scope regression that asserts actual `ScopeSnapshot` transitions
+  and per-frame bindings across `c:set`, `ui:param`, `ui:repeat`, and `c:forEach` together. Use that test when changing
+  scope traversal or binding lifetimes; it locks the intended push/pop behavior where include params and iterator vars
+  create descendant-only frames, `c:set` persists into later siblings inside the current branch, and descendant bindings
+  do not leak back outside the include/repeat boundary.
+- Local shadowing is now an explicit scope-stack contract, not just an emergent property of `visibleBindingsAt(...)`
+  ordering: `ScopeStackModel.resolve(...)` walks the active scope chain directly and returns the nearest matching
+  binding, while `visibleBindingsAt(...)` still returns the full inner-to-outer stack for diagnostics. Variable-capture
+  and alpha-renaming work should depend on `resolve(...)` for semantic lookup and reserve `visibleBindingsAt(...)` for
+  explanation/reporting paths.
+- `ScopeStackModelTest` now also locks two comparison-facing shadowing scenarios: preserved inner shadowing must keep
+  the same EL root bound to the innermost iterator across old/new trees, while flattening that removes the inner
+  shadowing must make the same root name resolve from `ITERATION_VAR` to the outer `c:set`. When EL
+  normalization/comparison lands, treat those tests as the prerequisite capture-regression contract.
+- `XhtmlSyntaxTree.normalizedStructureRoots()` and `LogicalNode.isTransparentStructureWrapper` now resolve element
+  transparency through `TagRuleRegistry.builtIns()` instead of hardcoded facelets tag-name checks. Keep future wrapper
+  or component semantics centralized in the registry so syntax, semantic extraction, and comparison stay aligned.
+- Custom tag-rule injection is now exercised end to end in `XhtmlSyntaxParserIncludeExpansionTest`: if later work needs
+  alternate or project-specific Facelets semantics, thread the registry through `FaceletsAnalyzer.scaffold(tagRules)` so
+  loader, parser, and semantic stages stay on the same rule set.
+- `src/test/kotlin/dev/xhtmlinlinecheck/rules/TagRuleRegistryTest.kt` now locks two registry contracts needed by
+  upcoming semantic work: repeated lookup must be deterministic across exact-rule, namespace-default, and fallback
+  overlays, and same-local-name collisions across namespaces must not leak Facelets include semantics onto unrelated
+  tags.
+- System Gradle 9.4.0 is now installed and can bootstrap the repository, but restricted environments may need
+  `GRADLE_USER_HOME`, `TEMP`, and `TMP` redirected to writable repository-local directories before Gradle can extract
+  native libraries reliably on Windows.
+- Repository baseline verification scripts now split by shell: use `scripts/verify-baseline.bash` on Unix-like shells
+  and `scripts/verify-baseline.ps1` on Windows PowerShell; both run `gradle test`, `gradle installDist`, and
+  `gradle runFaceletsVerify` against `fixtures/support/smoke/`.
+- On locked-down Windows shells, `scripts/verify-baseline.ps1` may need to be invoked via
+  `powershell -ExecutionPolicy Bypass -File scripts/verify-baseline.ps1` because direct script execution can be blocked
+  by local execution-policy settings even when the script itself is correct.
+- The first Gradle run still needs network access or a prewarmed cache for the Kotlin plugin and Maven dependencies. In
+  this sandbox, plugin resolution remained blocked after fixing the temp-directory issue, so compile/test execution
+  could not be completed end to end here.
+- `docs/development-tasks.md` is now organized as larger completion-oriented work packages rather than a flat task
+  queue. Use it as the primary sequencing guide for remaining MVP work: it intentionally groups tightly coupled EL,
+  semantic-node, target-resolution, matching, reporting, and release-hardening changes into vertical slices that should
+  be finished with their most relevant tests and fixtures together.
+- The repository now treats `dummy/` as an unverified realistic sample corpus rather than a canonical fixture:
+  `dummy/report.xhtml` is the original page, `dummy/report-flattened.xhtml` is a refactored counterpart, and the pair
+  must not be assigned an expected semantic verdict until it is reviewed explicitly.
+- When adding future canonical fixtures under `fixtures/`, prefer minimizing focused slices from `dummy/` instead of
+  inventing toy examples first. Keep direct tests over `dummy/` at smoke coverage level unless a later task deliberately
+  classifies the sample pair.
+- Treat `dummy/report.xhtml` and `dummy/report-flattened.xhtml` as the first realism source when selecting or minimizing
+  canonical comparison fixtures. Start from that pair before inventing alternate examples, but keep the pair itself
+  unclassified until a later task records an explicit trusted verdict.
+- `src/test/kotlin/dev/xhtmlinlinecheck/testing/DummySampleFixtureSmokeTest.kt` is the current guardrail for that sample
+  corpus. It only asserts that the current loader/parser pipeline can load and parse the `dummy/` roots and that the
+  original page still contains include boundaries; it intentionally does not assert equivalence or non-equivalence.
+- The MVP EL parser boundary is now documented in `docs/el-grammar-subset.md` and referenced from `SPEC.md`,
+  `docs/execution-plan.md`, `docs/architecture.md`, and `README.md`. Future EL tokenization, normalization, semantic
+  extraction, and unsupported-diagnostic work should treat that document as the single source of truth: supported forms
+  include container templates, identifiers, property/index access, method-call shape, boolean/equality/relational
+  guards, ternaries, parentheses, and scalar literals; unsupported forms such as namespaced functions, collection
+  literals, lambdas, assignments, arithmetic/concatenation beyond unary minus, selection/projection operators, and
+  invalid containers must produce explicit unsupported handling that feeds `INCONCLUSIVE`.
+- The first concrete EL implementation now lives under `src/main/kotlin/dev/xhtmlinlinecheck/el/` as a standalone
+  deterministic tokenizer/parser seam. `ElParser.parseTemplate(...)` preserves mixed literal plus `#{...}` / `${...}`
+  container segments, `parseExpression(...)` covers the documented MVP subset, and unsupported forms currently surface
+  as `ElParseException` with source offsets rather than being normalized implicitly.
+- `src/test/kotlin/dev/xhtmlinlinecheck/el/ElParserTest.kt` is the grammar-boundary regression suite for EL work. Extend
+  it first when changing operators, suffix parsing, or unsupported-form handling, because later semantic-node and
+  normalization code should build on this AST instead of reparsing EL ad hoc from attributes or text nodes.
+- `ElParserTest` now explicitly locks nested property/index parsing, boolean literals inside ternaries and method
+  arguments, and unsupported collection-literal / assignment / semicolon forms. Treat that file as the contract for
+  where the MVP EL grammar stops before deeper semantic comparison work extends normalization or unsupported
+  diagnostics.
+- Comparison-ready semantic nodes now live in `src/main/kotlin/dev/xhtmlinlinecheck/semantic/SemanticNodeModels.kt` and
+  are built by `SemanticNodeExtractor`. `SemanticModel.semanticNodes` is the semantic-layer handoff for stable
+  path-derived node ids, explicit component `id`, rendered EL facts, target-bearing attributes, transparency flags,
+  ancestry stacks, and node-level provenance/location; future matcher and structural-comparison work should consume that
+  list instead of reading raw syntax nodes directly.
+- `SemanticNodeExtractor` is the shared raw-tree walker for that handoff: it traverses element, include, and text nodes
+  once, derives stable ids from `LogicalNodePath` (`node:/...`), and joins raw plus normalized EL facts back onto the
+  same node record by syntax path. Future matcher/comparator work should extend that semantic-node model rather than
+  rewalking syntax nodes to rediscover ids, rendered facts, targets, or provenance.
+- `SemanticNodeExtractor` intentionally joins raw extracted EL and normalized EL back onto the same syntax-path-based
+  node facts. Include `src` / `ui:param value`, text-node EL, and rendered attributes all surface through
+  `SemanticNode.elFacts`, while `renderedAttribute` is just the node-local shortcut for `@rendered`; keep new
+  semantic-node facts aligned to that path-based handoff instead of inventing separate compare-time EL lookups.
+- Component-target references now have one shared semantic representation in
+  `src/main/kotlin/dev/xhtmlinlinecheck/semantic/SemanticTargetModels.kt`: `ComponentTargetAttributeKind` fixes the
+  supported attribute vocabulary (`for`, `update`, `render`, `process`, `execute`), `ComponentTargetAttribute` wraps the
+  captured `SemanticNodeAttribute` for source text/location, and `ComponentTargetReference` tokenizes the value into
+  deterministic `COMPONENT_ID` or `SEARCH_EXPRESSION` entries. Semantic extraction, future target resolution, structural
+  matching, and target diagnostics should all use `SemanticNode.componentTargetAttributes` instead of rescanning raw
+  attribute strings.
+- `ComponentTargetAttribute` is now explicitly built on the shared `SemanticNodeAttribute` capture rather than carrying
+  its own duplicate raw-string fields. Keep target-bearing attributes token-first: use `attribute.rawValue` only when
+  exact source text matters, and use `references` as the semantic payload for `for`, `update`, `render`, `process`, and
+  `execute`.
+- Semantic target resolution now runs as a dedicated post-extraction pass in
+  `src/main/kotlin/dev/xhtmlinlinecheck/semantic/SemanticTargetResolver.kt` before comparison or structural matching use
+  target-bearing attributes. It rewrites each `ComponentTargetAttribute` with `resolvedReferences`, resolving `@this`,
+  `@form`, and component-id tokens against semantic nodes instead of leaving matcher/comparator code to infer target
+  meaning from raw strings.
+- Same-form target lookup is now the current contract for component-id references when the source node is inside an
+  `h:form`: a unique same-form target resolves, duplicate same-form matches stay unresolved/ambiguous, and a target that
+  only exists in another form is treated as unresolved rather than silently falling back across forms. When the source
+  node has no form ancestry, a globally unique explicit id still resolves.
+- `SemanticNodeMatcher` now builds structural signatures from `ComponentTargetAttribute.renderResolved()` instead of raw
+  token strings. Preserve that ordering so reordering duplicate forms with repeated local ids can still match
+  buttons/labels by resolved target meaning rather than by document order.
+- `EquivalenceComparator.scaffold()` now compares resolved target-bearing attributes on structurally matched nodes and
+  emits `P-TARGET-RESOLUTION_CHANGED` when the matched node's semantic target meaning drifts across old/new trees. The
+  diagnostic currently points at the first target-bearing attribute of the affected node and explains the old/new
+  resolved target renderings.
+- Structural ancestry is now intentionally modeled as one semantic-node value object: `SemanticNode.structuralContext`
+  owns `formAncestry`, `namingContainerAncestry`, and `iterationAncestry`, and `SemanticNodeExtractor` computes all
+  three together in one pass before recursing. Future matcher/comparator work should consume that combined context as
+  the behaviorally relevant structural envelope instead of rebuilding separate ancestry stacks from syntax nodes.
+- Form ancestry is now registry-driven through `TagRule.isForm` rather than hardcoded tag-name checks. If future work
+  adds other form-like containers or alternate rule registries, update the tag rule and let semantic-node ancestry reuse
+  that signal.
+- `src/test/kotlin/dev/xhtmlinlinecheck/semantic/SemanticNodeExtractionTest.kt` is the regression seam for this layer.
+  Extend it when changing semantic-node ids, ancestry stacking, target-attribute capture, wrapper transparency, or
+  expanded provenance before touching matcher/comparator logic.
+- `SemanticNodeExtractionTest` now also locks the stronger canonical-model contract: `SemanticModel.semanticNodes` must
+  stay in stable depth-first path order, derive `nodeId` directly from `LogicalNodePath`, and be the deterministic join
+  point for extracted EL facts plus target-bearing attributes. Future matcher, target-resolution, or comparator work
+  should consume `semanticNodes` as the single source of truth for those facts instead of regrouping `elOccurrences` or
+  rescanning raw syntax attributes.
+- `SemanticNode.participatesInStructuralMatching` is now the semantic-layer gate for wrapper-free alignment: only
+  non-transparent `ELEMENT` nodes participate, while transparent Facelets wrappers, include boundaries, and text nodes
+  remain explicit semantic records but are intentionally excluded from structural matching.
+- Structural-context regressions are now locked in two layers: `SemanticNodeExtractionTest` asserts form ancestry,
+  naming-container ancestry, and iteration ancestry evolve together across multiple nodes in one traversal, and
+  `SemanticNodeMatcherTest` asserts the matcher consumes that combined context to distinguish otherwise similar nodes.
+  Future matcher/comparator work should treat `SemanticNode.structuralContext` as the single contract for
+  ancestry-sensitive behavior instead of recomputing separate stacks.
+- Early structural alignment now lives in `src/main/kotlin/dev/xhtmlinlinecheck/compare/SemanticNodeMatcher.kt`. The
+  matcher now runs in three explicit stages that future comparison work should preserve in that order: unique explicit
+  `id` anchors first, then unique explicit target-relationship anchors (`for`, `update`, `render`, `process`, `execute`)
+  that resolve to explicit target ids/forms, then semantic-signature fallback.
+- Semantic-signature fallback is no longer allowed to zip equal-size groups by document order. It only pairs mutually
+  unique candidates and requires nearest already matched structural ancestors to agree, which keeps anonymous descendant
+  alignment stable when include flattening or wrapper churn changes path order under already matched parents.
+- `src/test/kotlin/dev/xhtmlinlinecheck/compare/SemanticNodeMatcherTest.kt` is the regression seam for include-only and
+  wrapper-only rewrites. Use it before broadening comparator behavior; it locks that transparent wrapper differences
+  change semantic-node paths but do not leave unmatched structural candidates or invent false structural drift.
+- `SemanticNodeMatcher` fallback alignment now uses an explicit semantic-signature model instead of a coarse node-name
+  string. The signature combines namespace-aware tag identity, syntax role, ancestor explicit ids, iteration binding
+  kinds, rendered guards, resolved target attributes, and node-local EL fact fingerprints with occurrence-local binding
+  renumbering (`binding#1`, `binding#2`, ...) so safe alpha-renames and unrelated earlier bindings do not destabilize
+  matching.
+- `EquivalenceComparator.scaffold()` now treats structural alignment as a first-class counted comparison pass before
+  deeper mismatch rules land: every matcher pair contributes one matched structural fact, and each leftover unmatched
+  structural candidate now becomes `P-STRUCTURE-UNMATCHED_NODE` with side-specific provenance/snippet plus a stable "no
+  trustworthy match" explanation. Keep later form/naming-container/rendered mismatch rules layered on top of this pass
+  instead of bypassing matcher leftovers.
+- `FaceletsAnalyzerScaffoldTest` now locks the comparator-level alignment contract for include-inlined pages and
+  wrapper-only rewrites: both scenarios must stay free of `P-STRUCTURE-UNMATCHED_NODE` and keep structural counts fully
+  matched even though broader comparison still ends as scaffolded `INCONCLUSIVE`.
+- For matcher-related verification on Windows, set `GRADLE_USER_HOME=C:/projects/xhtml-inline-check/.gradle-user-home`
+  and `TEMP` / `TMP` to `C:/projects/xhtml-inline-check/.tmp` first; that avoids the `native-platform.dll` startup
+  failure, but this sandbox still cannot execute the tests because the Kotlin Gradle plugin must be fetched from the
+  plugin portal and network access is unavailable.
+- `tests.log` can become stale relative to `HEAD`. Before acting on a saved Gradle failure log, compare it to the
+  current tracked sources first; this repository has already carried fixes for the previously reported failure cluster (
+  JSF `value` EL extraction, occurrence-local EL binding renumbering, namespace blank-to-null normalization, text
+  renderer `NOT EQUIVALENT`, JDK 17 test `--add-opens`, and the associated stale test expectations), while offline
+  reruns may still fail if dependencies such as `com.fasterxml.woodstox:woodstox-core:6.6.2` are not present in
+  `.gradle-user-home`.
+- Root-anchored include resolution is now loader-fallback-aware: `SourceLoader` still tries
+  `SourceDocument.resolveIncludeSource(...)` first, but for `src="/..."` it falls back to the analyzed root XHTML's
+  directory when the base-directory target does not exist there. That preserves temp-tree tests that anchor includes to
+  the analysis base while still allowing fixture trees rooted under `fixtures/.../old|new/` to resolve `/fragments/...`
+  inside each side's own subtree.
+- `LogicalIncludeNode` provenance is intentionally different from expanded child-node provenance: the include boundary
+  itself now keeps both physical and logical location at the current file's include site, while expanded descendant
+  nodes still inherit fragment-file physical locations and the immediate include site's logical location through
+  `SourceGraphFile.provenance`.
+- `SemanticNodeId` is a regular data class again, not a Kotlin inline value class. Tests and AssertJ reflection rely on
+  `nodeId.value` being a real string property instead of tunneling into `java.lang.String` internals as a byte array.
+- EL canonical binding numbering now reserves ids from the visible outer-to-inner local binding stack, excluding
+  unreferenced `varStatus` bindings. That keeps `ui:param` and outer-scope locals stable in canonical numbering even
+  when a specific EL occurrence references only a deeper binding.
+- Built-in tag registry expectations are stricter than the generic fallback: `ui:repeat`, `c:set`, `c:forEach`, and
+  `c:if` explicitly carry shared target-attribute coverage plus `rendered`; `h:form` and `h:dataTable` stay exact rules
+  with only `rendered` EL; and `h:outputText` has an explicit `value` EL rule so JSF HTML namespace defaults do not
+  over-apply `value` extraction to every `h:*` tag.
+- Matched-node semantic comparison now lives in `src/main/kotlin/dev/xhtmlinlinecheck/compare/EquivalenceComparator.kt`
+  rather than a global zip over `normalizedElOccurrences`. For structurally matched nodes it checks, in order, non-
+  `rendered` normalized EL facts, normalized `rendered` guards, form ancestry, naming-container ancestry, iteration
+  ancestry, and resolved target attributes.
+- `EquivalenceComparator` now emits internal compare findings first and translates them into final `Problem`s only after
+  duplicate/cascade suppression. Keep future compare work on that two-step seam instead of creating reportable `Problem`
+  s inline from each raw mismatch, otherwise aggregate sanity checks and wrapper fallout will become noisy again.
+- Structural ancestry drift now has dedicated comparator diagnostics beyond unmatched nodes:
+  `P-STRUCTURE-FORM_ANCESTRY_CHANGED`, `P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED`,
+  `P-STRUCTURE-ITERATION_ANCESTRY_CHANGED`, and `P-STRUCTURE-RENDERED_GUARD_CHANGED`. Use those ids for fixture
+  expectations and report assertions instead of overloading `P-STRUCTURE-UNMATCHED_NODE`.
+- The matched-node comparator remains intentionally conservative about bean-level meaning: if a matched EL fact on
+  either side still contains unresolved global roots, it emits `W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT` for that matched
+  fact and does not count the fact as checked, even when the nodes themselves are already structurally aligned.
+- `FaceletsAnalyzerScaffoldTest` now covers matched-node drift for explicit-id-anchored nodes across form ancestry,
+  naming-container ancestry, iteration ancestry, rendered guards, and target resolution. Extend that file first when
+  changing compare-time mismatch ordering or summary headlines, because `AnalysisReportAssert.hasProblemIds(...)` locks
+  problem order exactly.
+- The compare layer now has a second structural-validation seam beyond one-to-one node pairs.
+  `EquivalenceComparator.scaffold()` first emits per-tree `P-STRUCTURE-ID_COLLISION` diagnostics for duplicate explicit
+  ids on either side, then after structural matching runs aggregate unmatched-node sanity checks for explicit-id
+  inventory (`P-STRUCTURE-ID_SANITY_CHANGED`), target-bearing attributes (`P-TARGET-SANITY_CHANGED`), and structural
+  ancestry inventory (`P-STRUCTURE-ANCESTRY_SANITY_CHANGED`).
+- Current suppression rules intentionally prefer the most navigable local explanation over aggregate fallout:
+  duplicate-id collisions suppress duplicate-id unmatched/sanity noise, unmatched target-bearing nodes collapse into
+  `P-TARGET-SANITY_CHANGED`, form-ancestry drift suppresses the same node's naming-container drift, and ancestor wrapper
+  fallout is suppressed when a matched descendant already proves the structural change more directly.
+- Those global sanity checks intentionally look only at unmatched structural nodes, so matched nodes still use the
+  dedicated pairwise ancestry/target diagnostics while unmatched regions keep broader id/target/ancestry drift visible.
+  When changing matcher behavior or problem ordering, re-check `FaceletsAnalyzerScaffoldTest` cases for unmatched-node
+  fallout, duplicate ids, and unmatched target drift.
+- The first-pass canonical comparison corpus now covers `safe-include-inline`, `safe-alpha-renaming`, `lost-ui-param`,
+  `variable-capture-regression`, `form-ancestry-drift`, `naming-container-ancestry-drift`, `changed-for-target`,
+  `changed-ajax-target`, `dynamic-include`, and `inconclusive-but-not-proven-wrong`. Keep new analyzer, reporter, and
+  CLI tests anchored to those fixture directories before inventing ad hoc inline trees.
+- The built-in tag registry now treats `h:dataTable` as a non-form naming container. Use it when a fixture or temp-tree
+  test needs to prove `P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED` without also triggering
+  `P-STRUCTURE-FORM_ANCESTRY_CHANGED`; iteration semantics for `h:dataTable` are still not modeled separately.
+- Reporter output is now driven through shared report-view helpers in
+  `src/main/kotlin/dev/xhtmlinlinecheck/report/ReportRenderingModels.kt` rather than renderer-local aggregate
+  formatting. Keep text and JSON changes on that seam so counts, coverage, warning totals, location detail payloads, and
+  binding-origin/include-stack rendering stay aligned.
+- `AnalysisReport` now exposes deterministic reporter-facing diagnostic views through `orderedProblems`, `errors`, and
+  `warnings`. Prefer those over raw constructor order when asserting output contracts or rendering reports, so stable
+  ordering remains `errors before warnings`, then category/id/location.
+- `TextReportRenderer` is now result-shaped instead of one-size-fits-all: `EQUIVALENT` stays concise with visible
+  warning one-liners, `NOT_EQUIVALENT` renders detailed problem blocks plus separate warning summaries, and
+  `INCONCLUSIVE` renders warning details prominently even when no mismatch was proven.
+- `JsonReportRenderer` now emits top-level `problems` and `warnings` arrays separately and builds JSON through Jackson
+  over ordered linked maps instead of hand-built string concatenation. Keep field order deliberate (`result`, `summary`,
+  `problems`, `warnings`, `stats`) and update `JsonReportRendererOrderingTest` when the machine-readable contract
+  intentionally changes.
+- Full reporter snapshot coverage now lives in `src/test/kotlin/dev/xhtmlinlinecheck/report/ReportRendererGoldenTest.kt`
+  with checked-in goldens under `src/test/resources/dev/xhtmlinlinecheck/report/golden/`. Use those snapshots for
+  deliberate text/JSON contract changes across result states; keep the narrower renderer tests for metadata-specific
+  assertions like attribute fallback and binding-origin rendering.
+- Reporter golden coverage now also includes an `ordered-diagnostics` snapshot that feeds both renderers an
+  intentionally unsorted mixed-diagnostic report with multiple errors and warnings, include provenance, binding origins,
+  and nontrivial counts. Use that case when changing reporter ordering or payload shape: it locks the full text/JSON
+  contract for diagnostic ordering, stable ids, provenance rendering, and aggregate statistics in one end-to-end fixture
+  instead of relying only on narrower ordering assertions.
+- CLI/reporting controls now hang off stable diagnostic ids and the shared report-view layer instead of ad hoc string
+  post-processing. `FaceletsVerifyCli` supports `--max-problems <n>`, `--fail-on-warning`, and standalone
+  `--explain <problem-id>` in both text and JSON modes; keep future control flags on that same seam so text/json
+  behavior stays aligned.
+- `FaceletsVerifyCli` now has two explicit execution modes: analysis mode requires exactly two root XHTML paths, while
+  `--explain <problem-id>` is standalone and rejects analysis-only flags. Unknown `--flag` tokens are treated as usage
+  errors instead of being misparsed as root paths.
+- CLI-to-analyzer wiring now normalizes root paths minimally and base directories eagerly before building
+  `AnalysisRequest`: roots keep relative-vs-absolute intent, but `baseOld` / `baseNew` are converted to absolute
+  normalized anchors at the CLI boundary so loader-side include resolution stays deterministic.
+- Analysis failures are now a first-class CLI outcome distinct from semantic comparison results: the CLI catches
+  analyzer exceptions, renders a deterministic `ANALYSIS_FAILED` payload in the selected `--format` (`text` or `json`),
+  and exits with code `2` per the spec instead of leaking an uncaught exception path.
+- `ReportRenderOptions.maxProblems` caps displayed diagnostics only after `AnalysisReport.orderedProblems` has already
+  established stable ordering, and the cap applies across the combined ordered diagnostic stream before renderers split
+  it back into `problems` and `warnings`. `JsonReportRenderer` now adds a top-level `display` object only when
+  truncation is requested, while `TextReportRenderer` surfaces the same limit as a single summary line.
+- `--fail-on-warning` is intentionally an exit-code-only control: it does not rewrite `AnalysisReport.result` or
+  reporter text. If warnings are present, the CLI exits `2` unless a proven mismatch already forces exit `1`;
+  informational scaffold warnings therefore still render under `EQUIVALENT` output but fail CI when the flag is set.
+- The documented `--verbose` flag is now accepted as a no-op compatibility switch. Preserve that parsing contract unless
+  a later task intentionally introduces richer verbose-only output.
+- Stable diagnostic help for `--explain` now lives in `src/main/kotlin/dev/xhtmlinlinecheck/domain/DiagnosticIds.kt`
+  under `DiagnosticCatalog`. Add new diagnostic ids together with their catalog definition so CLI explain mode, future
+  docs, and test assertions all share the same summary/explanation/hint metadata.
+- Analyzer profiling is now available without changing normal CLI output: set `XHTML_INLINE_CHECK_PROFILE=1` or
+  `-Ddev.xhtmlinlinecheck.profile=true` to emit stage timings to stderr. `FaceletsAnalyzer` reports `load`, `parse`,
+  `semantic`, and `compare`, and `SemanticAnalyzer` nests `semantic.old/new`, `scope`, `extract+normalize`, and
+  `targets` timings underneath.
+- Repeatable larger-tree profiling helpers now live at `scripts/profile-analyzer.ps1` and
+  `scripts/profile-analyzer.bash`. They run the analyzer against `dummy/report.xhtml` vs `dummy/report-flattened.xhtml`
+  with `--base-old dummy --base-new dummy` and print only `[profile]` timing lines for multiple iterations.
+- The semantic hot path no longer walks each syntax tree once for EL extraction and then again for semantic-node
+  extraction. `SemanticTreeExtractor` now does one depth-first walk per tree, collects EL occurrences and base semantic
+  nodes together, then materializes normalized EL facts onto those already visited nodes before target resolution.
+- Iteration ancestry lookups should now use `ScopeStackModel.bindingById(...)` rather than scanning
+  `ScopeStackModel.bindings` linearly. The previous `bindings.first { it.id == bindingId }` pattern sat inside the
+  per-node semantic walk and became avoidable waste on larger trees with many iterator bindings.
+- The in-repo large sample still shows why parser/semantic work must be evidence-driven: `dummy/report.xhtml` references
+  the same `YIELD_ACCURACY_COLUMN.xhtml` include seven times, so repeated full-tree passes add up quickly even before
+  broader parser-template caching is considered.
+- Representative registry coverage should now treat common dummy-sample wrappers and naming containers explicitly
+  instead of relying on generic fallback alone: Facelets `ui:decorate` / `ui:define` / `ui:insert` / `ui:component`, JSF
+  core `f:facet` / `f:metadata`, and third-party `custom:defaults` / `custom:injectAttributes` / `custom:with` are
+  transparent wrappers, while `custom:dataTable` and `custom:modalPanel` are naming containers.
+- When reducing mismatch noise, prefer fixture-backed cases that prove a better primary diagnostic instead of broader
+  compare-time suppression. The current regression seams are third-party wrapper flattening (should not emit
+  unmatched-node or global sanity fallout) and third-party data-table ancestry drift (should emit
+  `P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED` rather than passing silently).
+- Release-readiness deterministic-output coverage now lives in
+  `src/test/kotlin/dev/xhtmlinlinecheck/cli/FaceletsVerifyDeterministicOutputTest.kt`. It reruns the real `MainKt`
+  process three times per case from the repository root and asserts byte-identical stdout/stderr plus stable exit codes
+  for representative equivalent, mismatch, inconclusive, capped-output, and `--explain` invocations. Use
+  `scripts/verify-deterministic-output.ps1` or `scripts/verify-deterministic-output.bash` for the focused gate outside
+  the full baseline run.
+- Release-prep workflow is now documented in `docs/release-readiness.md`. Use that file as the canonical operator-facing
+  checklist for packaging (`installDist`, `distZip`, `distTar`), fixture/integration gates, deterministic-output
+  verification, and first-MVP release notes structure instead of scattering release instructions across ad hoc task
+  threads.
+- Day-to-day operator commands for building, running, smoke-checking, and packaging the CLI now live in
+  `docs/build-run-release.md`. Keep that file command-focused and use `docs/release-readiness.md` for the broader
+  go/no-go release checklist so routine usage instructions and release gating do not drift apart.
+- `CHANGELOG.md` now exists as the repository-level release log and starter template for the first `0.1.0` cut. Update
+  it together with `docs/release-readiness.md` when release-significant behavior, fixture contracts, packaging steps, or
+  operator-visible diagnostics change.
+- Repository-facing status docs now reflect the implemented MVP rather than the original scaffold state: treat
+  `README.md` as operator-facing current-state documentation, keep `docs/architecture.md` and `docs/fixture-corpus.md`
+  aligned to the implemented pipeline/corpus, and treat `docs/execution-plan.md` as historical rationale unless a new
+  plan supersedes it.
+- Comparator fallout now has an explicit unsupported-region guard: when a comparison already emitted include-expansion
+  warnings (`dynamic include`, `missing include`, `include cycle`) or extracted-EL subset warnings, scaffold comparison
+  suppresses structural unmatched-node and unmatched-inventory sanity fallout for that pass. Preserve that behavior
+  unless a later task can localize unsupported-region suppression more precisely; otherwise dynamic includes and
+  unsupported EL regress into false `NOT_EQUIVALENT` results.
+- Duplicate explicit-id diagnostics are scoped to the nearest naming-container ancestry, not the whole tree. Components
+  with the same `id` under different naming containers (for example separate `h:form`s) must not be treated as
+  collisions by the comparator.
+- Matched-node target drift now collapses all mismatched target-bearing attributes on the same node into one
+  `P-TARGET-RESOLUTION_CHANGED` problem with combined snippets/explanations. Keep that aggregation when adding new
+  target kinds so one moved command component does not fan out into multiple near-duplicate target diagnostics.
+- Temp-tree tests that pass absolute root paths without `baseOld` / `baseNew` still render root locations as
+  `root.xhtml` because `SourceDocument.fromPath(...)` defaults the root directory to the file's parent for absolute
+  inputs. Fixture-based tests that pass repository-relative roots plus base directories continue to render side-relative
+  paths like `fixtures/.../old/root.xhtml`.
+- Canonical fixture CLI/integration tests should pass `--base-old . --base-new .` (or
+  `FixtureScenarios.repositoryRoot`) for repository fixtures. Several fixture XHTML files intentionally use
+  repository-root-anchored include paths such as `/fixtures/...`, so side-local base directories will manufacture false
+  missing-include failures.
+- Built-in Facelets tag semantics now recognize both `http://xmlns.jcp.org/jsf/facelets` and the legacy
+  `http://java.sun.com/jsf/facelets` URI. Preserve both aliases in the rule registry so the `dummy/` sample and older
+  JSF 2.2 trees still get include discovery, transparent wrapper handling, and repeat semantics.
+- In this sandbox, Gradle/Kotlin often logs `AccessDeniedException` under
+  `C:\Users\janch\AppData\Local\kotlin\daemon\...` before falling back from the Kotlin daemon to out-of-process
+  compilation. With `GRADLE_USER_HOME=C:/projects/xhtml-inline-check/.gradle-user-home` and `TEMP` / `TMP` set to
+  `C:/projects/xhtml-inline-check/.tmp`, `gradle test --offline` still completes successfully once the repo-local cache
+  is populated.
