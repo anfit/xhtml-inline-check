@@ -1,6 +1,6 @@
 # Release Readiness
 
-This document is the repository's practical release-prep guide for the first MVP release.
+This document is the repository's release-prep guide.
 
 It focuses on four gates that already exist in the codebase and should stay aligned:
 
@@ -52,9 +52,9 @@ The jar manifest points at `dev.xhtmlinlinecheck.cli.MainKt`, but the packaged d
 4. Build archives with `gradle distZip distTar`.
 5. Smoke the installed launcher from `build/facelets-verify/bin/`.
 
-## MVP Release Checklist
+## Release Checklist
 
-Use this checklist before cutting the first non-snapshot MVP release.
+Use this checklist before cutting a release.
 
 ### Fixtures
 
@@ -82,30 +82,3 @@ Use this checklist before cutting the first non-snapshot MVP release.
 - [ ] The packaged launcher can analyze `fixtures/support/smoke/old/root.xhtml` vs `fixtures/support/smoke/new/root.xhtml` using explicit `--base-old` and `--base-new` paths.
 - [ ] Release notes and `CHANGELOG.md` are updated for the version being cut.
 - [ ] The version in `build.gradle.kts` is changed from snapshot to the intended release version before archives are published.
-
-## First MVP Release Notes Template
-
-Use the following structure when cutting the first release.
-
-```markdown
-## xhtml-inline-check v0.1.0
-
-### Scope
-- First MVP release of the static `facelets-verify` CLI for JSF Facelets include-inlining checks.
-
-### Included In This Release
-- Fixture-backed comparison coverage for equivalent, not-equivalent, and inconclusive outcomes.
-- Text and JSON reporting with stable diagnostic ids and `--explain` support.
-- Installable CLI distribution archives produced by Gradle.
-
-### Verification
-- `gradle test`
-- `scripts/verify-baseline.<bash|ps1>`
-- `scripts/verify-deterministic-output.<bash|ps1>`
-- `gradle distZip distTar`
-
-### Known Limitations
-- Static analysis only; no JSF runtime execution.
-- Unsupported constructs remain explicit and can force `INCONCLUSIVE`.
-- A system Gradle installation is still required until a wrapper is added.
-```

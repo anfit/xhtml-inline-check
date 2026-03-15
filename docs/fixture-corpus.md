@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The implementation is built around comparison fixtures. Fixtures are the main way this repository proves that the tool is useful on real refactor scenarios rather than only on isolated parser mechanics.
+The repository is built around comparison fixtures. Fixtures are the main way it proves behavior on real refactor scenarios rather than only on isolated parser mechanics.
 
 ## Goals
 
@@ -13,7 +13,7 @@ The fixture corpus is intended to:
 - make expected outcomes obvious to reviewers
 - support unit, comparison, and CLI golden testing
 
-The repository already includes one realistic sample tree under `dummy/`. Treat that directory as a reference corpus for carving out future fixtures and smoke tests, not as a canonical expected-outcome fixture on its own. `dummy/old/report.xhtml` is the original page and `dummy/new/report-flattened.xhtml` is a refactored counterpart whose semantic equivalence has not been verified yet.
+The repository also includes one realistic sample tree under `dummy/`. Treat that directory as a reference corpus for smoke tests and for carving out future fixtures, not as a canonical expected-outcome fixture on its own. `dummy/old/report.xhtml` is the original page and `dummy/new/report-flattened.xhtml` is a refactored counterpart whose semantic equivalence has not been verified yet.
 
 ## Recommended Layout
 
@@ -62,7 +62,7 @@ Optional additions:
 - `notes.md` for human explanation when the scenario is subtle
 - `expected.txt` for reporter golden output if the case is used by CLI tests
 
-## Suggested `expected.json` Shape
+## `expected.json` Shape
 
 ```json
 {
@@ -94,10 +94,7 @@ The fixture contract should stay concise, deterministic, and keyed on those stab
 - changed AJAX target resolution
 - unsupported dynamic include
 
-Current repository status:
-
-- the first-pass canonical corpus now covers safe include inlining, safe alpha-renaming, lost `ui:param`, variable capture, form ancestry drift, naming-container ancestry drift, changed `for` target resolution, changed AJAX target resolution, and inconclusive unsupported cases under `fixtures/`
-- the dedicated naming-container ancestry fixture uses `h:dataTable` as a non-form built-in naming container so the corpus can prove `P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED` independently of `h:form` drift
+Current canonical coverage includes safe include inlining, safe alpha-renaming, lost `ui:param`, variable capture, form ancestry drift, naming-container ancestry drift, changed `for` target resolution, changed AJAX target resolution, and inconclusive unsupported cases.
 
 ## Realistic Sample Baseline
 

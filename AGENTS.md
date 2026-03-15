@@ -8,7 +8,7 @@ This repository is intended to be worked on by humans and coding agents. These i
 
 - Read the current repository docs before making architectural or workflow changes, especially `README.md`, `SPEC.md`, and files under `docs/` that relate to the task.
 - Prefer small, focused, reviewable changes over broad rewrites unless a broader change is explicitly requested.
-- Keep the implementation aligned with the current specification and execution-plan documents; if code or docs need to diverge, update both deliberately.
+- Keep the implementation aligned with the current specification and repository documentation; if code or docs need to diverge, update both deliberately.
 - Preserve deterministic behavior in analysis, diagnostics, and tests wherever possible.
 - Prefer explicit unsupported or inconclusive behavior over silent assumptions.
 - Do not remove or weaken provenance, diagnostic precision, or fixture coverage without a strong reason.
@@ -21,20 +21,6 @@ This repository is intended to be worked on by humans and coding agents. These i
 - Before executing a task, verify that it still makes sense against the current repository state, current docs, and any newer changes already present in the branch.
 - If a requested change appears outdated, superseded, already implemented, or risky in the current context, do not apply it blindly.
 - In those cases, narrow the change to what is still relevant, or stop and surface the conflict clearly if proceeding would likely cause churn or regressions.
-
-## CONTEXT.md Workflow
-
-- Before starting each task, check whether `CONTEXT.md` exists at the repository root and read it if present.
-- After completing a task, update `CONTEXT.md` with noteworthy implementation-relevant remarks that will help future work continue smoothly.
-- Treat `CONTEXT.md` as a compact operational knowledge file, not a diary or chronological log.
-- Add information that is likely to remain useful, such as:
-  - how to run tests or representative commands
-  - known parser or fixture pitfalls
-  - important architectural constraints
-  - assumptions that future tasks must preserve
-  - gotchas discovered while implementing or verifying behavior
-- Do not fill `CONTEXT.md` with routine narration, timestamps, or "worked on X" notes unless they directly help a future implementer avoid mistakes.
-- If no durable, implementation-relevant knowledge was produced by the task, `CONTEXT.md` does not need to change.
 
 ## Implementation Guardrails
 

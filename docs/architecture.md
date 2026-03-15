@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document translates the product specification into the implementation boundaries used by the current codebase.
+This document describes the implementation boundaries used by the current codebase.
 
 ## Design Goal
 
@@ -147,6 +147,11 @@ Each tag rule should be able to answer:
 
 This keeps support for third-party component libraries incremental and testable.
 
+The registry is layered:
+
+- bundled defaults cover Facelets, JSTL, and core JSF semantics
+- an optional execution-root `.xhtml-inline-check.json` can extend or override those defaults for project-specific schemas
+
 ## Matching Strategy
 
 The comparator should prefer stable anchors over generic tree diffing.
@@ -160,7 +165,7 @@ Current order:
 
 This reduces diagnostic cascades and keeps output easier to understand.
 
-## Implementation Notes
+## Operational Notes
 
 - Loader and parser preserve enough metadata for file-linked diagnostics.
 - The loader, syntax walker, and semantic handoff share one `TagRuleRegistry`; later changes should keep reading the same rule decisions instead of re-deriving semantics ad hoc.

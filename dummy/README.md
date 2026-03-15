@@ -1,6 +1,6 @@
 # Dummy Sample
 
-This directory contains a realistic sample XHTML page tree that the project uses as a reference input for planning, smoke coverage, and future fixture design.
+This directory contains a realistic sample XHTML page tree used for smoke coverage and for carving out future fixtures.
 
 - `old/report.xhtml` is the original include-heavy page.
 - `new/report-flattened.xhtml` is a refactored page intended to represent an inlining/flattening pass.

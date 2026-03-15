@@ -1,8 +1,8 @@
 # Build, Run, And Release
 
-This document is the practical operator guide for building, running, and releasing the `xhtml-inline-check` module.
+This document is the practical operator guide for building, running, and releasing `xhtml-inline-check`.
 
-It is intentionally command-focused and complements, rather than replaces, the broader release checklist in [release-readiness.md](release-readiness.md).
+It is intentionally command-focused and complements [release-readiness.md](release-readiness.md).
 
 ## Prerequisites
 
@@ -61,6 +61,12 @@ gradle runFaceletsVerify --args="old/root.xhtml new/root.xhtml --base-old old --
 
 The executable name exposed by the Gradle application packaging is `facelets-verify`.
 
+### Execution-Root Configuration
+
+If the current working directory contains `.xhtml-inline-check.json`, the CLI merges that file on top of the bundled tag-rule defaults before analysis.
+
+Use this file to declare project-specific component namespaces, transparent wrappers, naming containers, EL-bearing attributes, and target-bearing attributes without changing application code.
+
 ### Run The Installed Distribution
 
 After `gradle installDist`, use the generated launcher from `build/facelets-verify/bin/`.
@@ -118,7 +124,7 @@ Those scripts rerun representative CLI invocations and assert byte-stable output
 
 ## Release
 
-Use [release-readiness.md](release-readiness.md) as the canonical release checklist. The short operational flow is:
+Use [release-readiness.md](release-readiness.md) as the release checklist. The short operational flow is:
 
 1. Run `gradle test`.
 2. Run `scripts/verify-baseline.bash` or `scripts/verify-baseline.ps1`.

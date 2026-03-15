@@ -4,26 +4,20 @@
 
 The project exists to support a common modernization step in legacy JSF 2.2 codebases: flattening `ui:include`-heavy page trees into more self-contained XHTML without accidentally changing EL scope, form ancestry, naming-container behavior, or target resolution.
 
-## Status
+## Capabilities
 
-The repository now contains the implemented MVP analyzer and CLI described by the original execution plan.
-
-What exists today:
-
-- the `facelets-verify` CLI with text and JSON output
-- loader-driven include discovery, expansion, provenance, missing-include handling, and include-cycle detection
-- a namespace-aware XHTML syntax tree built from a shared Woodstox-backed StAX reader
-- semantic extraction for bindings, normalized EL facts, structural ancestry, ids, rendered guards, and target-bearing attributes
-- structural matching and comparison for scope drift, ancestry drift, target-resolution drift, duplicate ids, unmatched nodes, and explicit unsupported cases
+- `facelets-verify` CLI with text and JSON output
+- static `ui:include` discovery and expansion with provenance
+- semantic extraction for bindings, normalized EL facts, ancestry, ids, rendered guards, and target-bearing attributes
+- structural comparison for scope drift, ancestry drift, target-resolution drift, duplicate ids, unmatched nodes, and explicit unsupported cases
+- deterministic diagnostics, `--max-problems`, `--fail-on-warning`, and `--explain`
 - fixture-backed comparison coverage under `fixtures/equivalent/`, `fixtures/not-equivalent/`, `fixtures/inconclusive/`, and `fixtures/support/`
-- deterministic reporter and CLI coverage, including `--max-problems`, `--fail-on-warning`, and `--explain`
-- release-prep and packaging docs for the Gradle-built `facelets-verify` distribution
 
-What is still intentionally limited:
+## Limits
 
 - static analysis only; no JSF runtime execution
-- unsupported constructs remain explicit and can force `INCONCLUSIVE`
-- CI automation is still not checked in
+- unsupported constructs remain explicit and can lead to `INCONCLUSIVE`
+- project-specific tag semantics may require execution-root configuration
 
 ## Outcomes
 
@@ -61,14 +55,21 @@ That means the product is designed around:
 facelets-verify legacy/order.xhtml refactored/order.xhtml --base-old legacy --base-new refactored --format text --verbose
 ```
 
+## Configuration
+
+Tag semantics are configuration-driven.
+
+- The application ships with bundled defaults for Facelets, JSTL, and core JSF rules.
+- If a file named `.xhtml-inline-check.json` exists in the execution root, its rules are merged on top.
+- This repository keeps its project-specific schema handling in that root config file.
+
 ## Documentation Map
 
 - [Specification](SPEC.md)
-- [Execution Plan](docs/execution-plan.md)
 - [Architecture Overview](docs/architecture.md)
 - [Build, Run, And Release](docs/build-run-release.md)
-- [MVP EL Grammar Subset](docs/el-grammar-subset.md)
-- [Fixture Corpus Plan](docs/fixture-corpus.md)
+- [EL Grammar Subset](docs/el-grammar-subset.md)
+- [Fixture Corpus](docs/fixture-corpus.md)
 - [Release Readiness](docs/release-readiness.md)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
@@ -86,44 +87,30 @@ build.gradle.kts
 settings.gradle.kts
 ```
 
-## Development
+## Build And Run
 
-The Gradle application setup is configured around the `facelets-verify` entrypoint, so an installed Gradle can:
+The Gradle application setup is configured around the `facelets-verify` entrypoint. With a system Gradle installation:
 
 - compile and test with `gradle test`
 - run the CLI with `gradle runFaceletsVerify --args="legacy.xhtml refactored.xhtml"`
 - assemble the runnable distribution in `build/facelets-verify/` with `gradle installDist`
 - assemble distribution archives with `gradle distZip distTar`
 
-Tag semantics are now configuration-driven. The app ships with bundled defaults for Facelets, JSTL, and core JSF rules, and if a file named `.xhtml-inline-check.json` exists in the execution root, its rules are merged on top. This repository keeps its company-specific schema handling in that root config file.
-
-Reusable JUnit 5 test support lives under `src/test/kotlin/dev/xhtmlinlinecheck/testing`. New tasks should prefer those helpers for temporary XHTML trees, fixture-path resolution under `fixtures/`, and AssertJ-based `AnalysisReport` assertions instead of duplicating setup in each package.
-
-Namespace-aware XML parsing is centralized in `src/main/kotlin/dev/xhtmlinlinecheck/xml/NamespaceAwareXml.kt` and shared by the loader and syntax layers. Namespace-rule, attribute-extraction, or syntax-tree tasks should extend that shared reader path instead of creating new ad hoc `XMLInputFactory` instances.
-
 A Gradle wrapper has not been generated yet, so repository verification currently assumes a system Gradle installation.
 
-For a single baseline check that matches the current Gradle app, entrypoint, and smoke-test infrastructure:
+For a repository-level baseline verification run:
 
 - on Unix-like shells, run `scripts/verify-baseline.bash`
 - on Windows PowerShell, run `scripts/verify-baseline.ps1`
 
 Both scripts execute `gradle test`, `gradle installDist`, and `gradle runFaceletsVerify` against `fixtures/support/smoke/`.
 
-For the release-readiness deterministic-output gate that reruns the real CLI entrypoint and asserts byte-stable text, JSON, and `--explain` output across repeated executions:
+For deterministic-output verification:
 
 - on Unix-like shells, run `scripts/verify-deterministic-output.bash`
 - on Windows PowerShell, run `scripts/verify-deterministic-output.ps1`
 
-On Windows, the PowerShell helper pins `GRADLE_USER_HOME`, `TEMP`, and `TMP` inside the repository before invoking Gradle. That avoids failures caused by inaccessible profile or temp directories in restricted environments while still using the installed Gradle executable. The first run still needs network access or a pre-populated Gradle cache so the Kotlin plugin and dependencies can be resolved.
-
-Release packaging and the MVP release checklist are documented in [docs/release-readiness.md](docs/release-readiness.md). The repository-level changelog template lives in [CHANGELOG.md](CHANGELOG.md).
-
-## Current Gaps
-
-1. Add CI automation around the existing Gradle and script-based verification gates.
-2. Broaden registry coverage and unsupported-case handling based on real project samples.
-3. Expand the canonical fixture corpus as new semantic rules or edge cases land.
+On Windows, the PowerShell helpers pin `GRADLE_USER_HOME`, `TEMP`, and `TMP` inside the repository before invoking Gradle. That avoids failures caused by inaccessible profile or temporary directories in restricted environments.
 
 ## License
 

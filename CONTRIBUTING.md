@@ -13,12 +13,11 @@ When contributing, optimize for:
 
 ## Before Writing Code
 
-Start by aligning with the current planning docs:
+Start by aligning with the current product and engineering docs:
 
 - [Specification](SPEC.md)
-- [Execution Plan](docs/execution-plan.md)
 - [Architecture Overview](docs/architecture.md)
-- [Fixture Corpus Plan](docs/fixture-corpus.md)
+- [Fixture Corpus](docs/fixture-corpus.md)
 
 If a code change materially changes behavior, update the relevant documentation in the same change.
 
