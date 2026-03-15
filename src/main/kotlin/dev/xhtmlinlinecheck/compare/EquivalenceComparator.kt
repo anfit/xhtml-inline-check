@@ -59,26 +59,32 @@ fun interface EquivalenceComparator {
                     semanticModels.oldRoot.elOccurrences.collectUnsupportedElProblems() +
                         semanticModels.newRoot.elOccurrences.collectUnsupportedElProblems()
                 val scaffoldWarning =
-                    Problem(
-                        id = WarningIds.UNSUPPORTED_ANALYZER_PIPELINE_SCAFFOLD,
-                        severity = Severity.WARNING,
-                        category = ProblemCategory.UNSUPPORTED,
-                        summary = "Analyzer pipeline scaffold is in place",
-                        locations = ProblemLocations(
-                            old = ProblemLocation(semanticModels.oldRoot.provenance),
-                            new = ProblemLocation(semanticModels.newRoot.provenance),
-                        ),
-                        explanation = "The loader, syntax, semantic, and comparison stages exist as placeholders for later tasks.",
-                        hint = "Implement the stage-specific logic before relying on comparison results.",
+                    ComparatorFinding(
+                        kind = ComparatorFindingKind.WARNING,
+                        renderProblem = {
+                            Problem(
+                                id = WarningIds.UNSUPPORTED_ANALYZER_PIPELINE_SCAFFOLD,
+                                severity = Severity.WARNING,
+                                category = ProblemCategory.UNSUPPORTED,
+                                summary = "Analyzer pipeline scaffold is in place",
+                                locations = ProblemLocations(
+                                    old = ProblemLocation(semanticModels.oldRoot.provenance),
+                                    new = ProblemLocation(semanticModels.newRoot.provenance),
+                                ),
+                                explanation = "The loader, syntax, semantic, and comparison stages exist as placeholders for later tasks.",
+                                hint = "Implement the stage-specific logic before relying on comparison results.",
+                            )
+                        },
                     )
-                val problems =
-                    treeInvariants.problems +
-                        structuralAlignment.problems +
-                        matchedNodeComparison.problems +
-                        globalSanity.problems +
+                val findings =
+                    treeInvariants.findings +
+                        structuralAlignment.findings +
+                        matchedNodeComparison.findings +
+                        globalSanity.findings +
                         includeProblems +
                         extractedElProblems +
                         scaffoldWarning
+                val problems = translateFindings(findings)
                 val warningCount = problems.count { it.severity == Severity.WARNING }
                 val warningTotals = WarningTotals(total = warningCount, blocking = warningCount)
                 val counts =
@@ -94,7 +100,7 @@ fun interface EquivalenceComparator {
                         blocksEquivalenceClaim = true,
                     ),
                     summary = AnalysisSummary(
-                        headline = summaryHeadline(treeInvariants, structuralAlignment, matchedNodeComparison, globalSanity),
+                        headline = summaryHeadline(problems, structuralAlignment, matchedNodeComparison),
                         counts = counts,
                         coverage = AggregateCoverage.from(counts),
                         warnings = warningTotals,
@@ -114,15 +120,14 @@ private data class StructuralAlignmentResult(
     val checked: Int,
     val matched: Int,
     val mismatched: Int,
-    val problems: List<Problem>,
+    val findings: List<ComparatorFinding>,
 )
 
 private data class InvariantCheckResult(
     val checked: Int,
     val matched: Int,
     val mismatched: Int,
-    val problems: List<Problem>,
-    val mismatchSignals: Set<String>,
+    val findings: List<ComparatorFinding>,
 )
 
 private data class MatchedNodeComparisonResult(
@@ -130,8 +135,7 @@ private data class MatchedNodeComparisonResult(
     val matched: Int,
     val mismatched: Int,
     val uncertain: Int,
-    val problems: List<Problem>,
-    val mismatchSignals: Set<String>,
+    val findings: List<ComparatorFinding>,
 )
 
 private data class FactComparisonResult(
@@ -139,25 +143,43 @@ private data class FactComparisonResult(
     val matched: Int = 0,
     val mismatched: Int = 0,
     val uncertain: Int = 0,
-    val problems: List<Problem> = emptyList(),
+    val findings: List<ComparatorFinding> = emptyList(),
 )
 
+private data class ComparatorFinding(
+    val kind: ComparatorFindingKind,
+    val signal: String? = null,
+    val oldNode: SemanticNode? = null,
+    val newNode: SemanticNode? = null,
+    val explicitIds: Set<String> = emptySet(),
+    val renderProblem: () -> Problem,
+)
+
+private enum class ComparatorFindingKind {
+    SCOPE_BINDING_MISMATCH,
+    STRUCTURE_UNMATCHED_NODE,
+    STRUCTURE_ID_COLLISION,
+    STRUCTURE_ID_SANITY_CHANGED,
+    STRUCTURE_FORM_ANCESTRY_CHANGED,
+    STRUCTURE_NAMING_CONTAINER_ANCESTRY_CHANGED,
+    STRUCTURE_ITERATION_ANCESTRY_CHANGED,
+    STRUCTURE_RENDERED_GUARD_CHANGED,
+    STRUCTURE_ANCESTRY_SANITY_CHANGED,
+    TARGET_RESOLUTION_CHANGED,
+    TARGET_SANITY_CHANGED,
+    WARNING,
+}
+
 private fun compareTreeInvariants(semanticModels: SemanticModels): InvariantCheckResult {
-    val oldProblems = semanticModels.oldRoot.collectIdCollisionProblems()
-    val newProblems = semanticModels.newRoot.collectIdCollisionProblems()
-    val problems = oldProblems + newProblems
+    val oldFindings = semanticModels.oldRoot.collectIdCollisionFindings()
+    val newFindings = semanticModels.newRoot.collectIdCollisionFindings()
+    val findings = oldFindings + newFindings
 
     return InvariantCheckResult(
-        checked = problems.size,
+        checked = findings.size,
         matched = 0,
-        mismatched = problems.size,
-        problems = problems,
-        mismatchSignals =
-            if (problems.isEmpty()) {
-                emptySet()
-            } else {
-                setOf("id-collision mismatches")
-            },
+        mismatched = findings.size,
+        findings = findings,
     )
 }
 
@@ -170,29 +192,18 @@ private fun compareGlobalSanity(
     val oldUnmatchedNodes = semanticModels.oldRoot.semanticNodes.filter { it.nodeId in unmatchedOldNodeIds }
     val newUnmatchedNodes = semanticModels.newRoot.semanticNodes.filter { it.nodeId in unmatchedNewNodeIds }
 
-    val idProblem = globalIdSanityProblem(oldUnmatchedNodes, newUnmatchedNodes)
-    val targetProblem = globalTargetSanityProblem(oldUnmatchedNodes, newUnmatchedNodes)
-    val ancestryProblem = globalAncestrySanityProblem(oldUnmatchedNodes, newUnmatchedNodes)
-    val problems = listOfNotNull(idProblem, targetProblem, ancestryProblem)
-    val mismatchSignals =
-        buildSet {
-            if (idProblem != null) {
-                add("global id-sanity mismatches")
-            }
-            if (targetProblem != null) {
-                add("global target-sanity mismatches")
-            }
-            if (ancestryProblem != null) {
-                add("global ancestry-sanity mismatches")
-            }
-        }
+    val findings =
+        listOfNotNull(
+            globalIdSanityFinding(oldUnmatchedNodes, newUnmatchedNodes),
+            globalTargetSanityFinding(oldUnmatchedNodes, newUnmatchedNodes),
+            globalAncestrySanityFinding(oldUnmatchedNodes, newUnmatchedNodes),
+        )
 
     return InvariantCheckResult(
-        checked = problems.size,
+        checked = findings.size,
         matched = 0,
-        mismatched = problems.size,
-        problems = problems,
-        mismatchSignals = mismatchSignals,
+        mismatched = findings.size,
+        findings = findings,
     )
 }
 
@@ -206,8 +217,7 @@ private fun compareMatchedNodes(
     var matched = 0
     var mismatched = 0
     var uncertain = 0
-    val problems = mutableListOf<Problem>()
-    val mismatchSignals = linkedSetOf<String>()
+    val findings = mutableListOf<ComparatorFinding>()
 
     matchResult.matches.forEach { match ->
         val oldNode = oldNodesById.getValue(match.oldNodeId)
@@ -218,20 +228,14 @@ private fun compareMatchedNodes(
             matched += result.matched
             mismatched += result.mismatched
             uncertain += result.uncertain
-            problems += result.problems
-            if (result.mismatched > 0) {
-                mismatchSignals += "local-binding EL mismatches"
-            }
+            findings += result.findings
         }
         compareRenderedGuard(oldNode, newNode).also { result ->
             checked += result.checked
             matched += result.matched
             mismatched += result.mismatched
             uncertain += result.uncertain
-            problems += result.problems
-            if (result.mismatched > 0) {
-                mismatchSignals += "rendered-guard mismatches"
-            }
+            findings += result.findings
         }
         compareAncestry(
             oldNode = oldNode,
@@ -244,10 +248,7 @@ private fun compareMatchedNodes(
             checked += result.checked
             matched += result.matched
             mismatched += result.mismatched
-            problems += result.problems
-            if (result.mismatched > 0) {
-                mismatchSignals += "form-ancestry mismatches"
-            }
+            findings += result.findings
         }
         compareAncestry(
             oldNode = oldNode,
@@ -260,28 +261,19 @@ private fun compareMatchedNodes(
             checked += result.checked
             matched += result.matched
             mismatched += result.mismatched
-            problems += result.problems
-            if (result.mismatched > 0) {
-                mismatchSignals += "naming-container mismatches"
-            }
+            findings += result.findings
         }
         compareIterationAncestry(oldNode, newNode).also { result ->
             checked += result.checked
             matched += result.matched
             mismatched += result.mismatched
-            problems += result.problems
-            if (result.mismatched > 0) {
-                mismatchSignals += "iteration-ancestry mismatches"
-            }
+            findings += result.findings
         }
         compareResolvedTargets(oldNode, newNode).also { result ->
             checked += result.checked
             matched += result.matched
             mismatched += result.mismatched
-            problems += result.problems
-            if (result.mismatched > 0) {
-                mismatchSignals += "target-resolution mismatches"
-            }
+            findings += result.findings
         }
     }
 
@@ -290,8 +282,7 @@ private fun compareMatchedNodes(
         matched = matched,
         mismatched = mismatched,
         uncertain = uncertain,
-        problems = problems,
-        mismatchSignals = mismatchSignals,
+        findings = findings,
     )
 }
 
@@ -299,7 +290,7 @@ private fun compareResolvedTargets(
     oldNode: SemanticNode,
     newNode: SemanticNode,
 ): FactComparisonResult {
-    val problems = mutableListOf<Problem>()
+    val findings = mutableListOf<ComparatorFinding>()
     var checked = 0
     var matched = 0
     var mismatched = 0
@@ -320,7 +311,7 @@ private fun compareResolvedTargets(
             matched++
         } else {
             mismatched++
-            problems += targetResolutionProblem(oldNode, oldAttributes, newNode, newAttributes)
+            findings += targetResolutionFinding(oldNode, oldAttributes, newNode, newAttributes)
         }
     }
 
@@ -328,7 +319,7 @@ private fun compareResolvedTargets(
         checked = checked,
         matched = matched,
         mismatched = mismatched,
-        problems = problems,
+        findings = findings,
     )
 }
 
@@ -344,7 +335,7 @@ private fun compareNonRenderedElFacts(
     var matched = 0
     var mismatched = 0
     var uncertain = 0
-    val problems = mutableListOf<Problem>()
+    val findings = mutableListOf<ComparatorFinding>()
 
     allKeys.forEach { key ->
         compareNormalizedElFact(
@@ -358,7 +349,7 @@ private fun compareNonRenderedElFacts(
             matched += result.matched
             mismatched += result.mismatched
             uncertain += result.uncertain
-            problems += result.problems
+            findings += result.findings
         }
     }
 
@@ -367,7 +358,7 @@ private fun compareNonRenderedElFacts(
         matched = matched,
         mismatched = mismatched,
         uncertain = uncertain,
-        problems = problems,
+        findings = findings,
     )
 }
 
@@ -389,7 +380,7 @@ private fun compareNormalizedElFact(
     newFact: SemanticNodeElFact?,
     oldNode: SemanticNode,
     newNode: SemanticNode,
-    mismatchProblem: (SemanticNodeElFact?, SemanticNodeElFact?, SemanticNode, SemanticNode) -> Problem,
+    mismatchProblem: (SemanticNodeElFact?, SemanticNodeElFact?, SemanticNode, SemanticNode) -> ComparatorFinding,
     countSharedAbsenceAsMatch: Boolean = false,
 ): FactComparisonResult {
     if (oldFact == null && newFact == null) {
@@ -403,7 +394,7 @@ private fun compareNormalizedElFact(
         return FactComparisonResult(
             checked = 1,
             mismatched = 1,
-            problems = listOf(mismatchProblem(oldFact, newFact, oldNode, newNode)),
+            findings = listOf(mismatchProblem(oldFact, newFact, oldNode, newNode)),
         )
     }
     if (oldFact.normalizedTemplate == null || newFact.normalizedTemplate == null) {
@@ -418,13 +409,13 @@ private fun compareNormalizedElFact(
             } else if (oldFact.globalReferences.isNotEmpty() || newFact.globalReferences.isNotEmpty()) {
                 FactComparisonResult(
                     uncertain = 1,
-                    problems = listOf(unresolvedGlobalRootProblem(oldFact, newFact)),
+                    findings = listOf(unresolvedGlobalRootFinding(oldFact, newFact)),
                 )
             } else {
                 FactComparisonResult(
                     checked = 1,
                     mismatched = 1,
-                    problems = listOf(mismatchProblem(oldFact, newFact, oldNode, newNode)),
+                    findings = listOf(mismatchProblem(oldFact, newFact, oldNode, newNode)),
                 )
             }
         } else {
@@ -434,7 +425,7 @@ private fun compareNormalizedElFact(
     if (oldFact.globalReferences.isNotEmpty() || newFact.globalReferences.isNotEmpty()) {
         return FactComparisonResult(
             uncertain = 1,
-            problems = listOf(unresolvedGlobalRootProblem(oldFact, newFact)),
+            findings = listOf(unresolvedGlobalRootFinding(oldFact, newFact)),
         )
     }
 
@@ -444,7 +435,7 @@ private fun compareNormalizedElFact(
         FactComparisonResult(
             checked = 1,
             mismatched = 1,
-            problems = listOf(mismatchProblem(oldFact, newFact, oldNode, newNode)),
+            findings = listOf(mismatchProblem(oldFact, newFact, oldNode, newNode)),
         )
     }
 }
@@ -465,7 +456,7 @@ private fun compareAncestry(
         FactComparisonResult(
             checked = 1,
             mismatched = 1,
-            problems = listOf(ancestryProblem(problemId, kindLabel, oldNode, newNode, oldRendered, newRendered)),
+            findings = listOf(ancestryFinding(problemId, kindLabel, oldNode, newNode, oldRendered, newRendered)),
         )
     }
 }
@@ -482,7 +473,7 @@ private fun compareIterationAncestry(
         FactComparisonResult(
             checked = 1,
             mismatched = 1,
-            problems = listOf(iterationAncestryProblem(oldNode, newNode, oldRendered, newRendered)),
+            findings = listOf(iterationAncestryFinding(oldNode, newNode, oldRendered, newRendered)),
         )
     }
 }
@@ -493,10 +484,10 @@ private fun compareStructuralAlignment(
 ): StructuralAlignmentResult {
     val oldNodesById = semanticModels.oldRoot.semanticNodes.associateBy(SemanticNode::nodeId)
     val newNodesById = semanticModels.newRoot.semanticNodes.associateBy(SemanticNode::nodeId)
-    val unmatchedOldProblems =
+    val unmatchedOldFindings =
         matchResult.unmatchedOldNodeIds.map { nodeId ->
             val node = oldNodesById.getValue(nodeId)
-            unmatchedStructuralNodeProblem(
+            unmatchedStructuralNodeFinding(
                 node = node,
                 summary = "Legacy structural node has no trustworthy match in the refactored tree",
                 explanationSide = "legacy",
@@ -504,10 +495,10 @@ private fun compareStructuralAlignment(
                 locations = ProblemLocations(old = ProblemLocation(node.provenance, node.describeForProblem())),
             )
         }
-    val unmatchedNewProblems =
+    val unmatchedNewFindings =
         matchResult.unmatchedNewNodeIds.map { nodeId ->
             val node = newNodesById.getValue(nodeId)
-            unmatchedStructuralNodeProblem(
+            unmatchedStructuralNodeFinding(
                 node = node,
                 summary = "Refactored structural node has no trustworthy match in the legacy tree",
                 explanationSide = "refactored",
@@ -515,26 +506,25 @@ private fun compareStructuralAlignment(
                 locations = ProblemLocations(new = ProblemLocation(node.provenance, node.describeForProblem())),
             )
         }
-    val mismatched = unmatchedOldProblems.size + unmatchedNewProblems.size
+    val mismatched = unmatchedOldFindings.size + unmatchedNewFindings.size
     val matched = matchResult.matches.size
 
     return StructuralAlignmentResult(
         checked = matched + mismatched,
         matched = matched,
         mismatched = mismatched,
-        problems = unmatchedOldProblems + unmatchedNewProblems,
+        findings = unmatchedOldFindings + unmatchedNewFindings,
     )
 }
 
 private fun summaryHeadline(
-    treeInvariants: InvariantCheckResult,
+    problems: List<Problem>,
     structuralAlignment: StructuralAlignmentResult,
     matchedNodeComparison: MatchedNodeComparisonResult,
-    globalSanity: InvariantCheckResult,
 ): String =
     when {
-        mismatchSignals(treeInvariants, structuralAlignment, matchedNodeComparison, globalSanity).isNotEmpty() ->
-            "Detected ${mismatchSignals(treeInvariants, structuralAlignment, matchedNodeComparison, globalSanity).joinForHeadline()}; broader semantic comparison is still scaffolded."
+        mismatchSignals(problems).isNotEmpty() ->
+            "Detected ${mismatchSignals(problems).joinForHeadline()}; broader semantic comparison is still scaffolded."
         matchedNodeComparison.uncertain > 0 ->
             "Matched semantic nodes still depend on unresolved global roots, so bean-level equivalence remains uncertain."
         matchedNodeComparison.checked > 0 ->
@@ -545,20 +535,13 @@ private fun summaryHeadline(
             "Scaffolded analyzer pipeline only; semantic comparison is not implemented yet."
     }
 
-private fun mismatchSignals(
-    treeInvariants: InvariantCheckResult,
-    structuralAlignment: StructuralAlignmentResult,
-    matchedNodeComparison: MatchedNodeComparisonResult,
-    globalSanity: InvariantCheckResult,
-): List<String> =
-    buildList {
-        addAll(treeInvariants.mismatchSignals)
-        if (structuralAlignment.mismatched > 0) {
-            add("unmatched structural nodes")
-        }
-        addAll(matchedNodeComparison.mismatchSignals)
-        addAll(globalSanity.mismatchSignals)
-    }
+private fun mismatchSignals(problems: List<Problem>): List<String> =
+    problems
+        .asSequence()
+        .filter { it.severity == Severity.ERROR }
+        .mapNotNull(::mismatchSignalFor)
+        .distinct()
+        .toList()
 
 private fun List<String>.joinForHeadline(): String =
     when (size) {
@@ -568,26 +551,144 @@ private fun List<String>.joinForHeadline(): String =
         else -> dropLast(1).joinToString(", ") + ", and ${last()}"
     }
 
+private fun translateFindings(findings: List<ComparatorFinding>): List<Problem> {
+    val visibleFindings = findings.filterNot { finding -> shouldSuppress(finding, findings) }
+    return visibleFindings.map { it.renderProblem() }
+}
+
+private fun shouldSuppress(
+    finding: ComparatorFinding,
+    allFindings: List<ComparatorFinding>,
+): Boolean =
+    when (finding.kind) {
+        ComparatorFindingKind.STRUCTURE_ID_SANITY_CHANGED ->
+            allFindings.any { other ->
+                other !== finding &&
+                    other.kind == ComparatorFindingKind.STRUCTURE_ID_COLLISION
+            }
+
+        ComparatorFindingKind.STRUCTURE_ANCESTRY_SANITY_CHANGED ->
+            allFindings.any { other ->
+                other !== finding &&
+                    (
+                        other.kind == ComparatorFindingKind.STRUCTURE_UNMATCHED_NODE ||
+                            other.kind == ComparatorFindingKind.STRUCTURE_FORM_ANCESTRY_CHANGED ||
+                            other.kind == ComparatorFindingKind.STRUCTURE_NAMING_CONTAINER_ANCESTRY_CHANGED ||
+                            other.kind == ComparatorFindingKind.STRUCTURE_ITERATION_ANCESTRY_CHANGED
+                    )
+            }
+
+        ComparatorFindingKind.TARGET_SANITY_CHANGED ->
+            allFindings.any { other ->
+                other !== finding &&
+                    other.kind == ComparatorFindingKind.TARGET_RESOLUTION_CHANGED
+            }
+
+        ComparatorFindingKind.STRUCTURE_NAMING_CONTAINER_ANCESTRY_CHANGED ->
+            allFindings.any { other ->
+                other !== finding &&
+                    other.kind == ComparatorFindingKind.STRUCTURE_FORM_ANCESTRY_CHANGED &&
+                    other.oldNode?.nodeId == finding.oldNode?.nodeId &&
+                    other.newNode?.nodeId == finding.newNode?.nodeId
+            }
+
+        ComparatorFindingKind.STRUCTURE_UNMATCHED_NODE ->
+            allFindings.any { other ->
+                other !== finding &&
+                    (
+                        other.explainsUnmatchedSubtree(finding) ||
+                            other.explainsUnmatchedTargetFinding(finding) ||
+                            other.explainsUnmatchedDuplicateId(finding)
+                    )
+            }
+
+        else -> false
+    }
+
+private fun ComparatorFinding.explainsUnmatchedSubtree(other: ComparatorFinding): Boolean {
+    if (other.kind != ComparatorFindingKind.STRUCTURE_UNMATCHED_NODE) {
+        return false
+    }
+    if (
+        kind != ComparatorFindingKind.STRUCTURE_FORM_ANCESTRY_CHANGED &&
+        kind != ComparatorFindingKind.STRUCTURE_ITERATION_ANCESTRY_CHANGED &&
+        kind != ComparatorFindingKind.SCOPE_BINDING_MISMATCH &&
+        kind != ComparatorFindingKind.STRUCTURE_RENDERED_GUARD_CHANGED
+    ) {
+        return false
+    }
+
+    return when {
+        other.oldNode != null && oldNode != null -> other.oldNode.nodePath.isAncestorOf(oldNode.nodePath)
+        other.newNode != null && newNode != null -> other.newNode.nodePath.isAncestorOf(newNode.nodePath)
+        else -> false
+    }
+}
+
+private fun ComparatorFinding.explainsUnmatchedTargetFinding(other: ComparatorFinding): Boolean {
+    if (kind != ComparatorFindingKind.TARGET_SANITY_CHANGED || other.kind != ComparatorFindingKind.STRUCTURE_UNMATCHED_NODE) {
+        return false
+    }
+
+    return when {
+        other.oldNode?.componentTargetAttributes?.isNotEmpty() == true -> true
+        other.newNode?.componentTargetAttributes?.isNotEmpty() == true -> true
+        else -> false
+    }
+}
+
+private fun ComparatorFinding.explainsUnmatchedDuplicateId(other: ComparatorFinding): Boolean {
+    if (kind != ComparatorFindingKind.STRUCTURE_ID_COLLISION || other.kind != ComparatorFindingKind.STRUCTURE_UNMATCHED_NODE) {
+        return false
+    }
+
+    return other.explicitIds.any { it in explicitIds }
+}
+
+private fun mismatchSignalFor(problem: Problem): String? =
+    when (problem.id) {
+        ProblemIds.SCOPE_BINDING_MISMATCH -> "local-binding EL mismatches"
+        ProblemIds.STRUCTURE_UNMATCHED_NODE -> "unmatched structural nodes"
+        ProblemIds.STRUCTURE_ID_COLLISION -> "id-collision mismatches"
+        ProblemIds.STRUCTURE_ID_SANITY_CHANGED -> "global id-sanity mismatches"
+        ProblemIds.STRUCTURE_FORM_ANCESTRY_CHANGED -> "form-ancestry mismatches"
+        ProblemIds.STRUCTURE_NAMING_CONTAINER_ANCESTRY_CHANGED -> "naming-container mismatches"
+        ProblemIds.STRUCTURE_ITERATION_ANCESTRY_CHANGED -> "iteration-ancestry mismatches"
+        ProblemIds.STRUCTURE_RENDERED_GUARD_CHANGED -> "rendered-guard mismatches"
+        ProblemIds.STRUCTURE_ANCESTRY_SANITY_CHANGED -> "global ancestry-sanity mismatches"
+        ProblemIds.TARGET_RESOLUTION_CHANGED -> "target-resolution mismatches"
+        ProblemIds.TARGET_SANITY_CHANGED -> "global target-sanity mismatches"
+        else -> null
+    }
+
 private fun bindingMismatchProblem(
     oldFact: SemanticNodeElFact?,
     newFact: SemanticNodeElFact?,
     oldNode: SemanticNode,
     newNode: SemanticNode,
-): Problem =
-    Problem(
-        id = ProblemIds.SCOPE_BINDING_MISMATCH,
-        severity = Severity.ERROR,
-        category = ProblemCategory.SCOPE,
-        summary = "Local variable resolves to different binding",
-        locations =
-            ProblemLocations(
-                old = oldFact.toProblemLocation(oldNode),
-                new = newFact.toProblemLocation(newNode),
-            ),
-        explanation =
-            "A matched semantic node no longer carries equivalent normalized EL after resolving local bindings. " +
-                "Old: ${oldFact.renderNormalizedOrMissing()} New: ${newFact.renderNormalizedOrMissing()}",
-        hint = "Preserve the original local binding scope or keep the matched node's EL-bearing facts normalized to the same local origins.",
+): ComparatorFinding =
+    ComparatorFinding(
+        kind = ComparatorFindingKind.SCOPE_BINDING_MISMATCH,
+        signal = "local-binding EL mismatches",
+        oldNode = oldNode,
+        newNode = newNode,
+        renderProblem = {
+            Problem(
+                id = ProblemIds.SCOPE_BINDING_MISMATCH,
+                severity = Severity.ERROR,
+                category = ProblemCategory.SCOPE,
+                summary = "Local variable resolves to different binding",
+                locations =
+                    ProblemLocations(
+                        old = oldFact.toProblemLocation(oldNode),
+                        new = newFact.toProblemLocation(newNode),
+                    ),
+                explanation =
+                    "A matched semantic node no longer carries equivalent normalized EL after resolving local bindings. " +
+                        "Old: ${oldFact.renderNormalizedOrMissing()} New: ${newFact.renderNormalizedOrMissing()}",
+                hint = "Preserve the original local binding scope or keep the matched node's EL-bearing facts normalized to the same local origins.",
+            )
+        },
     )
 
 private fun renderedGuardProblem(
@@ -595,102 +696,147 @@ private fun renderedGuardProblem(
     newFact: SemanticNodeElFact?,
     oldNode: SemanticNode,
     newNode: SemanticNode,
-): Problem =
-    Problem(
-        id = ProblemIds.STRUCTURE_RENDERED_GUARD_CHANGED,
-        severity = Severity.ERROR,
-        category = ProblemCategory.STRUCTURE,
-        summary = "Matched node no longer has the same rendered guard",
-        locations =
-            ProblemLocations(
-                old = oldFact.toProblemLocation(oldNode, fallbackSnippet = oldNode.describeForProblem()),
-                new = newFact.toProblemLocation(newNode, fallbackSnippet = newNode.describeForProblem()),
-            ),
-        explanation =
-            "The matched node's effective rendered guard changed after normalization. " +
-                "Old: ${oldFact.renderNormalizedOrMissing()} New: ${newFact.renderNormalizedOrMissing()}",
-        hint = "Keep the same rendered condition, or preserve equivalent local-binding capture if the guard moved.",
+): ComparatorFinding =
+    ComparatorFinding(
+        kind = ComparatorFindingKind.STRUCTURE_RENDERED_GUARD_CHANGED,
+        signal = "rendered-guard mismatches",
+        oldNode = oldNode,
+        newNode = newNode,
+        renderProblem = {
+            Problem(
+                id = ProblemIds.STRUCTURE_RENDERED_GUARD_CHANGED,
+                severity = Severity.ERROR,
+                category = ProblemCategory.STRUCTURE,
+                summary = "Matched node no longer has the same rendered guard",
+                locations =
+                    ProblemLocations(
+                        old = oldFact.toProblemLocation(oldNode, fallbackSnippet = oldNode.describeForProblem()),
+                        new = newFact.toProblemLocation(newNode, fallbackSnippet = newNode.describeForProblem()),
+                    ),
+                explanation =
+                    "The matched node's effective rendered guard changed after normalization. " +
+                        "Old: ${oldFact.renderNormalizedOrMissing()} New: ${newFact.renderNormalizedOrMissing()}",
+                hint = "Keep the same rendered condition, or preserve equivalent local-binding capture if the guard moved.",
+            )
+        },
     )
 
-private fun unresolvedGlobalRootProblem(
+private fun unresolvedGlobalRootFinding(
     oldFact: SemanticNodeElFact,
     newFact: SemanticNodeElFact,
-): Problem {
+): ComparatorFinding {
     val oldBindingOrigin = oldFact.firstBindingOrigin()
     val newBindingOrigin = newFact.firstBindingOrigin()
     val oldGlobals = oldFact.globalReferences.joinToString(", ") { it.writtenName }
     val newGlobals = newFact.globalReferences.joinToString(", ") { it.writtenName }
 
-    return Problem(
-        id = WarningIds.UNSUPPORTED_UNRESOLVED_GLOBAL_ROOT,
-        severity = Severity.WARNING,
-        category = ProblemCategory.UNSUPPORTED,
-        summary = "Unresolved global roots keep EL comparison uncertain",
-        locations =
-            ProblemLocations(
-                old = ProblemLocation(oldFact.provenance, oldFact.rawValue, oldBindingOrigin),
-                new = ProblemLocation(newFact.provenance, newFact.rawValue, newBindingOrigin),
-            ),
-        explanation =
-            "The matched semantic-node fact still depends on symbolic global roots, so the EL layer can only compare local-binding shape here. " +
-                "Old globals: [$oldGlobals] -> ${oldFact.normalizedTemplate!!.render()} " +
-                "New globals: [$newGlobals] -> ${newFact.normalizedTemplate!!.render()}",
-        hint = "Treat bean-level equivalence for these unresolved roots as unknown until broader EL or bean analysis exists.",
+    return ComparatorFinding(
+        kind = ComparatorFindingKind.WARNING,
+        oldNode = null,
+        newNode = null,
+        renderProblem = {
+            Problem(
+                id = WarningIds.UNSUPPORTED_UNRESOLVED_GLOBAL_ROOT,
+                severity = Severity.WARNING,
+                category = ProblemCategory.UNSUPPORTED,
+                summary = "Unresolved global roots keep EL comparison uncertain",
+                locations =
+                    ProblemLocations(
+                        old = ProblemLocation(oldFact.provenance, oldFact.rawValue, oldBindingOrigin),
+                        new = ProblemLocation(newFact.provenance, newFact.rawValue, newBindingOrigin),
+                    ),
+                explanation =
+                    "The matched semantic-node fact still depends on symbolic global roots, so the EL layer can only compare local-binding shape here. " +
+                        "Old globals: [$oldGlobals] -> ${oldFact.normalizedTemplate!!.render()} " +
+                        "New globals: [$newGlobals] -> ${newFact.normalizedTemplate!!.render()}",
+                hint = "Treat bean-level equivalence for these unresolved roots as unknown until broader EL or bean analysis exists.",
+            )
+        },
     )
 }
 
-private fun ancestryProblem(
+private fun ancestryFinding(
     problemId: DiagnosticId,
     kindLabel: String,
     oldNode: SemanticNode,
     newNode: SemanticNode,
     oldRendered: String,
     newRendered: String,
-): Problem =
-    Problem(
-        id = problemId,
-        severity = Severity.ERROR,
-        category = ProblemCategory.STRUCTURE,
-        summary = "Matched node no longer has the same $kindLabel",
-        locations =
-            ProblemLocations(
-                old = ProblemLocation(oldNode.provenance, oldNode.describeForProblem()),
-                new = ProblemLocation(newNode.provenance, newNode.describeForProblem()),
-            ),
-        explanation =
-            "The matched node's $kindLabel changed after the refactor. " +
-                "Old: $oldRendered New: $newRendered",
-        hint = "Keep the matched node inside the same behavioral container chain so $kindLabel stays stable.",
-    )
+): ComparatorFinding {
+    val kind =
+        when (problemId) {
+            ProblemIds.STRUCTURE_FORM_ANCESTRY_CHANGED -> ComparatorFindingKind.STRUCTURE_FORM_ANCESTRY_CHANGED
+            ProblemIds.STRUCTURE_NAMING_CONTAINER_ANCESTRY_CHANGED -> ComparatorFindingKind.STRUCTURE_NAMING_CONTAINER_ANCESTRY_CHANGED
+            else -> error("unsupported ancestry problem id for comparator finding translation: $problemId")
+        }
+    val signal =
+        when (problemId) {
+            ProblemIds.STRUCTURE_FORM_ANCESTRY_CHANGED -> "form-ancestry mismatches"
+            ProblemIds.STRUCTURE_NAMING_CONTAINER_ANCESTRY_CHANGED -> "naming-container mismatches"
+            else -> null
+        }
 
-private fun iterationAncestryProblem(
+    return ComparatorFinding(
+        kind = kind,
+        signal = signal,
+        oldNode = oldNode,
+        newNode = newNode,
+        renderProblem = {
+            Problem(
+                id = problemId,
+                severity = Severity.ERROR,
+                category = ProblemCategory.STRUCTURE,
+                summary = "Matched node no longer has the same $kindLabel",
+                locations =
+                    ProblemLocations(
+                        old = ProblemLocation(oldNode.provenance, oldNode.describeForProblem()),
+                        new = ProblemLocation(newNode.provenance, newNode.describeForProblem()),
+                    ),
+                explanation =
+                    "The matched node's $kindLabel changed after the refactor. " +
+                        "Old: $oldRendered New: $newRendered",
+                hint = "Keep the matched node inside the same behavioral container chain so $kindLabel stays stable.",
+            )
+        },
+    )
+}
+
+private fun iterationAncestryFinding(
     oldNode: SemanticNode,
     newNode: SemanticNode,
     oldRendered: String,
     newRendered: String,
-): Problem =
-    Problem(
-        id = ProblemIds.STRUCTURE_ITERATION_ANCESTRY_CHANGED,
-        severity = Severity.ERROR,
-        category = ProblemCategory.STRUCTURE,
-        summary = "Matched node no longer has the same iteration ancestry",
-        locations =
-            ProblemLocations(
-                old = ProblemLocation(oldNode.provenance, oldNode.describeForProblem()),
-                new = ProblemLocation(newNode.provenance, newNode.describeForProblem()),
-            ),
-        explanation =
-            "The matched node's enclosing iteration context changed after the refactor. " +
-                "Old: $oldRendered New: $newRendered",
-        hint = "Keep the matched node under the same repeat or forEach layers so local iteration semantics stay stable.",
+): ComparatorFinding =
+    ComparatorFinding(
+        kind = ComparatorFindingKind.STRUCTURE_ITERATION_ANCESTRY_CHANGED,
+        signal = "iteration-ancestry mismatches",
+        oldNode = oldNode,
+        newNode = newNode,
+        renderProblem = {
+            Problem(
+                id = ProblemIds.STRUCTURE_ITERATION_ANCESTRY_CHANGED,
+                severity = Severity.ERROR,
+                category = ProblemCategory.STRUCTURE,
+                summary = "Matched node no longer has the same iteration ancestry",
+                locations =
+                    ProblemLocations(
+                        old = ProblemLocation(oldNode.provenance, oldNode.describeForProblem()),
+                        new = ProblemLocation(newNode.provenance, newNode.describeForProblem()),
+                    ),
+                explanation =
+                    "The matched node's enclosing iteration context changed after the refactor. " +
+                        "Old: $oldRendered New: $newRendered",
+                hint = "Keep the matched node under the same repeat or forEach layers so local iteration semantics stay stable.",
+            )
+        },
     )
 
-private fun targetResolutionProblem(
+private fun targetResolutionFinding(
     oldNode: SemanticNode,
     oldAttributes: List<ComponentTargetAttribute>,
     newNode: SemanticNode,
     newAttributes: List<ComponentTargetAttribute>,
-): Problem {
+): ComparatorFinding {
     val oldAttribute = oldAttributes.firstOrNull()
     val newAttribute = newAttributes.firstOrNull()
     val oldSnippet = oldAttributes.joinToString(separator = ", ") { attribute -> attribute.render() }.takeIf { it.isNotBlank() }
@@ -698,60 +844,77 @@ private fun targetResolutionProblem(
     val oldResolved = oldAttributes.joinToString(separator = ", ") { attribute -> attribute.renderResolved() }.ifBlank { "<missing>" }
     val newResolved = newAttributes.joinToString(separator = ", ") { attribute -> attribute.renderResolved() }.ifBlank { "<missing>" }
 
-    return Problem(
-        id = ProblemIds.TARGET_RESOLUTION_CHANGED,
-        severity = Severity.ERROR,
-        category = ProblemCategory.TARGET,
-        summary = "Component target resolves differently after refactor",
-        locations =
-            ProblemLocations(
-                old =
-                    ProblemLocation(
-                        provenance = oldNode.attributeProvenance(oldAttribute),
-                        snippet = oldSnippet,
+    return ComparatorFinding(
+        kind = ComparatorFindingKind.TARGET_RESOLUTION_CHANGED,
+        signal = "target-resolution mismatches",
+        oldNode = oldNode,
+        newNode = newNode,
+        renderProblem = {
+            Problem(
+                id = ProblemIds.TARGET_RESOLUTION_CHANGED,
+                severity = Severity.ERROR,
+                category = ProblemCategory.TARGET,
+                summary = "Component target resolves differently after refactor",
+                locations =
+                    ProblemLocations(
+                        old =
+                            ProblemLocation(
+                                provenance = oldNode.attributeProvenance(oldAttribute),
+                                snippet = oldSnippet,
+                            ),
+                        new =
+                            ProblemLocation(
+                                provenance = newNode.attributeProvenance(newAttribute),
+                                snippet = newSnippet,
+                            ),
                     ),
-                new =
-                    ProblemLocation(
-                        provenance = newNode.attributeProvenance(newAttribute),
-                        snippet = newSnippet,
-                    ),
-            ),
-        explanation =
-            "The matched node's target-bearing attributes no longer resolve to the same semantic targets. " +
-                "Old: $oldResolved New: $newResolved",
-        hint = "Keep the component in the same form or preserve the target component ids so the resolved target meaning stays the same.",
+                explanation =
+                    "The matched node's target-bearing attributes no longer resolve to the same semantic targets. " +
+                        "Old: $oldResolved New: $newResolved",
+                hint = "Keep the component in the same form or preserve the target component ids so the resolved target meaning stays the same.",
+            )
+        },
     )
 }
 
-private fun unmatchedStructuralNodeProblem(
+private fun unmatchedStructuralNodeFinding(
     node: SemanticNode,
     summary: String,
     explanationSide: String,
     counterpartSide: String,
     locations: ProblemLocations,
-): Problem =
-    Problem(
-        id = ProblemIds.STRUCTURE_UNMATCHED_NODE,
-        severity = Severity.ERROR,
-        category = ProblemCategory.STRUCTURE,
-        summary = summary,
-        locations = locations,
-        explanation =
-            "The structural matcher could not align ${node.describeForProblem()} from the $explanationSide tree " +
-                "with any node in the $counterpartSide tree after explicit id, explicit target-relationship, and semantic-signature matching.",
-        hint = "Preserve a stable structural anchor such as explicit ids, resolved targets, or equivalent ancestry/context around this node.",
+): ComparatorFinding =
+    ComparatorFinding(
+        kind = ComparatorFindingKind.STRUCTURE_UNMATCHED_NODE,
+        signal = "unmatched structural nodes",
+        oldNode = locations.old?.let { node },
+        newNode = locations.new?.let { node },
+        explicitIds = setOfNotNull(node.explicitIdAttribute?.rawValue),
+        renderProblem = {
+            Problem(
+                id = ProblemIds.STRUCTURE_UNMATCHED_NODE,
+                severity = Severity.ERROR,
+                category = ProblemCategory.STRUCTURE,
+                summary = summary,
+                locations = locations,
+                explanation =
+                    "The structural matcher could not align ${node.describeForProblem()} from the $explanationSide tree " +
+                        "with any node in the $counterpartSide tree after explicit id, explicit target-relationship, and semantic-signature matching.",
+                hint = "Preserve a stable structural anchor such as explicit ids, resolved targets, or equivalent ancestry/context around this node.",
+            )
+        },
     )
 
-private fun SemanticModel.collectIdCollisionProblems(): List<Problem> =
+private fun SemanticModel.collectIdCollisionFindings(): List<ComparatorFinding> =
     semanticNodes
         .filter { it.participatesInStructuralMatching && it.explicitIdAttribute != null }
         .groupBy { it.explicitIdAttribute!!.rawValue }
         .toSortedMap()
         .values
         .filter { it.size > 1 }
-        .map(::idCollisionProblem)
+        .map(::idCollisionFinding)
 
-private fun idCollisionProblem(nodes: List<SemanticNode>): Problem {
+private fun idCollisionFinding(nodes: List<SemanticNode>): ComparatorFinding {
     val firstNode = nodes.first()
     val explicitId = firstNode.explicitIdAttribute!!.rawValue
     val sideLabel =
@@ -765,22 +928,31 @@ private fun idCollisionProblem(nodes: List<SemanticNode>): Problem {
             "${node.describeForProblem()} at ${node.provenance.logicalLocation.render()} (${node.structuralContextFingerprint()})"
         }
 
-    return Problem(
-        id = ProblemIds.STRUCTURE_ID_COLLISION,
-        severity = Severity.ERROR,
-        category = ProblemCategory.STRUCTURE,
-        summary = "Component id collides within the $sideLabel tree",
-        locations = sideSpecificLocations(firstNode.provenance, snippet),
-        explanation =
-            "The explicit id '$explicitId' is assigned to multiple structural nodes in the same $sideLabel tree: $explanationDetails",
-        hint = "Restore unique component ids per tree so explicit-id anchors and target resolution remain trustworthy.",
+    return ComparatorFinding(
+        kind = ComparatorFindingKind.STRUCTURE_ID_COLLISION,
+        signal = "id-collision mismatches",
+        oldNode = nodes.firstOrNull { it.provenance.logicalLocation.document.side == AnalysisSide.OLD },
+        newNode = nodes.firstOrNull { it.provenance.logicalLocation.document.side == AnalysisSide.NEW },
+        explicitIds = setOf(explicitId),
+        renderProblem = {
+            Problem(
+                id = ProblemIds.STRUCTURE_ID_COLLISION,
+                severity = Severity.ERROR,
+                category = ProblemCategory.STRUCTURE,
+                summary = "Component id collides within the $sideLabel tree",
+                locations = sideSpecificLocations(firstNode.provenance, snippet),
+                explanation =
+                    "The explicit id '$explicitId' is assigned to multiple structural nodes in the same $sideLabel tree: $explanationDetails",
+                hint = "Restore unique component ids per tree so explicit-id anchors and target resolution remain trustworthy.",
+            )
+        },
     )
 }
 
-private fun globalIdSanityProblem(
+private fun globalIdSanityFinding(
     oldNodes: List<SemanticNode>,
     newNodes: List<SemanticNode>,
-): Problem? {
+): ComparatorFinding? {
     val oldEntries = oldNodes.explicitIdInventory()
     val newEntries = newNodes.explicitIdInventory()
     if (oldEntries == newEntries) {
@@ -790,27 +962,40 @@ private fun globalIdSanityProblem(
     val oldLocation = oldNodes.firstOrNull { it.explicitIdAttribute != null }
     val newLocation = newNodes.firstOrNull { it.explicitIdAttribute != null }
 
-    return Problem(
-        id = ProblemIds.STRUCTURE_ID_SANITY_CHANGED,
-        severity = Severity.ERROR,
-        category = ProblemCategory.STRUCTURE,
-        summary = "Unmatched explicit-id inventory changed after refactor",
-        locations =
-            ProblemLocations(
-                old = oldLocation?.let { ProblemLocation(it.provenance, "id=\"${it.explicitIdAttribute!!.rawValue}\"") },
-                new = newLocation?.let { ProblemLocation(it.provenance, "id=\"${it.explicitIdAttribute!!.rawValue}\"") },
-            ),
-        explanation =
-            "Explicit-id anchors that remain outside trustworthy one-to-one matches no longer line up globally. " +
-                "Old unmatched ids: ${oldEntries.renderInventory()} New unmatched ids: ${newEntries.renderInventory()}",
-        hint = "Preserve the same unmatched explicit-id inventory, or fix the structural alignment issue that prevented those ids from pairing cleanly.",
+    return ComparatorFinding(
+        kind = ComparatorFindingKind.STRUCTURE_ID_SANITY_CHANGED,
+        signal = "global id-sanity mismatches",
+        oldNode = oldLocation,
+        newNode = newLocation,
+        explicitIds =
+            buildSet {
+                addAll(oldEntries.map { it.substringBefore("@") })
+                addAll(newEntries.map { it.substringBefore("@") })
+            },
+        renderProblem = {
+            Problem(
+                id = ProblemIds.STRUCTURE_ID_SANITY_CHANGED,
+                severity = Severity.ERROR,
+                category = ProblemCategory.STRUCTURE,
+                summary = "Unmatched explicit-id inventory changed after refactor",
+                locations =
+                    ProblemLocations(
+                        old = oldLocation?.let { ProblemLocation(it.provenance, "id=\"${it.explicitIdAttribute!!.rawValue}\"") },
+                        new = newLocation?.let { ProblemLocation(it.provenance, "id=\"${it.explicitIdAttribute!!.rawValue}\"") },
+                    ),
+                explanation =
+                    "Explicit-id anchors that remain outside trustworthy one-to-one matches no longer line up globally. " +
+                        "Old unmatched ids: ${oldEntries.renderInventory()} New unmatched ids: ${newEntries.renderInventory()}",
+                hint = "Preserve the same unmatched explicit-id inventory, or fix the structural alignment issue that prevented those ids from pairing cleanly.",
+            )
+        },
     )
 }
 
-private fun globalTargetSanityProblem(
+private fun globalTargetSanityFinding(
     oldNodes: List<SemanticNode>,
     newNodes: List<SemanticNode>,
-): Problem? {
+): ComparatorFinding? {
     val oldEntries = oldNodes.targetInventory()
     val newEntries = newNodes.targetInventory()
     if (oldEntries == newEntries) {
@@ -820,27 +1005,35 @@ private fun globalTargetSanityProblem(
     val oldLocation = oldNodes.firstOrNull { it.componentTargetAttributes.isNotEmpty() }
     val newLocation = newNodes.firstOrNull { it.componentTargetAttributes.isNotEmpty() }
 
-    return Problem(
-        id = ProblemIds.TARGET_SANITY_CHANGED,
-        severity = Severity.ERROR,
-        category = ProblemCategory.TARGET,
-        summary = "Unmatched target relationships changed after refactor",
-        locations =
-            ProblemLocations(
-                old = oldLocation?.let { ProblemLocation(it.provenance, it.componentTargetAttributes.first().render()) },
-                new = newLocation?.let { ProblemLocation(it.provenance, it.componentTargetAttributes.first().render()) },
-            ),
-        explanation =
-            "Resolved target-bearing attributes that remain outside trustworthy one-to-one matches no longer line up globally. " +
-                "Old unmatched targets: ${oldEntries.renderInventory()} New unmatched targets: ${newEntries.renderInventory()}",
-        hint = "Preserve the same unresolved or target-bearing relationships, or fix the structural alignment issue that left these nodes unmatched.",
+    return ComparatorFinding(
+        kind = ComparatorFindingKind.TARGET_SANITY_CHANGED,
+        signal = "global target-sanity mismatches",
+        oldNode = oldLocation,
+        newNode = newLocation,
+        renderProblem = {
+            Problem(
+                id = ProblemIds.TARGET_SANITY_CHANGED,
+                severity = Severity.ERROR,
+                category = ProblemCategory.TARGET,
+                summary = "Unmatched target relationships changed after refactor",
+                locations =
+                    ProblemLocations(
+                        old = oldLocation?.let { ProblemLocation(it.provenance, it.componentTargetAttributes.first().render()) },
+                        new = newLocation?.let { ProblemLocation(it.provenance, it.componentTargetAttributes.first().render()) },
+                    ),
+                explanation =
+                    "Resolved target-bearing attributes that remain outside trustworthy one-to-one matches no longer line up globally. " +
+                        "Old unmatched targets: ${oldEntries.renderInventory()} New unmatched targets: ${newEntries.renderInventory()}",
+                hint = "Preserve the same unresolved or target-bearing relationships, or fix the structural alignment issue that left these nodes unmatched.",
+            )
+        },
     )
 }
 
-private fun globalAncestrySanityProblem(
+private fun globalAncestrySanityFinding(
     oldNodes: List<SemanticNode>,
     newNodes: List<SemanticNode>,
-): Problem? {
+): ComparatorFinding? {
     val oldEntries = oldNodes.ancestryInventory()
     val newEntries = newNodes.ancestryInventory()
     if (oldEntries == newEntries) {
@@ -850,24 +1043,32 @@ private fun globalAncestrySanityProblem(
     val oldLocation = oldNodes.firstOrNull()
     val newLocation = newNodes.firstOrNull()
 
-    return Problem(
-        id = ProblemIds.STRUCTURE_ANCESTRY_SANITY_CHANGED,
-        severity = Severity.ERROR,
-        category = ProblemCategory.STRUCTURE,
-        summary = "Unmatched structural ancestry inventory changed after refactor",
-        locations =
-            ProblemLocations(
-                old = oldLocation?.let { ProblemLocation(it.provenance, it.describeForProblem()) },
-                new = newLocation?.let { ProblemLocation(it.provenance, it.describeForProblem()) },
-            ),
-        explanation =
-            "Form, naming-container, and iteration context for unmatched structural nodes no longer line up globally. " +
-                "Old unmatched ancestry: ${oldEntries.renderInventory()} New unmatched ancestry: ${newEntries.renderInventory()}",
-        hint = "Preserve the same unmatched structural context, or fix the alignment issue that left these nodes outside one-to-one comparison.",
+    return ComparatorFinding(
+        kind = ComparatorFindingKind.STRUCTURE_ANCESTRY_SANITY_CHANGED,
+        signal = "global ancestry-sanity mismatches",
+        oldNode = oldLocation,
+        newNode = newLocation,
+        renderProblem = {
+            Problem(
+                id = ProblemIds.STRUCTURE_ANCESTRY_SANITY_CHANGED,
+                severity = Severity.ERROR,
+                category = ProblemCategory.STRUCTURE,
+                summary = "Unmatched structural ancestry inventory changed after refactor",
+                locations =
+                    ProblemLocations(
+                        old = oldLocation?.let { ProblemLocation(it.provenance, it.describeForProblem()) },
+                        new = newLocation?.let { ProblemLocation(it.provenance, it.describeForProblem()) },
+                    ),
+                explanation =
+                    "Form, naming-container, and iteration context for unmatched structural nodes no longer line up globally. " +
+                        "Old unmatched ancestry: ${oldEntries.renderInventory()} New unmatched ancestry: ${newEntries.renderInventory()}",
+                hint = "Preserve the same unmatched structural context, or fix the alignment issue that left these nodes outside one-to-one comparison.",
+            )
+        },
     )
 }
 
-private fun List<SemanticElOccurrence>.collectUnsupportedElProblems(): List<Problem> =
+private fun List<SemanticElOccurrence>.collectUnsupportedElProblems(): List<ComparatorFinding> =
     filter { !it.isSupported }.map { occurrence ->
         val locations = locationsFor(occurrence.provenance, occurrence.rawValue)
         val carrierDescription = occurrence.describeCarrier()
@@ -875,21 +1076,26 @@ private fun List<SemanticElOccurrence>.collectUnsupportedElProblems(): List<Prob
             "unsupported semantic EL occurrences must carry a parse failure"
         }
 
-        Problem(
-            id = WarningIds.UNSUPPORTED_EXTRACTED_EL,
-            severity = Severity.WARNING,
-            category = ProblemCategory.UNSUPPORTED,
-            summary = "Extracted EL falls outside the MVP subset",
-            locations = locations,
-            explanation =
-                "$carrierDescription uses extracted EL that the MVP parser does not support yet: ${failure.message}. " +
-                    "The affected semantic fact is treated as unknown, so equivalence remains inconclusive.",
-            hint = "Rewrite the EL into the documented MVP subset or keep the result inconclusive until support is added.",
+        ComparatorFinding(
+            kind = ComparatorFindingKind.WARNING,
+            renderProblem = {
+                Problem(
+                    id = WarningIds.UNSUPPORTED_EXTRACTED_EL,
+                    severity = Severity.WARNING,
+                    category = ProblemCategory.UNSUPPORTED,
+                    summary = "Extracted EL falls outside the MVP subset",
+                    locations = locations,
+                    explanation =
+                        "$carrierDescription uses extracted EL that the MVP parser does not support yet: ${failure.message}. " +
+                            "The affected semantic fact is treated as unknown, so equivalence remains inconclusive.",
+                    hint = "Rewrite the EL into the documented MVP subset or keep the result inconclusive until support is added.",
+                )
+            },
         )
     }
 
-private fun XhtmlSyntaxTree.collectIncludeProblems(): List<Problem> {
-    val problems = mutableListOf<Problem>()
+private fun XhtmlSyntaxTree.collectIncludeProblems(): List<ComparatorFinding> {
+    val problems = mutableListOf<ComparatorFinding>()
     walkDepthFirst { node ->
         if (node is LogicalIncludeNode) {
             node.includeFailure?.let { includeFailure ->
@@ -903,34 +1109,44 @@ private fun XhtmlSyntaxTree.collectIncludeProblems(): List<Problem> {
 private fun includeProblemFor(
     node: LogicalIncludeNode,
     includeFailure: SourceGraphIncludeFailure,
-): Problem {
+): ComparatorFinding {
     val locations = locationsFor(node.provenance, node.sourcePath)
 
     return when (includeFailure.kind) {
         SourceGraphIncludeFailureKind.DYNAMIC_PATH -> {
             val requestedPath = includeFailure.dynamicSourcePath ?: node.sourcePath ?: "dynamic src"
-            Problem(
-                id = WarningIds.UNSUPPORTED_DYNAMIC_INCLUDE,
-                severity = Severity.WARNING,
-                category = ProblemCategory.UNSUPPORTED,
-                summary = "Dynamic include path is not statically resolvable",
-                locations = locations,
-                explanation =
-                    "The include src uses a dynamic expression ($requestedPath), so comparison beneath this node is not trustworthy.",
-                hint = "Replace the dynamic include with a static path or treat the result as inconclusive.",
+            ComparatorFinding(
+                kind = ComparatorFindingKind.WARNING,
+                renderProblem = {
+                    Problem(
+                        id = WarningIds.UNSUPPORTED_DYNAMIC_INCLUDE,
+                        severity = Severity.WARNING,
+                        category = ProblemCategory.UNSUPPORTED,
+                        summary = "Dynamic include path is not statically resolvable",
+                        locations = locations,
+                        explanation =
+                            "The include src uses a dynamic expression ($requestedPath), so comparison beneath this node is not trustworthy.",
+                        hint = "Replace the dynamic include with a static path or treat the result as inconclusive.",
+                    )
+                },
             )
         }
 
         SourceGraphIncludeFailureKind.INCLUDE_CYCLE -> {
             val cyclePath = includeFailure.cycleDocuments.joinToString(" -> ") { it.displayPath }
-            Problem(
-                id = WarningIds.UNSUPPORTED_INCLUDE_CYCLE,
-                severity = Severity.WARNING,
-                category = ProblemCategory.UNSUPPORTED,
-                summary = "Recursive include cycle detected",
-                locations = locations,
-                explanation = "The include graph loops back on itself: $cyclePath",
-                hint = "Break the recursive include chain before relying on static equivalence analysis.",
+            ComparatorFinding(
+                kind = ComparatorFindingKind.WARNING,
+                renderProblem = {
+                    Problem(
+                        id = WarningIds.UNSUPPORTED_INCLUDE_CYCLE,
+                        severity = Severity.WARNING,
+                        category = ProblemCategory.UNSUPPORTED,
+                        summary = "Recursive include cycle detected",
+                        locations = locations,
+                        explanation = "The include graph loops back on itself: $cyclePath",
+                        hint = "Break the recursive include chain before relying on static equivalence analysis.",
+                    )
+                },
             )
         }
 
@@ -939,15 +1155,20 @@ private fun includeProblemFor(
                 "missing include diagnostics require the unresolved target document"
             }
             val requestedPath = node.sourcePath ?: missingDocument.displayPath
-            Problem(
-                id = WarningIds.UNSUPPORTED_MISSING_INCLUDE,
-                severity = Severity.WARNING,
-                category = ProblemCategory.UNSUPPORTED,
-                summary = "Included file could not be found",
-                locations = locations,
-                explanation =
-                    "Static include $requestedPath resolved to ${missingDocument.displayPath}, but that file does not exist.",
-                hint = "Fix the include path or restore the missing file before relying on static equivalence analysis.",
+            ComparatorFinding(
+                kind = ComparatorFindingKind.WARNING,
+                renderProblem = {
+                    Problem(
+                        id = WarningIds.UNSUPPORTED_MISSING_INCLUDE,
+                        severity = Severity.WARNING,
+                        category = ProblemCategory.UNSUPPORTED,
+                        summary = "Included file could not be found",
+                        locations = locations,
+                        explanation =
+                            "Static include $requestedPath resolved to ${missingDocument.displayPath}, but that file does not exist.",
+                        hint = "Fix the include path or restore the missing file before relying on static equivalence analysis.",
+                    )
+                },
             )
         }
     }
@@ -1107,3 +1328,6 @@ private fun List<String>.renderInventory(limit: Int = 4): String =
         size <= limit -> joinToString("; ")
         else -> take(limit).joinToString("; ") + "; ... (${size - limit} more)"
     }
+
+private fun dev.xhtmlinlinecheck.syntax.LogicalNodePath.isAncestorOf(other: dev.xhtmlinlinecheck.syntax.LogicalNodePath): Boolean =
+    segments.size < other.segments.size && other.segments.take(segments.size) == segments

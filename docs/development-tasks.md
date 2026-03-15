@@ -1,4 +1,3 @@
-Implement mismatch-to-problem translation and duplicate/cascade suppression together so raw comparator findings become concise navigable diagnostics rather than noisy, repetitive output.
 Implement final result derivation across mismatches and unsupported findings, then add fixture tests for safe alpha-renaming, variable-capture regressions, form-ancestry drift, changed AJAX targets, and inconclusive-but-not-proven-wrong cases.
 Create the first-pass canonical fixture corpus under `fixtures/`, including equivalent, non-equivalent, and inconclusive cases plus short notes for subtle scenarios, so analyzer, reporter, and CLI tests share stable long-lived assets.
 Use `dummy/report.xhtml` and `dummy/report-flattened.xhtml` as the first realism source when selecting or minimizing those canonical fixtures, but keep that pair unclassified until it has an explicit trusted verdict.

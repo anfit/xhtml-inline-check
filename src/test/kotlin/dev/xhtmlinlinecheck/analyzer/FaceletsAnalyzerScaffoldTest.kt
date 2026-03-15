@@ -187,11 +187,10 @@ class FaceletsAnalyzerScaffoldTest {
 
         assertThatReport(report)
             .hasResult(AnalysisResult.NOT_EQUIVALENT)
-            .hasProblemCount(3)
+            .hasProblemCount(2)
             .hasWarningCount(1)
             .hasProblemIds(
                 "P-STRUCTURE-UNMATCHED_NODE",
-                "P-STRUCTURE-ANCESTRY_SANITY_CHANGED",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
             )
         assertThat(report.problems.first().summary).isEqualTo("Refactored structural node has no trustworthy match in the legacy tree")
@@ -199,7 +198,6 @@ class FaceletsAnalyzerScaffoldTest {
         assertThat(report.problems.first().locations.new?.snippet).isEqualTo("h:commandButton")
         assertThat(report.problems.first().explanation).contains("explicit id")
         assertThat(report.summary.headline).contains("unmatched structural nodes")
-        assertThat(report.summary.headline).contains("global ancestry-sanity mismatches")
         assertThat(report.summary.counts.checked).isEqualTo(12)
         assertThat(report.summary.counts.matched).isEqualTo(10)
         assertThat(report.summary.counts.mismatched).isEqualTo(2)
@@ -674,26 +672,21 @@ class FaceletsAnalyzerScaffoldTest {
 
         assertThatReport(report)
             .hasResult(AnalysisResult.NOT_EQUIVALENT)
-            .hasProblemCount(7)
+            .hasProblemCount(2)
             .hasWarningCount(1)
-        assertThat(report.problems.first().id.value).isEqualTo("P-STRUCTURE-ID_COLLISION")
+            .hasProblemIds(
+                "P-STRUCTURE-ID_COLLISION",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
         assertThat(report.problems.first().summary).isEqualTo("Component id collides within the refactored tree")
         assertThat(report.problems.first().locations.new?.logicalLocation?.render()).startsWith("refactored/root.xhtml:3:")
         assertThat(report.problems.first().locations.new?.snippet).isEqualTo("id=\"saveButton\"")
         assertThat(report.problems.first().explanation).contains("h:commandButton#saveButton")
-        assertThat(report.problems.map { it.id.value }).contains(
-            "P-STRUCTURE-ID_COLLISION",
-            "P-STRUCTURE-UNMATCHED_NODE",
-            "P-STRUCTURE-ID_SANITY_CHANGED",
-            "P-STRUCTURE-ANCESTRY_SANITY_CHANGED",
-            "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
-        )
         assertThat(report.summary.headline).contains("id-collision mismatches")
-        assertThat(report.summary.headline).contains("global id-sanity mismatches")
     }
 
     @Test
-    fun `scaffold analyzer keeps unmatched target drift visible through global sanity checks`() {
+    fun `scaffold analyzer translates unmatched target drift into one navigable diagnostic`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(
             "legacy/root.xhtml",
@@ -729,14 +722,12 @@ class FaceletsAnalyzerScaffoldTest {
 
         assertThatReport(report)
             .hasResult(AnalysisResult.NOT_EQUIVALENT)
-            .hasProblemCount(4)
+            .hasProblemCount(2)
             .hasWarningCount(1)
-        assertThat(report.problems.map { it.id.value }).containsExactly(
-            "P-STRUCTURE-UNMATCHED_NODE",
-            "P-STRUCTURE-UNMATCHED_NODE",
-            "P-TARGET-SANITY_CHANGED",
-            "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
-        )
+            .hasProblemIds(
+                "P-TARGET-SANITY_CHANGED",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
         val targetProblem = report.problems.first { it.id.value == "P-TARGET-SANITY_CHANGED" }
         assertThat(targetProblem.summary).isEqualTo("Unmatched target relationships changed after refactor")
         assertThat(targetProblem.explanation).contains("for=component:nameInput->h:inputText#nameInput@form:mainForm")
@@ -787,11 +778,10 @@ class FaceletsAnalyzerScaffoldTest {
 
         assertThatReport(report)
             .hasResult(AnalysisResult.NOT_EQUIVALENT)
-            .hasProblemCount(4)
+            .hasProblemCount(3)
             .hasWarningCount(1)
             .hasProblemIds(
                 "P-STRUCTURE-FORM_ANCESTRY_CHANGED",
-                "P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED",
                 "P-TARGET-RESOLUTION_CHANGED",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
             )
@@ -804,7 +794,7 @@ class FaceletsAnalyzerScaffoldTest {
         assertThat(targetProblem.explanation).contains("component:panel->h:panelGroup#panel@form:mainForm")
         assertThat(targetProblem.explanation).contains("component:panel->h:panelGroup#panel@form:otherForm")
         assertThat(report.problems.map { it.id.value }).contains("P-STRUCTURE-FORM_ANCESTRY_CHANGED")
-        assertThat(report.problems.map { it.id.value }).contains("P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED")
+        assertThat(report.problems.map { it.id.value }).doesNotContain("P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED")
         assertThat(report.summary.headline).contains("target-resolution mismatches")
     }
 
@@ -841,19 +831,16 @@ class FaceletsAnalyzerScaffoldTest {
 
         assertThatReport(report)
             .hasResult(AnalysisResult.NOT_EQUIVALENT)
-            .hasProblemCount(3)
+            .hasProblemCount(2)
             .hasWarningCount(1)
             .hasProblemIds(
                 "P-STRUCTURE-FORM_ANCESTRY_CHANGED",
-                "P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
             )
         assertThat(report.problems.first().summary).isEqualTo("Matched node no longer has the same form ancestry")
-        assertThat(report.problems[1].summary).isEqualTo("Matched node no longer has the same naming-container ancestry")
         assertThat(report.problems.first().explanation).contains("mainForm")
-        assertThat(report.problems[1].explanation).contains("mainForm")
         assertThat(report.summary.headline).contains("form-ancestry mismatches")
-        assertThat(report.summary.headline).contains("naming-container mismatches")
+        assertThat(report.summary.headline).doesNotContain("naming-container mismatches")
     }
 
     @Test
@@ -889,12 +876,10 @@ class FaceletsAnalyzerScaffoldTest {
 
         assertThatReport(report)
             .hasResult(AnalysisResult.NOT_EQUIVALENT)
-            .hasProblemCount(5)
+            .hasProblemCount(3)
             .hasWarningCount(2)
-        assertThat(report.problems.map { it.id.value }).containsExactly(
-            "P-STRUCTURE-UNMATCHED_NODE",
+            .hasProblemIds(
             "W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT",
-            "P-STRUCTURE-ANCESTRY_SANITY_CHANGED",
             "P-STRUCTURE-ITERATION_ANCESTRY_CHANGED",
             "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
         )
@@ -902,7 +887,7 @@ class FaceletsAnalyzerScaffoldTest {
         assertThat(report.problems.first { it.id.value == "P-STRUCTURE-ITERATION_ANCESTRY_CHANGED" }.explanation)
             .contains("ui:repeat")
         assertThat(report.summary.headline).contains("iteration-ancestry mismatches")
-        assertThat(report.summary.headline).contains("global ancestry-sanity mismatches")
+        assertThat(report.summary.headline).doesNotContain("global ancestry-sanity mismatches")
     }
 
     @Test
