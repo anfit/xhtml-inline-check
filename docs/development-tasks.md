@@ -1,4 +1,3 @@
-Add end-to-end CLI integration tests for representative success and failure flows and for invalid input or parser-failure paths so the documented CLI contract is exercised through the real pipeline.
 Profile the completed analyzer on larger XHTML trees, then reduce unnecessary reparsing and duplicate walks only where profiling shows real waste so performance work is evidence-driven instead of speculative.
 Review and refine registry and diagnostic quality together by validating tag-rule coverage against representative third-party component tags and improving the highest-noise mismatch categories using real fixture and profiling results.
 Run deterministic-output validation across repeated executions as a release-readiness gate once matching, suppression, reporting, and CLI behavior are complete.
