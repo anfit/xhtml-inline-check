@@ -7,9 +7,27 @@ import dev.xhtmlinlinecheck.domain.BindingOrigin
 import dev.xhtmlinlinecheck.domain.IncludeProvenanceStep
 import dev.xhtmlinlinecheck.domain.Problem
 import dev.xhtmlinlinecheck.domain.ProblemLocation
+import dev.xhtmlinlinecheck.domain.Severity
 import dev.xhtmlinlinecheck.domain.SourceLocation
 import dev.xhtmlinlinecheck.domain.WarningTotals
 import java.util.Locale
+
+data class ReportRenderOptions(
+    val maxProblems: Int? = null,
+) {
+    init {
+        require(maxProblems == null || maxProblems >= 0) {
+            "maxProblems must be non-negative"
+        }
+    }
+}
+
+internal data class ReportDisplayView(
+    val maxProblems: Int?,
+    val displayedDiagnostics: Int,
+    val totalDiagnostics: Int,
+    val omittedDiagnostics: Int,
+)
 
 internal data class ReportAggregateView(
     val checked: Int,
@@ -26,21 +44,37 @@ internal data class ReportAggregateView(
 internal data class ReportSections(
     val result: String,
     val headline: String,
+    val display: ReportDisplayView,
     val summary: ReportAggregateView,
     val stats: ReportAggregateView,
     val errors: List<Problem>,
     val warnings: List<Problem>,
 )
 
-internal fun AnalysisReport.toReportSections(): ReportSections =
-    ReportSections(
+internal fun AnalysisReport.toReportSections(options: ReportRenderOptions = ReportRenderOptions()): ReportSections {
+    val displayedProblems =
+        if (options.maxProblems == null) {
+            orderedProblems
+        } else {
+            orderedProblems.take(options.maxProblems)
+        }
+
+    return ReportSections(
         result = result.name,
         headline = summary.headline,
+        display =
+            ReportDisplayView(
+                maxProblems = options.maxProblems,
+                displayedDiagnostics = displayedProblems.size,
+                totalDiagnostics = orderedProblems.size,
+                omittedDiagnostics = orderedProblems.size - displayedProblems.size,
+            ),
         summary = summaryView(summary.counts, summary.coverage, summary.warnings),
         stats = summaryView(stats.counts, stats.coverage, stats.warnings),
-        errors = errors,
-        warnings = warnings,
+        errors = displayedProblems.filter { it.severity == Severity.ERROR },
+        warnings = displayedProblems.filter { it.severity == Severity.WARNING },
     )
+}
 
 private fun summaryView(
     counts: AggregateCounts,

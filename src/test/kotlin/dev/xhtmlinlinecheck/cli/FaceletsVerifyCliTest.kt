@@ -26,6 +26,18 @@ class FaceletsVerifyCliTest {
     }
 
     @Test
+    fun `fail on warning upgrades clean-but-warned runs to a failing exit code`() {
+        val args = smokeArgs() + "--fail-on-warning"
+        val output = StringBuilder()
+
+        val exitCode = FaceletsVerifyCli().run(args, output)
+
+        assertThat(exitCode).isEqualTo(2)
+        assertThat(output.toString()).contains("EQUIVALENT")
+        assertThat(output.toString()).contains("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
+    }
+
+    @Test
     fun `prints usage when roots are missing`() {
         val output = StringBuilder()
 
@@ -88,6 +100,70 @@ class FaceletsVerifyCliTest {
         assertThat(output.toString()).contains("pages/root.xhtml")
         assertThat(output.toString()).doesNotContain(tree.path("workspace/legacy").toString())
         assertThat(output.toString()).doesNotContain(tree.path("workspace/refactored").toString())
+    }
+
+    @Test
+    fun `max problems caps displayed diagnostics after stable ordering`() {
+        val output = StringBuilder()
+
+        val exitCode = FaceletsVerifyCli().run(
+            listOf(
+                "fixtures/not-equivalent/changed-ajax-target/old/root.xhtml",
+                "fixtures/not-equivalent/changed-ajax-target/new/root.xhtml",
+                "--max-problems",
+                "1",
+            ),
+            output,
+        )
+
+        assertThat(exitCode).isEqualTo(1)
+        assertThat(output.toString()).contains("Displayed diagnostics: 1/2 (1 omitted by --max-problems=1)")
+        assertThat(output.toString()).contains("P-TARGET-RESOLUTION_CHANGED")
+        assertThat(output.toString()).doesNotContain("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
+    }
+
+    @Test
+    fun `explain renders stable diagnostic help in text mode`() {
+        val output = StringBuilder()
+
+        val exitCode = FaceletsVerifyCli().run(
+            listOf("--explain", "P-TARGET-RESOLUTION_CHANGED"),
+            output,
+        )
+
+        assertThat(exitCode).isEqualTo(0)
+        assertThat(output.toString()).contains("P-TARGET-RESOLUTION_CHANGED")
+        assertThat(output.toString()).contains("Severity: ERROR")
+        assertThat(output.toString()).contains("Category: TARGET")
+        assertThat(output.toString()).contains("Summary: Component target no longer resolves the same way")
+    }
+
+    @Test
+    fun `explain renders stable diagnostic help in json mode`() {
+        val output = StringBuilder()
+
+        val exitCode = FaceletsVerifyCli().run(
+            listOf("--format", "json", "--explain", "W-UNSUPPORTED-DYNAMIC_INCLUDE"),
+            output,
+        )
+
+        assertThat(exitCode).isEqualTo(0)
+        assertThat(output.toString()).contains("\"id\" : \"W-UNSUPPORTED-DYNAMIC_INCLUDE\"")
+        assertThat(output.toString()).contains("\"severity\" : \"WARNING\"")
+        assertThat(output.toString()).contains("\"blocking\" : true")
+    }
+
+    @Test
+    fun `explain rejects unknown diagnostic ids`() {
+        val output = StringBuilder()
+
+        val exitCode = FaceletsVerifyCli().run(
+            listOf("--explain", "P-NOT-REAL"),
+            output,
+        )
+
+        assertThat(exitCode).isEqualTo(64)
+        assertThat(output.toString()).contains("Unknown diagnostic id: P-NOT-REAL")
     }
 
     private fun smokeArgs(): List<String> {

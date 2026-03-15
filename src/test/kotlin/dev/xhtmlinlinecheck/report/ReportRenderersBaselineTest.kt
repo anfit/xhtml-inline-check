@@ -55,7 +55,12 @@ class ReportRenderersBaselineTest {
                         severity = Severity.WARNING,
                         category = ProblemCategory.UNSUPPORTED,
                         summary = "Attribute location stays explicit",
-                        locations = ProblemLocations(old = ProblemLocation(Provenance(location, location), "#{bean.flag}")),
+                        locations = ProblemLocations(
+                            old = ProblemLocation(
+                                Provenance(location, location),
+                                "#{bean.flag}"
+                            )
+                        ),
                         explanation = "Reporter should preserve fallback metadata.",
                     ),
                 ),
@@ -123,8 +128,8 @@ class ReportRenderersBaselineTest {
 
         assertThat(TextReportRenderer().render(report)).contains("[binding: ui:repeat var=row from legacy/order.xhtml]")
         assertThat(JsonReportRenderer().render(report)).contains("\"bindingOrigin\"")
-        assertThat(JsonReportRenderer().render(report)).contains("\"descriptor\": \"ui:repeat var=item\"")
-        assertThat(JsonReportRenderer().render(report)).contains("\"rendered\": \"ui:repeat var=item from refactored/order.xhtml\"")
+        assertThat(JsonReportRenderer().render(report)).contains("\"descriptor\" : \"ui:repeat var=item\"")
+        assertThat(JsonReportRenderer().render(report)).contains("\"rendered\" : \"ui:repeat var=item from refactored/order.xhtml\"")
     }
 
     @Test
@@ -145,7 +150,7 @@ class ReportRenderersBaselineTest {
     fun `mismatch text output stays detailed and separates warnings`() {
         val rendered = TextReportRenderer().render(notEquivalentReport())
 
-        assertThat(rendered).contains("NOT_EQUIVALENT")
+        assertThat(rendered).contains("NOT EQUIVALENT")
         assertThat(rendered).contains("Problems: 1")
         assertThat(rendered).contains("P-STRUCTURE-FORM_ANCESTRY_CHANGED Component moved outside form")
         assertThat(rendered).contains("old: legacy/order.xhtml -> <h:form><p:commandButton id=\"saveBtn\" /></h:form>")
@@ -183,6 +188,23 @@ class ReportRenderersBaselineTest {
         assertThat(rendered).contains("\"mismatched\" : 1")
         assertThat(rendered).contains("\"blocking\" : 0")
         assertThat(rendered).contains("\"stats\"")
+    }
+
+    @Test
+    fun `renderers cap displayed diagnostics after deterministic ordering`() {
+        val report = GoldenReportSamples.orderedDiagnosticsReport()
+
+        val textRendered = TextReportRenderer().render(report, ReportRenderOptions(maxProblems = 1))
+        val jsonRendered = JsonReportRenderer().render(report, ReportRenderOptions(maxProblems = 1))
+
+        assertThat(textRendered).contains("Displayed diagnostics: 1/4 (3 omitted by --max-problems=1)")
+        assertThat(textRendered).contains("P-SCOPE-BINDING_MISMATCH")
+        assertThat(textRendered).doesNotContain("P-TARGET-RESOLUTION_CHANGED")
+        assertThat(textRendered).doesNotContain("W-UNSUPPORTED-DYNAMIC_INCLUDE")
+        assertThat(jsonRendered).contains("\"display\"")
+        assertThat(jsonRendered).contains("\"maxProblems\" : 1")
+        assertThat(jsonRendered).contains("\"displayedDiagnostics\" : 1")
+        assertThat(jsonRendered).contains("\"omittedDiagnostics\" : 3")
     }
 
     private fun equivalentReport(): AnalysisReport =
@@ -349,5 +371,4 @@ class ReportRenderersBaselineTest {
             ),
             explanation = "Current analysis stages still return a scaffold warning.",
         )
-    }
 }

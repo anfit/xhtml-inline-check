@@ -5,13 +5,17 @@ import dev.xhtmlinlinecheck.domain.AnalysisResult
 import dev.xhtmlinlinecheck.domain.Problem
 
 class TextReportRenderer {
-    fun render(report: AnalysisReport): String {
-        val sections = report.toReportSections()
+    fun render(
+        report: AnalysisReport,
+        options: ReportRenderOptions = ReportRenderOptions(),
+    ): String {
+        val sections = report.toReportSections(options)
 
         val lines = buildList {
-            add(sections.result)
+            add(renderResult(report.result))
             add(sections.headline)
             add(renderAggregateLines(sections.summary))
+            renderDisplayLimit(sections.display)?.let(::add)
 
             when (report.result) {
                 AnalysisResult.EQUIVALENT -> {
@@ -48,6 +52,23 @@ class TextReportRenderer {
         }
 
         return lines.joinToString(System.lineSeparator())
+    }
+
+    private fun renderDisplayLimit(display: ReportDisplayView): String? {
+        if (display.maxProblems == null) {
+            return null
+        }
+        return buildString {
+            append("Displayed diagnostics: ")
+            append(display.displayedDiagnostics)
+            append("/")
+            append(display.totalDiagnostics)
+            append(" (")
+            append(display.omittedDiagnostics)
+            append(" omitted by --max-problems=")
+            append(display.maxProblems)
+            append(")")
+        }
     }
 
     private fun renderAggregateLines(aggregate: ReportAggregateView): String =
@@ -108,6 +129,8 @@ class TextReportRenderer {
                 append(hint)
             }
         }
+
+    private fun renderResult(result: AnalysisResult): String = result.name.replace('_', ' ')
 
     private fun firstLocation(problem: Problem) = problem.locations.old ?: problem.locations.new
 }

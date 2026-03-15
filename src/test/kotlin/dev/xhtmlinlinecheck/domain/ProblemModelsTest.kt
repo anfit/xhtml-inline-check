@@ -123,4 +123,14 @@ class ProblemModelsTest {
         assertThat(problemLocation.bindingOrigin).isEqualTo(bindingOrigin)
         assertThat(problemLocation.bindingOrigin?.render()).isEqualTo("ui:repeat var=row from legacy/table.xhtml")
     }
+
+    @Test
+    fun `diagnostic catalog resolves stable ids to explainable definitions`() {
+        val definition = DiagnosticCatalog.definitionFor(ProblemIds.TARGET_RESOLUTION_CHANGED)
+
+        assertThat(definition).isNotNull
+        assertThat(definition?.id).isEqualTo(ProblemIds.TARGET_RESOLUTION_CHANGED)
+        assertThat(definition?.summary).isEqualTo("Component target no longer resolves the same way")
+        assertThat(definition?.blocking).isTrue()
+    }
 }

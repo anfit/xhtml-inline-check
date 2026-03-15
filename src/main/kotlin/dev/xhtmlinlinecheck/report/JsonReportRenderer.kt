@@ -12,19 +12,31 @@ class JsonReportRenderer {
             .setSerializationInclusion(JsonInclude.Include.ALWAYS)
             .disable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
 
-    fun render(report: AnalysisReport): String {
-        val sections = report.toReportSections()
-        val payload =
-            linkedMapOf(
-                "result" to sections.result,
-                "summary" to renderAggregatePayload(sections.headline, sections.summary),
-                "problems" to sections.errors.map(::renderProblem),
-                "warnings" to sections.warnings.map(::renderProblem),
-                "stats" to renderAggregatePayload(sections.headline, sections.stats),
-            )
+    fun render(
+        report: AnalysisReport,
+        options: ReportRenderOptions = ReportRenderOptions(),
+    ): String {
+        val sections = report.toReportSections(options)
+        val payload = linkedMapOf<String, Any?>()
+        payload["result"] = sections.result
+        payload["summary"] = renderAggregatePayload(sections.headline, sections.summary)
+        if (sections.display.maxProblems != null) {
+            payload["display"] = renderDisplayPayload(sections.display)
+        }
+        payload["problems"] = sections.errors.map(::renderProblem)
+        payload["warnings"] = sections.warnings.map(::renderProblem)
+        payload["stats"] = renderAggregatePayload(sections.headline, sections.stats)
 
         return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(payload)
     }
+
+    private fun renderDisplayPayload(display: ReportDisplayView): Map<String, Any?> =
+        linkedMapOf(
+            "maxProblems" to display.maxProblems,
+            "displayedDiagnostics" to display.displayedDiagnostics,
+            "totalDiagnostics" to display.totalDiagnostics,
+            "omittedDiagnostics" to display.omittedDiagnostics,
+        )
 
     private fun renderAggregatePayload(
         headline: String,

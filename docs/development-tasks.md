@@ -1,4 +1,3 @@
-Implement CLI/reporting controls together, including `--max-problems`, `--fail-on-warning`, and `--explain <problem-id>`, on top of deterministic ordering and finalized problem ids.
 Wire the CLI end to end by connecting argument parsing to the analysis pipeline, keeping base-directory wiring deterministic, adding output-format selection, and mapping semantic outcomes to process exit codes.
 Add end-to-end CLI integration tests for representative success and failure flows and for invalid input or parser-failure paths so the documented CLI contract is exercised through the real pipeline.
 Profile the completed analyzer on larger XHTML trees, then reduce unnecessary reparsing and duplicate walks only where profiling shows real waste so performance work is evidence-driven instead of speculative.
