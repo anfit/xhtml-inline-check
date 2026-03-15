@@ -61,7 +61,7 @@ StringLiteral      ::= single-quoted or double-quoted literal
 
 ## Supported Semantic Shapes
 
-This grammar is sufficient for the MVP behaviors already planned in the repository:
+This grammar is sufficient for the MVP behaviors implemented in the repository:
 
 - scope comparison:
   - local-root identifiers

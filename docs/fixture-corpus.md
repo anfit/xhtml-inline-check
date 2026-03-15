@@ -1,12 +1,12 @@
-# Fixture Corpus Plan
+# Fixture Corpus
 
 ## Purpose
 
-The implementation should be built around comparison fixtures from the beginning. Fixtures are the easiest way to prove that the tool is useful on real refactor scenarios rather than only on isolated parser mechanics.
+The implementation is built around comparison fixtures. Fixtures are the main way this repository proves that the tool is useful on real refactor scenarios rather than only on isolated parser mechanics.
 
 ## Goals
 
-The fixture corpus should:
+The fixture corpus is intended to:
 
 - model realistic JSF include-inlining refactors
 - exercise both safe and unsafe changes
@@ -43,7 +43,7 @@ fixtures/
       expected.json
 ```
 
-Recommended usage split:
+Usage split:
 
 - keep `dummy/` intact as a representative sample page tree
 - derive minimized canonical fixtures under `fixtures/` from focused slices of that sample when a semantic rule needs a deterministic expected outcome
@@ -51,7 +51,7 @@ Recommended usage split:
 
 ## Fixture Contents
 
-Each fixture directory should contain:
+Each fixture directory contains:
 
 - `old/` with the legacy tree
 - `new/` with the refactored tree
@@ -80,7 +80,7 @@ Id convention requirements for fixtures:
 - warning ids use `W-<CATEGORY>-<SLUG>`
 - `<SLUG>` should stay stable even if renderer ordering, wording, or counts change
 
-The implementation can evolve the exact schema later, but the fixture contract should stay concise, deterministic, and keyed on those stable ids.
+The fixture contract should stay concise, deterministic, and keyed on those stable ids.
 
 ## Minimum Fixture Categories
 
@@ -101,13 +101,13 @@ Current repository status:
 
 ## Realistic Sample Baseline
 
-Use the checked-in `dummy/` report page as the first realism baseline when:
+Use the checked-in `dummy/` report page as the realism baseline when:
 
 - validating that loader and parser changes still handle include-heavy pages with many shared fragments
-- choosing future canonical fixture scenarios for scope, ancestry, and target-resolution work
+- choosing additional canonical fixture scenarios for scope, ancestry, and target-resolution work
 - reviewing whether a new rule or diagnostic still matches the kind of XHTML the project is meant to analyze
 
-Until the old/new pair is explicitly reviewed, do not place it under `fixtures/equivalent/` or `fixtures/not-equivalent/`, and do not assign it an `expected.json` contract that would imply a trusted semantic verdict.
+The `dummy/` pair is still intentionally not part of the canonical expected-outcome corpus. Do not place it under `fixtures/equivalent/` or `fixtures/not-equivalent/`, and do not assign it an `expected.json` contract that would imply a trusted semantic verdict.
 
 ## Fixture Review Standard
 

@@ -11,7 +11,7 @@ The project is still pre-release. Keep entries concise and oriented around opera
 - Initial release-notes template for the first MVP cut.
 
 ### Changed
-- README documentation map now points to the release-readiness guide and changelog.
+- README and implementation-facing docs now describe the implemented MVP analyzer/CLI instead of the earlier planning-only scaffold.
 
 ## [0.1.0] - YYYY-MM-DD
 

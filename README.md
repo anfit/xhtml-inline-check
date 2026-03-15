@@ -1,31 +1,31 @@
 # xhtml-inline-check
 
-`xhtml-inline-check` is a planned CLI tool for verifying whether a refactored JSF Facelets XHTML tree remains statically equivalent to the original after include inlining.
+`xhtml-inline-check` is a CLI tool for verifying whether a refactored JSF Facelets XHTML tree remains statically equivalent to the original after include inlining.
 
 The project exists to support a common modernization step in legacy JSF 2.2 codebases: flattening `ui:include`-heavy page trees into more self-contained XHTML without accidentally changing EL scope, form ancestry, naming-container behavior, or target resolution.
 
 ## Status
 
-This repository is currently in specification and project-groundwork mode.
+The repository now contains the implemented MVP analyzer and CLI described by the original execution plan.
 
 What exists today:
 
-- the product specification
-- an execution plan
-- architecture and fixture-planning docs
-- an unverified realistic sample page tree under `dummy/` for fixture design and parser/analyzer smoke coverage
-- repository conventions for future implementation
-- a single-module Gradle Kotlin CLI scaffold with placeholder pipeline stages, baseline tests, and application packaging for `facelets-verify`
-- loader-driven include discovery and expansion
+- the `facelets-verify` CLI with text and JSON output
+- loader-driven include discovery, expansion, provenance, missing-include handling, and include-cycle detection
 - a namespace-aware XHTML syntax tree built from a shared Woodstox-backed StAX reader
+- semantic extraction for bindings, normalized EL facts, structural ancestry, ids, rendered guards, and target-bearing attributes
+- structural matching and comparison for scope drift, ancestry drift, target-resolution drift, duplicate ids, unmatched nodes, and explicit unsupported cases
+- fixture-backed comparison coverage under `fixtures/equivalent/`, `fixtures/not-equivalent/`, `fixtures/inconclusive/`, and `fixtures/support/`
+- deterministic reporter and CLI coverage, including `--max-problems`, `--fail-on-warning`, and `--explain`
+- release-prep and packaging docs for the Gradle-built `facelets-verify` distribution
 
-What does not exist yet:
+What is still intentionally limited:
 
-- semantic equivalence analysis beyond the current scaffold
-- a verified canonical comparison corpus beyond the early support and sample fixtures already checked in
-- CI automation
+- static analysis only; no JSF runtime execution
+- unsupported constructs remain explicit and can force `INCONCLUSIVE`
+- CI automation is still not checked in
 
-## Planned Outcome
+## Outcomes
 
 The tool will compare two root XHTML pages and return one of three outcomes:
 
@@ -55,7 +55,7 @@ That means the product is designed around:
 - anchor-first structural matching
 - visible unsupported cases instead of silent assumptions
 
-## Planned CLI
+## CLI
 
 ```text
 facelets-verify legacy/order.xhtml refactored/order.xhtml --base-old legacy --base-new refactored --format text --verbose
@@ -72,9 +72,9 @@ facelets-verify legacy/order.xhtml refactored/order.xhtml --base-old legacy --ba
 - [Contributing Guide](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
 
-## Expected Repository Shape
+## Repository Shape
 
-The repo now includes the initial Kotlin CLI layout and is being prepared for fixture-driven implementation. The top-level layout is:
+The repository is organized around the implemented analyzer pipeline and fixture corpus:
 
 ```text
 docs/         product and engineering documentation
@@ -87,16 +87,16 @@ settings.gradle.kts
 
 ## Development
 
-The current scaffold defines a single JVM application with a placeholder analyzer pipeline and smoke tests. The Gradle application setup is configured around the `facelets-verify` entrypoint, so an installed Gradle can:
+The Gradle application setup is configured around the `facelets-verify` entrypoint, so an installed Gradle can:
 
 - compile and test with `gradle test`
 - run the CLI with `gradle runFaceletsVerify --args="legacy.xhtml refactored.xhtml"`
 - assemble the runnable distribution in `build/facelets-verify/` with `gradle installDist`
 - assemble distribution archives with `gradle distZip distTar`
 
-Reusable JUnit 5 test support now lives under `src/test/kotlin/dev/xhtmlinlinecheck/testing`. New tasks should prefer those helpers for temporary XHTML trees, fixture-path resolution under `fixtures/`, and AssertJ-based `AnalysisReport` assertions instead of duplicating setup in each package.
+Reusable JUnit 5 test support lives under `src/test/kotlin/dev/xhtmlinlinecheck/testing`. New tasks should prefer those helpers for temporary XHTML trees, fixture-path resolution under `fixtures/`, and AssertJ-based `AnalysisReport` assertions instead of duplicating setup in each package.
 
-Namespace-aware XML parsing is now centralized in `src/main/kotlin/dev/xhtmlinlinecheck/xml/NamespaceAwareXml.kt` and shared by the loader and syntax layers. Later namespace-rule, attribute-extraction, or syntax-tree tasks should extend that shared reader path instead of creating new ad hoc `XMLInputFactory` instances.
+Namespace-aware XML parsing is centralized in `src/main/kotlin/dev/xhtmlinlinecheck/xml/NamespaceAwareXml.kt` and shared by the loader and syntax layers. Namespace-rule, attribute-extraction, or syntax-tree tasks should extend that shared reader path instead of creating new ad hoc `XMLInputFactory` instances.
 
 A Gradle wrapper has not been generated yet, so repository verification currently assumes a system Gradle installation.
 
@@ -116,13 +116,11 @@ On Windows, the PowerShell helper pins `GRADLE_USER_HOME`, `TEMP`, and `TMP` ins
 
 Release packaging and the MVP release checklist are documented in [docs/release-readiness.md](docs/release-readiness.md). The repository-level changelog template lives in [CHANGELOG.md](CHANGELOG.md).
 
-## Near-Term Roadmap
+## Current Gaps
 
-1. Bootstrap the Kotlin/Gradle CLI shell.
-2. Implement loader, include expansion, and provenance tracking.
-3. Implement scope resolution and symbolic EL normalization.
-4. Implement structural comparison and reporters.
-5. Build out the fixture corpus and CI coverage.
+1. Add CI automation around the existing Gradle and script-based verification gates.
+2. Broaden registry coverage and unsupported-case handling based on real project samples.
+3. Expand the canonical fixture corpus as new semantic rules or edge cases land.
 
 ## License
 

@@ -1,5 +1,7 @@
 # Execution Plan
 
+Status: completed as the baseline MVP implementation. This document is now historical guidance for why the current architecture and delivery order look the way they do.
+
 ## Objective
 
 Deliver a fast static verifier that answers one practical question for JSF 2.2 refactors:
@@ -210,7 +212,7 @@ Desired operator experience:
 
 Real XHTML may be messy even if formally valid. Parser and loader code should be validated against representative project samples early, not just toy fixtures.
 
-The repository's `dummy/` tree is now the first such representative sample. Use it to smoke-test loader, parser, provenance, and future semantic work, while keeping canonical expected-outcome assertions in minimized fixtures under `fixtures/`.
+The repository's `dummy/` tree is now the first such representative sample. Use it to smoke-test loader, parser, provenance, and additional semantic work, while keeping canonical expected-outcome assertions in minimized fixtures under `fixtures/`.
 
 ### EL Complexity Risk
 

@@ -2,11 +2,11 @@
 
 ## Purpose
 
-This document translates the product specification into implementation-facing boundaries so the codebase can grow without mixing concerns too early.
+This document translates the product specification into the implementation boundaries used by the current codebase.
 
 ## Design Goal
 
-The analyzer should be easy to trust, easy to test, and easy to extend for new tag semantics.
+The analyzer is designed to stay easy to trust, easy to test, and easy to extend for new tag semantics.
 
 That means the core architecture should separate:
 
@@ -34,9 +34,9 @@ flowchart LR
 
 ### Source Graph
 
-Represents files and include relationships before or during expansion.
+Represents loaded files and include relationships before and during expansion.
 
-Should capture:
+It captures:
 
 - root file
 - included file path
@@ -47,12 +47,11 @@ Should capture:
 
 ### Syntax Tree
 
-Represents parsed XHTML with namespace-aware elements and source metadata.
+Represents parsed XHTML with namespace-aware elements, explicit include-boundary nodes, and source metadata.
 
-Should capture:
+It captures:
 
 - element name and namespace
-- resolved tag-rule semantics from the shared registry
 - attributes
 - child order
 - source location
@@ -60,9 +59,9 @@ Should capture:
 
 ### Binding Model
 
-Represents local variables introduced by Facelets and JSTL constructs.
+Represents local variables introduced by Facelets and JSTL constructs and tracked through semantic extraction.
 
-Should capture:
+It captures:
 
 - binding id
 - written name
@@ -75,7 +74,7 @@ Should capture:
 
 Represents behaviorally relevant facts extracted from syntax nodes.
 
-Should capture:
+It captures:
 
 - semantic signature
 - normalized EL expressions
@@ -87,9 +86,9 @@ Should capture:
 
 ### Problem
 
-Represents an actionable diagnostic.
+Represents an actionable diagnostic rendered by the CLI and reporters.
 
-Should capture:
+It captures:
 
 - severity
 - category
@@ -110,7 +109,7 @@ Owns path resolution, include expansion, provenance, cycle detection, and missin
 
 ### `syntax`
 
-Owns namespace-aware parsing and location-preserving tree construction.
+Owns namespace-aware parsing and location-preserving tree construction, including expanded logical include nodes.
 
 ### `scope`
 
@@ -124,19 +123,19 @@ The EL layer should accept only the MVP subset defined in [docs/el-grammar-subse
 
 ### `semantic`
 
-Owns extraction of structural facts and normalized node facts from syntax trees.
+Owns extraction of bindings, normalized EL facts, semantic nodes, ancestry, and resolved target references from syntax trees.
 
 ### `compare`
 
-Owns node matching, mismatch detection, duplicate suppression, and final result derivation.
+Owns node matching, mismatch detection, duplicate suppression, sanity checks, and final result derivation.
 
 ### `report`
 
-Owns text and JSON rendering and stable output ordering.
+Owns text and JSON rendering, diagnostic explanation output, and stable ordering.
 
 ## Extension Strategy
 
-Tag semantics should be described in a registry rather than scattered across parser or comparator logic.
+Tag semantics are described in a registry rather than scattered across parser or comparator logic.
 
 Each tag rule should be able to answer:
 
@@ -152,7 +151,7 @@ This keeps support for third-party component libraries incremental and testable.
 
 The comparator should prefer stable anchors over generic tree diffing.
 
-Recommended order:
+Current order:
 
 1. explicit ids
 2. explicit target relationships
@@ -163,8 +162,8 @@ This reduces diagnostic cascades and keeps output easier to understand.
 
 ## Implementation Notes
 
-- Loader and parser should preserve enough metadata for file-linked diagnostics from day one.
-- The loader, syntax walker, and semantic handoff should share one `TagRuleRegistry`; resolve tag semantics once onto syntax nodes so later scope and structural work read the same rule decisions.
-- The EL layer should stay symbolic; it is not a runtime evaluator.
-- The semantic layer should treat transparent wrappers carefully so include inlining does not create false mismatches.
-- The comparator should suppress duplicate downstream noise when a single upstream mismatch already explains the failure.
+- Loader and parser preserve enough metadata for file-linked diagnostics.
+- The loader, syntax walker, and semantic handoff share one `TagRuleRegistry`; later changes should keep reading the same rule decisions instead of re-deriving semantics ad hoc.
+- The EL layer stays symbolic; it is not a runtime evaluator.
+- The semantic layer treats transparent wrappers carefully so include inlining does not create false mismatches.
+- The comparator suppresses duplicate downstream noise when a single upstream mismatch already explains the failure.
