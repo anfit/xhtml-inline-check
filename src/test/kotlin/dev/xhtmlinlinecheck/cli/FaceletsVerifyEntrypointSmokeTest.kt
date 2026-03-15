@@ -84,6 +84,7 @@ class FaceletsVerifyEntrypointSmokeTest {
             "dev.xhtmlinlinecheck.cli.MainKt",
             *args,
         )
+            .directory(FixtureScenarios.repositoryRoot.toFile())
             .redirectErrorStream(true)
             .start()
 

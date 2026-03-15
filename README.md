@@ -95,6 +95,8 @@ The Gradle application setup is configured around the `facelets-verify` entrypoi
 - assemble the runnable distribution in `build/facelets-verify/` with `gradle installDist`
 - assemble distribution archives with `gradle distZip distTar`
 
+Tag semantics are now configuration-driven. The app ships with bundled defaults for Facelets, JSTL, and core JSF rules, and if a file named `.xhtml-inline-check.json` exists in the execution root, its rules are merged on top. This repository keeps its company-specific schema handling in that root config file.
+
 Reusable JUnit 5 test support lives under `src/test/kotlin/dev/xhtmlinlinecheck/testing`. New tasks should prefer those helpers for temporary XHTML trees, fixture-path resolution under `fixtures/`, and AssertJ-based `AnalysisReport` assertions instead of duplicating setup in each package.
 
 Namespace-aware XML parsing is centralized in `src/main/kotlin/dev/xhtmlinlinecheck/xml/NamespaceAwareXml.kt` and shared by the loader and syntax layers. Namespace-rule, attribute-extraction, or syntax-tree tasks should extend that shared reader path instead of creating new ad hoc `XMLInputFactory` instances.

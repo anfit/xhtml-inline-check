@@ -2,6 +2,7 @@ package dev.xhtmlinlinecheck.analyzer
 
 import dev.xhtmlinlinecheck.domain.AttributeLocationPrecision
 import dev.xhtmlinlinecheck.domain.AnalysisResult
+import dev.xhtmlinlinecheck.rules.TagRuleRegistry
 import dev.xhtmlinlinecheck.testing.FixtureExpectations
 import dev.xhtmlinlinecheck.testing.FixtureScenarios
 import dev.xhtmlinlinecheck.testing.TemporaryProjectTree
@@ -182,7 +183,7 @@ class FaceletsAnalyzerScaffoldTest {
             """,
         )
 
-        val report = FaceletsAnalyzer.scaffold().analyze(
+        val report = FaceletsAnalyzer.scaffold(TagRuleRegistry.forExecutionRoot(FixtureScenarios.repositoryRoot)).analyze(
             AnalysisRequest(
                 oldRoot = oldRoot,
                 newRoot = newRoot,
@@ -227,7 +228,7 @@ class FaceletsAnalyzerScaffoldTest {
             """,
         )
 
-        val report = FaceletsAnalyzer.scaffold().analyze(
+        val report = FaceletsAnalyzer.scaffold(TagRuleRegistry.forExecutionRoot(FixtureScenarios.repositoryRoot)).analyze(
             AnalysisRequest(
                 oldRoot = oldRoot,
                 newRoot = newRoot,
@@ -1066,7 +1067,7 @@ class FaceletsAnalyzerScaffoldTest {
             """,
         )
 
-        val report = FaceletsAnalyzer.scaffold().analyze(
+        val report = FaceletsAnalyzer.scaffold(TagRuleRegistry.forExecutionRoot(FixtureScenarios.repositoryRoot)).analyze(
             AnalysisRequest(
                 oldRoot = oldRoot,
                 newRoot = newRoot,

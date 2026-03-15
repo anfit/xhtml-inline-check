@@ -13,6 +13,7 @@ import dev.xhtmlinlinecheck.report.JsonReportRenderer
 import dev.xhtmlinlinecheck.report.ReportRenderOptions
 import dev.xhtmlinlinecheck.report.TextDiagnosticExplanationRenderer
 import dev.xhtmlinlinecheck.report.TextReportRenderer
+import dev.xhtmlinlinecheck.rules.TagRuleRegistry
 import java.nio.file.Path
 
 enum class OutputFormat {
@@ -48,7 +49,10 @@ data class ExplainInvocation(
 ) : CliInvocation
 
 class FaceletsVerifyCli(
-    private val analyzer: FaceletsAnalyzer = FaceletsAnalyzer.scaffold(),
+    private val analyzer: FaceletsAnalyzer =
+        FaceletsAnalyzer.scaffold(
+            TagRuleRegistry.forExecutionRoot(Path.of("").toAbsolutePath().normalize()),
+        ),
     private val textRenderer: TextReportRenderer = TextReportRenderer(),
     private val jsonRenderer: JsonReportRenderer = JsonReportRenderer(),
     private val textExplanationRenderer: TextDiagnosticExplanationRenderer = TextDiagnosticExplanationRenderer(),

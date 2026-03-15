@@ -2,9 +2,11 @@ package dev.xhtmlinlinecheck.compare
 
 import dev.xhtmlinlinecheck.analyzer.AnalysisRequest
 import dev.xhtmlinlinecheck.loader.SourceLoader
+import dev.xhtmlinlinecheck.rules.TagRuleRegistry
 import dev.xhtmlinlinecheck.semantic.SemanticAnalyzer
 import dev.xhtmlinlinecheck.semantic.SemanticModels
 import dev.xhtmlinlinecheck.syntax.XhtmlSyntaxParser
+import dev.xhtmlinlinecheck.testing.FixtureScenarios
 import dev.xhtmlinlinecheck.testing.TemporaryProjectTree
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.groups.Tuple
@@ -51,7 +53,12 @@ class SemanticNodeMatcherTest {
             """,
         )
 
-        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val semanticModels = semanticModelsFor(
+            oldRoot = oldRoot,
+            newRoot = newRoot,
+            baseDir = tempDir,
+            tagRules = TagRuleRegistry.forExecutionRoot(FixtureScenarios.repositoryRoot),
+        )
         val result = SemanticNodeMatcher.matchStructuralCandidates(
             oldNodes = semanticModels.oldRoot.semanticNodes,
             newNodes = semanticModels.newRoot.semanticNodes,
@@ -101,7 +108,12 @@ class SemanticNodeMatcherTest {
             """,
         )
 
-        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val semanticModels = semanticModelsFor(
+            oldRoot = oldRoot,
+            newRoot = newRoot,
+            baseDir = tempDir,
+            tagRules = TagRuleRegistry.forExecutionRoot(FixtureScenarios.repositoryRoot),
+        )
         val result = SemanticNodeMatcher.matchStructuralCandidates(
             oldNodes = semanticModels.oldRoot.semanticNodes,
             newNodes = semanticModels.newRoot.semanticNodes,
@@ -156,7 +168,12 @@ class SemanticNodeMatcherTest {
             """,
         )
 
-        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        val semanticModels = semanticModelsFor(
+            oldRoot = oldRoot,
+            newRoot = newRoot,
+            baseDir = tempDir,
+            tagRules = TagRuleRegistry.forExecutionRoot(FixtureScenarios.repositoryRoot),
+        )
         assertThat(
             semanticModels.oldRoot.semanticNodes
                 .filter { it.nodeName in setOf("custom:defaults", "custom:injectAttributes", "custom:with") }
@@ -666,10 +683,15 @@ class SemanticNodeMatcherTest {
         assertThat(result.unmatchedNewNodeIds).isEmpty()
     }
 
-    private fun semanticModelsFor(oldRoot: Path, newRoot: Path, baseDir: Path): SemanticModels =
-        SemanticAnalyzer.scaffold().analyze(
-            XhtmlSyntaxParser.scaffold().parse(
-                SourceLoader.scaffold().load(
+    private fun semanticModelsFor(
+        oldRoot: Path,
+        newRoot: Path,
+        baseDir: Path,
+        tagRules: TagRuleRegistry = TagRuleRegistry.builtIns(),
+    ): SemanticModels =
+        SemanticAnalyzer.scaffold(tagRules).analyze(
+            XhtmlSyntaxParser.scaffold(tagRules).parse(
+                SourceLoader.scaffold(tagRules).load(
                     AnalysisRequest(
                         oldRoot = baseDir.relativize(oldRoot),
                         newRoot = baseDir.relativize(newRoot),

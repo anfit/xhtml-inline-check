@@ -1,0 +1,203 @@
+{
+  "exactRules": [
+    {
+      "namespaceUri": "http://xmlns.jcp.org/jsf/facelets",
+      "localName": "include",
+      "syntaxRole": "INCLUDE",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true,
+      "elAttributeNames": ["src"]
+    },
+    {
+      "namespaceUri": "http://xmlns.jcp.org/jsf/facelets",
+      "localName": "param",
+      "syntaxRole": "INCLUDE_PARAMETER",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true,
+      "bindingRules": [
+        { "kind": "UI_PARAM", "nameAttribute": "name", "valueAttribute": "value" }
+      ],
+      "elAttributeNames": ["value"]
+    },
+    {
+      "namespaceUri": "http://xmlns.jcp.org/jsf/facelets",
+      "localName": "composition",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://xmlns.jcp.org/jsf/facelets",
+      "localName": "decorate",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://xmlns.jcp.org/jsf/facelets",
+      "localName": "define",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://xmlns.jcp.org/jsf/facelets",
+      "localName": "fragment",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://xmlns.jcp.org/jsf/facelets",
+      "localName": "insert",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://xmlns.jcp.org/jsf/facelets",
+      "localName": "component",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://xmlns.jcp.org/jsf/facelets",
+      "localName": "repeat",
+      "bindingRules": [
+        { "kind": "ITERATION_VAR", "nameAttribute": "var" },
+        { "kind": "VAR_STATUS", "nameAttribute": "varStatus" }
+      ],
+      "elAttributeNames": ["value", "offset", "size", "step", "rendered"],
+      "targetAttributeNames": ["for", "update", "render", "process", "execute"]
+    },
+    {
+      "namespaceUri": "http://java.sun.com/jsf/facelets",
+      "localName": "include",
+      "syntaxRole": "INCLUDE",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true,
+      "elAttributeNames": ["src"]
+    },
+    {
+      "namespaceUri": "http://java.sun.com/jsf/facelets",
+      "localName": "param",
+      "syntaxRole": "INCLUDE_PARAMETER",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true,
+      "bindingRules": [
+        { "kind": "UI_PARAM", "nameAttribute": "name", "valueAttribute": "value" }
+      ],
+      "elAttributeNames": ["value"]
+    },
+    {
+      "namespaceUri": "http://java.sun.com/jsf/facelets",
+      "localName": "composition",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://java.sun.com/jsf/facelets",
+      "localName": "decorate",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://java.sun.com/jsf/facelets",
+      "localName": "define",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://java.sun.com/jsf/facelets",
+      "localName": "fragment",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://java.sun.com/jsf/facelets",
+      "localName": "insert",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://java.sun.com/jsf/facelets",
+      "localName": "component",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://java.sun.com/jsf/facelets",
+      "localName": "repeat",
+      "bindingRules": [
+        { "kind": "ITERATION_VAR", "nameAttribute": "var" },
+        { "kind": "VAR_STATUS", "nameAttribute": "varStatus" }
+      ],
+      "elAttributeNames": ["value", "offset", "size", "step", "rendered"],
+      "targetAttributeNames": ["for", "update", "render", "process", "execute"]
+    },
+    {
+      "namespaceUri": "http://java.sun.com/jsp/jstl/core",
+      "localName": "set",
+      "bindingRules": [
+        { "kind": "C_SET", "nameAttribute": "var", "valueAttribute": "value" }
+      ],
+      "elAttributeNames": ["value", "target", "rendered"],
+      "targetAttributeNames": ["for", "update", "render", "process", "execute"]
+    },
+    {
+      "namespaceUri": "http://java.sun.com/jsp/jstl/core",
+      "localName": "forEach",
+      "bindingRules": [
+        { "kind": "ITERATION_VAR", "nameAttribute": "var" },
+        { "kind": "VAR_STATUS", "nameAttribute": "varStatus" }
+      ],
+      "elAttributeNames": ["items", "begin", "end", "step", "rendered"],
+      "targetAttributeNames": ["for", "update", "render", "process", "execute"]
+    },
+    {
+      "namespaceUri": "http://java.sun.com/jsp/jstl/core",
+      "localName": "if",
+      "elAttributeNames": ["test", "rendered"],
+      "targetAttributeNames": ["for", "update", "render", "process", "execute"]
+    },
+    {
+      "namespaceUri": "http://xmlns.jcp.org/jsf/html",
+      "localName": "form",
+      "inheritsFallbackRule": false,
+      "isForm": true,
+      "isNamingContainer": true,
+      "elAttributeNames": ["rendered"],
+      "targetAttributeNames": ["for", "update", "render", "process", "execute"]
+    },
+    {
+      "namespaceUri": "http://xmlns.jcp.org/jsf/html",
+      "localName": "dataTable",
+      "inheritsFallbackRule": false,
+      "isNamingContainer": true,
+      "elAttributeNames": ["rendered"],
+      "targetAttributeNames": ["for", "update", "render", "process", "execute"]
+    },
+    {
+      "namespaceUri": "http://xmlns.jcp.org/jsf/html",
+      "localName": "outputText",
+      "elAttributeNames": ["value"]
+    },
+    {
+      "namespaceUri": "http://java.sun.com/jsf/core",
+      "localName": "facet",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://java.sun.com/jsf/core",
+      "localName": "metadata",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    }
+  ],
+  "namespaceDefaults": [
+    {
+      "namespaceUri": "http://xmlns.jcp.org/jsf/html",
+      "elAttributeNames": ["rendered"]
+    }
+  ],
+  "fallbackRule": {
+    "elAttributeNames": ["rendered"],
+    "targetAttributeNames": ["for", "update", "render", "process", "execute"]
+  }
+}

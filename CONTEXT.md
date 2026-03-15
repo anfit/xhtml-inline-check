@@ -709,6 +709,14 @@
 - Built-in Facelets tag semantics now recognize both `http://xmlns.jcp.org/jsf/facelets` and the legacy
   `http://java.sun.com/jsf/facelets` URI. Preserve both aliases in the rule registry so the `dummy/` sample and older
   JSF 2.2 trees still get include discovery, transparent wrapper handling, and repeat semantics.
+- Tag-rule semantics are now layered and configuration-driven. `TagRuleRegistry.builtIns()` is the app-shipped generic
+  default loaded from `src/main/resources/dev/xhtmlinlinecheck/rules/default-tag-rules.json`, while
+  `TagRuleRegistry.forExecutionRoot(...)` merges an optional execution-root `.xhtml-inline-check.json` on top for
+  project-specific schemas. Keep company- or repository-specific XHTML rules in that execution-root file instead of
+  hardcoding them back into the bundled defaults.
+- `FaceletsAnalyzer.scaffold()` intentionally still defaults to bundled built-ins so library use and narrow tests remain
+  deterministic. CLI-facing entrypoints should opt into `TagRuleRegistry.forExecutionRoot(Path.of("").toAbsolutePath()
+  .normalize())` so running from the repository or project root automatically picks up local schema overrides.
 - In this sandbox, Gradle/Kotlin often logs `AccessDeniedException` under
   `C:\Users\janch\AppData\Local\kotlin\daemon\...` before falling back from the Kotlin daemon to out-of-process
   compilation. With `GRADLE_USER_HOME=C:/projects/xhtml-inline-check/.gradle-user-home` and `TEMP` / `TMP` set to

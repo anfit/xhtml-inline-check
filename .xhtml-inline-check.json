@@ -1,0 +1,76 @@
+{
+  "exactRules": [
+    {
+      "namespaceUri": "http://www.company.com/components",
+      "localName": "defaults",
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://www.company.com/components",
+      "localName": "failIfNotDefined",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://www.company.com/components",
+      "localName": "injectAttributes",
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://www.company.com/components",
+      "localName": "with",
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://www.company.com/components",
+      "localName": "dataTable",
+      "isNamingContainer": true
+    },
+    {
+      "namespaceUri": "http://www.company.com/components",
+      "localName": "modalPanel",
+      "isNamingContainer": true
+    },
+    {
+      "namespaceUri": "http://www.company.com/components/app",
+      "localName": "column",
+      "targetAttributeNames": ["for"]
+    },
+    {
+      "namespaceUri": "http://www.company.com/components/layouts",
+      "localName": "box",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://www.company.com/components/layouts",
+      "localName": "cell",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://www.company.com/components/layouts",
+      "localName": "field",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://www.company.com/components/layouts",
+      "localName": "fieldlist",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://www.company.com/components/layouts",
+      "localName": "fieldset",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    },
+    {
+      "namespaceUri": "http://www.company.com/components/layouts",
+      "localName": "row",
+      "inheritsFallbackRule": false,
+      "isTransparentStructureWrapper": true
+    }
+  ]
+}

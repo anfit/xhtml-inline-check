@@ -2,10 +2,17 @@ package dev.xhtmlinlinecheck.rules
 
 import dev.xhtmlinlinecheck.domain.BindingKind
 import dev.xhtmlinlinecheck.syntax.LogicalName
+import dev.xhtmlinlinecheck.testing.FixtureScenarios
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
+import java.nio.file.Path
 
 class TagRuleRegistryTest {
+    @TempDir
+    lateinit var tempDir: Path
+
     private val registry = TagRuleRegistry.builtIns()
 
     @Test
@@ -339,6 +346,7 @@ class TagRuleRegistryTest {
 
     @Test
     fun `representative third party tags from the dummy sample have explicit wrapper and naming container coverage`() {
+        val registry = TagRuleRegistry.forExecutionRoot(FixtureScenarios.repositoryRoot)
         val defaultsRule = registry.resolve(
             LogicalName(
                 localName = "defaults",
@@ -406,6 +414,62 @@ class TagRuleRegistryTest {
         assertThat(metadataRule.isTransparentStructureWrapper).isTrue()
         assertThat(metadataRule.elAttributeNames).isEmpty()
         assertThat(metadataRule.targetAttributeNames).isEmpty()
+    }
+
+    @Test
+    fun `execution root config can extend bundled defaults with custom schema rules`() {
+        Files.writeString(
+            tempDir.resolve(".xhtml-inline-check.json"),
+            """
+            {
+              "exactRules": [
+                {
+                  "namespaceUri": "urn:custom",
+                  "localName": "panel",
+                  "inheritsFallbackRule": false,
+                  "isTransparentStructureWrapper": true,
+                  "elAttributeNames": ["value"]
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val registry = TagRuleRegistry.forExecutionRoot(tempDir)
+        val panelRule = registry.resolve(LogicalName(localName = "panel", namespaceUri = "urn:custom"))
+        val formRule = registry.resolve(LogicalName(localName = "form", namespaceUri = JSF_HTML_NAMESPACE))
+
+        assertThat(panelRule.isTransparentStructureWrapper).isTrue()
+        assertThat(panelRule.elAttributeNames).containsExactly("value")
+        assertThat(panelRule.targetAttributeNames).isEmpty()
+        assertThat(formRule.isForm).isTrue()
+    }
+
+    @Test
+    fun `execution root config can override bundled exact rules`() {
+        Files.writeString(
+            tempDir.resolve(".xhtml-inline-check.json"),
+            """
+            {
+              "exactRules": [
+                {
+                  "namespaceUri": "http://xmlns.jcp.org/jsf/html",
+                  "localName": "form",
+                  "inheritsFallbackRule": false,
+                  "isTransparentStructureWrapper": true
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val registry = TagRuleRegistry.forExecutionRoot(tempDir)
+        val formRule = registry.resolve(LogicalName(localName = "form", namespaceUri = JSF_HTML_NAMESPACE))
+
+        assertThat(formRule.isTransparentStructureWrapper).isTrue()
+        assertThat(formRule.isForm).isTrue()
+        assertThat(formRule.isNamingContainer).isTrue()
+        assertThat(formRule.elAttributeNames).containsExactly("rendered")
     }
 
     @Test

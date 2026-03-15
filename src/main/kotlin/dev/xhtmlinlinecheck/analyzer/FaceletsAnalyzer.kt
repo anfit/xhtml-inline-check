@@ -23,7 +23,9 @@ class FaceletsAnalyzer(
     }
 
     companion object {
-        fun scaffold(tagRules: TagRuleRegistry = TagRuleRegistry.builtIns()): FaceletsAnalyzer =
+        fun scaffold(
+            tagRules: TagRuleRegistry = TagRuleRegistry.builtIns(),
+        ): FaceletsAnalyzer =
             FaceletsAnalyzer(
                 sourceLoader = SourceLoader.scaffold(tagRules),
                 syntaxParser = XhtmlSyntaxParser.scaffold(tagRules),
