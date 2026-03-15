@@ -1,0 +1,6 @@
+{
+  "result": "EQUIVALENT",
+  "problemIds": [],
+  "warningIds": ["W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD"],
+  "notes": "Static include expansion and direct inlining should remain equivalent when ids, ancestry, and EL all stay the same."
+}

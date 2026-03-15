@@ -42,9 +42,12 @@ class CanonicalFixtureComparisonTest {
         @JvmStatic
         fun canonicalScenarios(): Stream<String> =
             Stream.of(
+                "equivalent/safe-include-inline",
                 "equivalent/safe-alpha-renaming",
+                "not-equivalent/lost-ui-param",
                 "not-equivalent/variable-capture-regression",
                 "not-equivalent/form-ancestry-drift",
+                "not-equivalent/changed-for-target",
                 "not-equivalent/changed-ajax-target",
                 "inconclusive/inconclusive-but-not-proven-wrong",
             )

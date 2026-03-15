@@ -94,6 +94,11 @@ The implementation can evolve the exact schema later, but the fixture contract s
 - changed AJAX target resolution
 - unsupported dynamic include
 
+Current repository status:
+
+- the first-pass canonical corpus now covers safe include inlining, safe alpha-renaming, lost `ui:param`, variable capture, form ancestry drift, changed `for` target resolution, changed AJAX target resolution, and inconclusive unsupported cases under `fixtures/`
+- a dedicated naming-container-only canonical fixture is still deferred because the current built-in rule set models naming containers only through `h:form`, so the most direct refactors collapse into the already-covered form-ancestry diagnostic path
+
 ## Realistic Sample Baseline
 
 Use the checked-in `dummy/` report page as the first realism baseline when:

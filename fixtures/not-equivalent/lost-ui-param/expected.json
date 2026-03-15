@@ -1,0 +1,6 @@
+{
+  "result": "NOT_EQUIVALENT",
+  "problemIds": ["P-SCOPE-BINDING_MISMATCH"],
+  "warningIds": ["W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD"],
+  "notes": "Removing the include boundary drops the ui:param binding, so the same EL text resolves to a different local origin."
+}
