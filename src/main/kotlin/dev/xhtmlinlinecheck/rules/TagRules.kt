@@ -4,8 +4,13 @@ import dev.xhtmlinlinecheck.domain.BindingKind
 import dev.xhtmlinlinecheck.syntax.LogicalName
 
 const val FACELETS_NAMESPACE: String = "http://xmlns.jcp.org/jsf/facelets"
+const val LEGACY_FACELETS_NAMESPACE: String = "http://java.sun.com/jsf/facelets"
 const val JSTL_CORE_NAMESPACE: String = "http://java.sun.com/jsp/jstl/core"
 const val JSF_HTML_NAMESPACE: String = "http://xmlns.jcp.org/jsf/html"
+const val JSF_CORE_NAMESPACE: String = "http://java.sun.com/jsf/core"
+const val COMPANY_COMPONENT_NAMESPACE: String = "http://www.company.com/components"
+const val COMPANY_APP_COMPONENT_NAMESPACE: String = "http://www.company.com/components/app"
+const val COMPANY_LAYOUT_COMPONENT_NAMESPACE: String = "http://www.company.com/components/layouts"
 
 enum class SyntaxRole {
     ELEMENT,
@@ -86,18 +91,167 @@ internal class StaticTagRuleRegistry(
 
 object BuiltInTagRuleRegistry : TagRuleRegistry by StaticTagRuleRegistry(
     exactRules =
+        faceletsRules(FACELETS_NAMESPACE) +
+                faceletsRules(LEGACY_FACELETS_NAMESPACE) +
+                mapOf(
+                    TagSelector(JSTL_CORE_NAMESPACE, "set") to
+                            StaticTagRule(
+                                bindingRules =
+                                    listOf(
+                                        BindingCreationRule(
+                                            kind = BindingKind.C_SET,
+                                            nameAttribute = "var",
+                                            valueAttribute = "value",
+                                        ),
+                                    ),
+                                elAttributeNames = linkedSetOf("value", "target", "rendered"),
+                                targetAttributeNames = linkedSetOf("for", "update", "render", "process", "execute"),
+                            ),
+                    TagSelector(JSTL_CORE_NAMESPACE, "forEach") to
+                            StaticTagRule(
+                                bindingRules =
+                                    listOf(
+                                        BindingCreationRule(
+                                            kind = BindingKind.ITERATION_VAR,
+                                            nameAttribute = "var",
+                                        ),
+                                        BindingCreationRule(
+                                            kind = BindingKind.VAR_STATUS,
+                                            nameAttribute = "varStatus",
+                                        ),
+                                    ),
+                                elAttributeNames = linkedSetOf("items", "begin", "end", "step", "rendered"),
+                                targetAttributeNames = linkedSetOf("for", "update", "render", "process", "execute"),
+                            ),
+                    TagSelector(JSTL_CORE_NAMESPACE, "if") to
+                            StaticTagRule(
+                                elAttributeNames = linkedSetOf("test", "rendered"),
+                                targetAttributeNames = linkedSetOf("for", "update", "render", "process", "execute"),
+                            ),
+                    TagSelector(JSF_HTML_NAMESPACE, "form") to
+                            StaticTagRule(
+                                inheritsFallbackRule = false,
+                                isForm = true,
+                                isNamingContainer = true,
+                                elAttributeNames = linkedSetOf("rendered"),
+                                targetAttributeNames = linkedSetOf("for", "update", "render", "process", "execute"),
+                            ),
+                    TagSelector(JSF_HTML_NAMESPACE, "dataTable") to
+                            StaticTagRule(
+                                inheritsFallbackRule = false,
+                                isNamingContainer = true,
+                                elAttributeNames = linkedSetOf("rendered"),
+                                targetAttributeNames = linkedSetOf("for", "update", "render", "process", "execute"),
+                            ),
+                    TagSelector(JSF_HTML_NAMESPACE, "outputText") to
+                            StaticTagRule(
+                                elAttributeNames = linkedSetOf("value"),
+                            ),
+                    TagSelector(JSF_CORE_NAMESPACE, "facet") to
+                            StaticTagRule(
+                                inheritsFallbackRule = false,
+                                isTransparentStructureWrapper = true,
+                            ),
+                    TagSelector(JSF_CORE_NAMESPACE, "metadata") to
+                            StaticTagRule(
+                                inheritsFallbackRule = false,
+                                isTransparentStructureWrapper = true,
+                            ),
+                    TagSelector(COMPANY_COMPONENT_NAMESPACE, "defaults") to
+                            StaticTagRule(
+                                isTransparentStructureWrapper = true,
+                            ),
+                    TagSelector(COMPANY_COMPONENT_NAMESPACE, "failIfNotDefined") to
+                            StaticTagRule(
+                                inheritsFallbackRule = false,
+                                isTransparentStructureWrapper = true,
+                            ),
+                    TagSelector(COMPANY_COMPONENT_NAMESPACE, "injectAttributes") to
+                            StaticTagRule(
+                                isTransparentStructureWrapper = true,
+                            ),
+                    TagSelector(COMPANY_COMPONENT_NAMESPACE, "with") to
+                            StaticTagRule(
+                                isTransparentStructureWrapper = true,
+                            ),
+                    TagSelector(COMPANY_COMPONENT_NAMESPACE, "dataTable") to
+                            StaticTagRule(
+                                isNamingContainer = true,
+                            ),
+                    TagSelector(COMPANY_COMPONENT_NAMESPACE, "modalPanel") to
+                            StaticTagRule(
+                                isNamingContainer = true,
+                            ),
+                    TagSelector(COMPANY_APP_COMPONENT_NAMESPACE, "column") to
+                            StaticTagRule(
+                                targetAttributeNames = linkedSetOf("for"),
+                            ),
+                    TagSelector(COMPANY_LAYOUT_COMPONENT_NAMESPACE, "box") to
+                            StaticTagRule(
+                                inheritsFallbackRule = false,
+                                isTransparentStructureWrapper = true,
+                            ),
+                    TagSelector(COMPANY_LAYOUT_COMPONENT_NAMESPACE, "cell") to
+                            StaticTagRule(
+                                inheritsFallbackRule = false,
+                                isTransparentStructureWrapper = true,
+                            ),
+                    TagSelector(COMPANY_LAYOUT_COMPONENT_NAMESPACE, "field") to
+                            StaticTagRule(
+                                inheritsFallbackRule = false,
+                                isTransparentStructureWrapper = true,
+                            ),
+                    TagSelector(COMPANY_LAYOUT_COMPONENT_NAMESPACE, "fieldlist") to
+                            StaticTagRule(
+                                inheritsFallbackRule = false,
+                                isTransparentStructureWrapper = true,
+                            ),
+                    TagSelector(COMPANY_LAYOUT_COMPONENT_NAMESPACE, "fieldset") to
+                            StaticTagRule(
+                                inheritsFallbackRule = false,
+                                isTransparentStructureWrapper = true,
+                            ),
+                    TagSelector(COMPANY_LAYOUT_COMPONENT_NAMESPACE, "row") to
+                            StaticTagRule(
+                                inheritsFallbackRule = false,
+                                isTransparentStructureWrapper = true,
+                            ),
+                ),
+    namespaceDefaults =
         mapOf(
-            TagSelector(FACELETS_NAMESPACE, "include") to
+            JSF_HTML_NAMESPACE to
+                    StaticTagRule(
+                        elAttributeNames = linkedSetOf("rendered"),
+                    ),
+        ),
+    fallbackRule =
+        StaticTagRule(
+            elAttributeNames = linkedSetOf("rendered"),
+            targetAttributeNames = linkedSetOf("for", "update", "render", "process", "execute"),
+        ),
+)
+
+internal data class TagSelector(
+    val namespaceUri: String?,
+    val localName: String,
+)
+
+private val DEFAULT_TAG_RULE: TagRule = StaticTagRule()
+
+private fun faceletsRules(namespace: String): Map<TagSelector, TagRule> =
+    mapOf(
+        TagSelector(namespace, "include") to
                 StaticTagRule(
                     syntaxRole = SyntaxRole.INCLUDE,
                     inheritsFallbackRule = false,
                     isTransparentStructureWrapper = true,
                     elAttributeNames = linkedSetOf("src"),
                 ),
-            TagSelector(FACELETS_NAMESPACE, "param") to
+        TagSelector(namespace, "param") to
                 StaticTagRule(
                     syntaxRole = SyntaxRole.INCLUDE_PARAMETER,
                     inheritsFallbackRule = false,
+                    isTransparentStructureWrapper = true,
                     bindingRules =
                         listOf(
                             BindingCreationRule(
@@ -108,17 +262,37 @@ object BuiltInTagRuleRegistry : TagRuleRegistry by StaticTagRuleRegistry(
                         ),
                     elAttributeNames = linkedSetOf("value"),
                 ),
-            TagSelector(FACELETS_NAMESPACE, "composition") to
+        TagSelector(namespace, "composition") to
                 StaticTagRule(
                     inheritsFallbackRule = false,
                     isTransparentStructureWrapper = true,
                 ),
-            TagSelector(FACELETS_NAMESPACE, "fragment") to
+        TagSelector(namespace, "decorate") to
                 StaticTagRule(
                     inheritsFallbackRule = false,
                     isTransparentStructureWrapper = true,
                 ),
-            TagSelector(FACELETS_NAMESPACE, "repeat") to
+        TagSelector(namespace, "define") to
+                StaticTagRule(
+                    inheritsFallbackRule = false,
+                    isTransparentStructureWrapper = true,
+                ),
+        TagSelector(namespace, "fragment") to
+                StaticTagRule(
+                    inheritsFallbackRule = false,
+                    isTransparentStructureWrapper = true,
+                ),
+        TagSelector(namespace, "insert") to
+                StaticTagRule(
+                    inheritsFallbackRule = false,
+                    isTransparentStructureWrapper = true,
+                ),
+        TagSelector(namespace, "component") to
+                StaticTagRule(
+                    inheritsFallbackRule = false,
+                    isTransparentStructureWrapper = true,
+                ),
+        TagSelector(namespace, "repeat") to
                 StaticTagRule(
                     bindingRules =
                         listOf(
@@ -131,70 +305,10 @@ object BuiltInTagRuleRegistry : TagRuleRegistry by StaticTagRuleRegistry(
                                 nameAttribute = "varStatus",
                             ),
                         ),
-                    elAttributeNames = linkedSetOf("value", "offset", "size", "step"),
+                    elAttributeNames = linkedSetOf("value", "offset", "size", "step", "rendered"),
+                    targetAttributeNames = linkedSetOf("for", "update", "render", "process", "execute"),
                 ),
-            TagSelector(JSTL_CORE_NAMESPACE, "set") to
-                StaticTagRule(
-                    bindingRules =
-                        listOf(
-                            BindingCreationRule(
-                                kind = BindingKind.C_SET,
-                                nameAttribute = "var",
-                                valueAttribute = "value",
-                            ),
-                        ),
-                    elAttributeNames = linkedSetOf("value", "target"),
-                ),
-            TagSelector(JSTL_CORE_NAMESPACE, "forEach") to
-                StaticTagRule(
-                    bindingRules =
-                        listOf(
-                            BindingCreationRule(
-                                kind = BindingKind.ITERATION_VAR,
-                                nameAttribute = "var",
-                            ),
-                            BindingCreationRule(
-                                kind = BindingKind.VAR_STATUS,
-                                nameAttribute = "varStatus",
-                            ),
-                        ),
-                    elAttributeNames = linkedSetOf("items", "begin", "end", "step"),
-                ),
-            TagSelector(JSTL_CORE_NAMESPACE, "if") to
-                StaticTagRule(
-                    elAttributeNames = linkedSetOf("test"),
-                ),
-            TagSelector(JSF_HTML_NAMESPACE, "form") to
-                StaticTagRule(
-                    isForm = true,
-                    isNamingContainer = true,
-                ),
-            TagSelector(JSF_HTML_NAMESPACE, "dataTable") to
-                StaticTagRule(
-                    isNamingContainer = true,
-                ),
-        ),
-    namespaceDefaults =
-        mapOf(
-            JSF_HTML_NAMESPACE to
-                StaticTagRule(
-                    elAttributeNames = linkedSetOf("rendered"),
-                    targetAttributeNames = linkedSetOf("for"),
-                ),
-        ),
-    fallbackRule =
-        StaticTagRule(
-            elAttributeNames = linkedSetOf("rendered"),
-            targetAttributeNames = linkedSetOf("for", "update", "render", "process", "execute"),
-        ),
-)
-
-private data class TagSelector(
-    val namespaceUri: String?,
-    val localName: String,
-)
-
-private val DEFAULT_TAG_RULE: TagRule = StaticTagRule()
+    )
 
 private fun TagRule.overlay(base: TagRule): TagRule =
     StaticTagRule(

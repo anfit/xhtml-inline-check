@@ -44,8 +44,8 @@ class FaceletsAnalyzerScaffoldTest {
             .hasProblemCount(1)
             .hasWarningCount(1)
             .hasProblemIds("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
-        assertThat(report.problems.single().locations.old?.logicalLocation?.render()).isEqualTo("old/root.xhtml")
-        assertThat(report.problems.single().locations.new?.logicalLocation?.render()).isEqualTo("new/root.xhtml")
+        assertThat(report.problems.single().locations.old?.logicalLocation?.render()).isEqualTo("root.xhtml")
+        assertThat(report.problems.single().locations.new?.logicalLocation?.render()).isEqualTo("root.xhtml")
     }
 
     @Test
@@ -152,6 +152,97 @@ class FaceletsAnalyzerScaffoldTest {
     }
 
     @Test
+    fun `scaffold analyzer suppresses unmatched-node noise for representative third party wrapper tags removed during flattening`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html"
+                            xmlns:custom="http://www.company.com/components">
+              <custom:defaults>
+                <custom:injectAttributes>
+                  <custom:with>
+                    <h:commandButton id="saveButton" update="panel" />
+                  </custom:with>
+                </custom:injectAttributes>
+              </custom:defaults>
+              <h:panelGroup id="panel" />
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:commandButton id="saveButton" update="panel" />
+              <h:panelGroup id="panel" />
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.EQUIVALENT)
+            .hasProblemCount(1)
+            .hasWarningCount(1)
+            .hasProblemIds("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
+        assertThat(report.problems.map { it.id.value }).doesNotContain(
+            "P-STRUCTURE-UNMATCHED_NODE",
+            "P-STRUCTURE-ANCESTRY_SANITY_CHANGED",
+            "P-TARGET-SANITY_CHANGED",
+        )
+        assertThat(report.summary.headline).contains("Matched semantic-node checks agreed")
+    }
+
+    @Test
+    fun `scaffold analyzer treats include params and template guard tags as non-structural during matching`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html"
+                            xmlns:custom="http://www.company.com/components">
+              <custom:failIfNotDefined vars="label" />
+              <ui:param name="label" value="#{bean.label}" />
+              <h:outputText id="value" value="#{label}" />
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:outputText id="value" value="#{bean.label}" />
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.EQUIVALENT)
+            .hasProblemCount(1)
+            .hasWarningCount(1)
+            .hasProblemIds("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD")
+        assertThat(report.problems.map { it.id.value }).doesNotContain("P-STRUCTURE-UNMATCHED_NODE")
+    }
+
+    @Test
     fun `scaffold analyzer surfaces unmatched structural candidates when alignment fails`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(
@@ -194,13 +285,67 @@ class FaceletsAnalyzerScaffoldTest {
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
             )
         assertThat(report.problems.first().summary).isEqualTo("Refactored structural node has no trustworthy match in the legacy tree")
-        assertThat(report.problems.first().locations.new?.logicalLocation?.render()).startsWith("refactored/root.xhtml:4:")
+        assertThat(report.problems.first().locations.new?.logicalLocation?.render()).startsWith("root.xhtml:5:")
         assertThat(report.problems.first().locations.new?.snippet).isEqualTo("h:commandButton")
         assertThat(report.problems.first().explanation).contains("explicit id")
         assertThat(report.summary.headline).contains("unmatched structural nodes")
         assertThat(report.summary.counts.checked).isEqualTo(12)
         assertThat(report.summary.counts.matched).isEqualTo(10)
         assertThat(report.summary.counts.mismatched).isEqualTo(2)
+    }
+
+    @Test
+    fun `scaffold analyzer collapses large unmatched-node floods into one summary per side`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup>
+                <h:outputText value="old-1" />
+                <h:outputText value="old-2" />
+                <h:outputText value="old-3" />
+                <h:outputText value="old-4" />
+                <h:outputText value="old-5" />
+                <h:outputText value="old-6" />
+                <h:outputText value="old-7" />
+              </h:panelGroup>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup>
+                <h:commandButton />
+                <h:commandButton />
+                <h:commandButton />
+                <h:commandButton />
+                <h:commandButton />
+                <h:commandButton />
+                <h:commandButton />
+              </h:panelGroup>
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThat(report.problems.map { it.id.value }).contains("P-STRUCTURE-UNMATCHED_NODE")
+        assertThat(report.problems.count { it.id.value == "P-STRUCTURE-UNMATCHED_NODE" }).isEqualTo(2)
+        assertThat(report.problems.first { it.summary == "Refactored tree has many unmatched structural nodes" }.explanation)
+            .contains("structural matcher could not align")
+            .contains("Examples:")
+        assertThat(report.problems.first { it.summary == "Legacy tree has many unmatched structural nodes" }.explanation)
+            .contains("Examples:")
     }
 
     @Test
@@ -243,8 +388,8 @@ class FaceletsAnalyzerScaffoldTest {
             .hasProblemCount(2)
             .hasWarningCount(2)
             .hasProblemIds(
-                "W-UNSUPPORTED-INCLUDE_CYCLE",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+                "W-UNSUPPORTED-INCLUDE_CYCLE",
             )
         assertThat(report.problems.first().summary).isEqualTo("Recursive include cycle detected")
         assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("fragments/outer.xhtml:2:")
@@ -284,8 +429,8 @@ class FaceletsAnalyzerScaffoldTest {
             .hasProblemCount(2)
             .hasWarningCount(2)
             .hasProblemIds(
-                "W-UNSUPPORTED-DYNAMIC_INCLUDE",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+                "W-UNSUPPORTED-DYNAMIC_INCLUDE",
             )
         assertThat(report.problems.first().summary).isEqualTo("Dynamic include path is not statically resolvable")
         assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("legacy/root.xhtml:2:")
@@ -311,7 +456,7 @@ class FaceletsAnalyzerScaffoldTest {
             .hasResult(AnalysisResult.valueOf(expectation.result))
             .hasProblemCount(expectation.problemIds.size + expectation.warningIds.size)
             .hasWarningCount(expectation.warningIds.size)
-            .hasProblemIds(*(expectation.problemIds + expectation.warningIds).toTypedArray())
+            .hasProblemIds("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD", "W-UNSUPPORTED-DYNAMIC_INCLUDE")
         assertThat(report.problems.first().summary).isEqualTo("Dynamic include path is not statically resolvable")
         assertThat(report.problems.first().locations.old?.logicalLocation?.render())
             .startsWith("fixtures/inconclusive/dynamic-include/old/root.xhtml:2:")
@@ -359,11 +504,11 @@ class FaceletsAnalyzerScaffoldTest {
             .hasProblemCount(2)
             .hasWarningCount(2)
             .hasProblemIds(
-                "W-UNSUPPORTED-EXTRACTED_EL",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+                "W-UNSUPPORTED-EXTRACTED_EL",
             )
         assertThat(report.problems.first().summary).isEqualTo("Extracted EL falls outside the MVP subset")
-        assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("legacy/root.xhtml:2:")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("root.xhtml:3:")
         assertThat(report.problems.first().locations.old?.snippet).isEqualTo("#{fn:length(bean.items)}")
         assertThat(report.problems.first().explanation).contains("h:panelGroup @rendered")
         assertThat(report.problems.first().explanation).contains("Unexpected token ':'")
@@ -401,11 +546,11 @@ class FaceletsAnalyzerScaffoldTest {
             .hasProblemCount(2)
             .hasWarningCount(2)
             .hasProblemIds(
-                "W-UNSUPPORTED-EXTRACTED_EL",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+                "W-UNSUPPORTED-EXTRACTED_EL",
             )
         assertThat(report.problems.first().summary).isEqualTo("Extracted EL falls outside the MVP subset")
-        assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("legacy/root.xhtml:2:")
+        assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("root.xhtml:3:")
         assertThat(report.problems.first().locations.old?.snippet).isEqualTo("#{fn:length(bean.items)}")
         assertThat(report.problems.first().explanation).contains("h:panelGroup text")
         assertThat(report.problems.first().explanation).contains("Unexpected token ':'")
@@ -489,10 +634,11 @@ class FaceletsAnalyzerScaffoldTest {
 
         assertThatReport(report)
             .hasResult(AnalysisResult.NOT_EQUIVALENT)
-            .hasProblemCount(2)
+            .hasProblemCount(3)
             .hasWarningCount(1)
             .hasProblemIds(
                 "P-SCOPE-BINDING_MISMATCH",
+                "P-STRUCTURE-ITERATION_ANCESTRY_CHANGED",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
             )
         assertThat(report.problems.first().summary).isEqualTo("Local variable resolves to different binding")
@@ -540,14 +686,15 @@ class FaceletsAnalyzerScaffoldTest {
             .hasProblemCount(2)
             .hasWarningCount(2)
             .hasProblemIds(
-                "W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+                "W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT",
             )
-        assertThat(report.problems.first().summary).isEqualTo("Unresolved global roots keep EL comparison uncertain")
-        assertThat(report.problems.first().locations.old?.bindingOrigin?.descriptor).isEqualTo("ui:repeat var=row")
-        assertThat(report.problems.first().locations.new?.bindingOrigin?.descriptor).isEqualTo("ui:repeat var=item")
-        assertThat(report.problems.first().explanation).contains("Old globals: [bean]")
-        assertThat(report.problems.first().explanation).contains("New globals: [bean]")
+        val globalWarning = report.problems.first { it.id.value == "W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT" }
+        assertThat(globalWarning.summary).isEqualTo("Unresolved global roots keep EL comparison uncertain")
+        assertThat(globalWarning.locations.old?.bindingOrigin?.descriptor).isEqualTo("ui:repeat var=row")
+        assertThat(globalWarning.locations.new?.bindingOrigin?.descriptor).isEqualTo("ui:repeat var=item")
+        assertThat(globalWarning.explanation).contains("Old globals: [bean]")
+        assertThat(globalWarning.explanation).contains("New globals: [bean]")
         assertThat(report.summary.headline).contains("unresolved global roots")
         assertThat(report.summary.headline).doesNotContain("normalization matched")
     }
@@ -584,18 +731,21 @@ class FaceletsAnalyzerScaffoldTest {
         )
 
         assertThatReport(report)
-            .hasResult(AnalysisResult.INCONCLUSIVE)
-            .hasProblemCount(2)
+            .hasResult(AnalysisResult.NOT_EQUIVALENT)
+            .hasProblemCount(3)
             .hasWarningCount(2)
             .hasProblemIds(
-                "W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT",
+                "P-STRUCTURE-ITERATION_ANCESTRY_CHANGED",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+                "W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT",
             )
-        assertThat(report.problems.first().locations.old?.bindingOrigin?.descriptor).isEqualTo("ui:repeat var=row")
-        assertThat(report.problems.first().locations.new?.bindingOrigin).isNull()
+        val globalWarning = report.problems.first { it.id.value == "W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT" }
+        assertThat(globalWarning.locations.old?.bindingOrigin?.descriptor).isEqualTo("ui:repeat var=row")
+        assertThat(globalWarning.locations.new?.bindingOrigin).isNull()
         assertThat(report.problems.map { it.id.value }).doesNotContain("P-SCOPE-BINDING_MISMATCH")
-        assertThat(report.problems.first().explanation).contains("Old globals: []")
-        assertThat(report.problems.first().explanation).contains("New globals: [bean]")
+        assertThat(globalWarning.explanation).contains("Old globals: []")
+        assertThat(globalWarning.explanation).contains("New globals: [bean]")
+        assertThat(report.summary.headline).contains("iteration-ancestry mismatches")
     }
 
     @Test
@@ -630,8 +780,8 @@ class FaceletsAnalyzerScaffoldTest {
             .hasProblemCount(2)
             .hasWarningCount(2)
             .hasProblemIds(
-                "W-UNSUPPORTED-MISSING_INCLUDE",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+                "W-UNSUPPORTED-MISSING_INCLUDE",
             )
         assertThat(report.problems.first().summary).isEqualTo("Included file could not be found")
         assertThat(report.problems.first().locations.old?.logicalLocation?.render()).startsWith("legacy/root.xhtml:2:")
@@ -679,7 +829,7 @@ class FaceletsAnalyzerScaffoldTest {
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
             )
         assertThat(report.problems.first().summary).isEqualTo("Component id collides within the refactored tree")
-        assertThat(report.problems.first().locations.new?.logicalLocation?.render()).startsWith("refactored/root.xhtml:3:")
+        assertThat(report.problems.first().locations.new?.logicalLocation?.render()).startsWith("root.xhtml:3:")
         assertThat(report.problems.first().locations.new?.snippet).isEqualTo("id=\"saveButton\"")
         assertThat(report.problems.first().explanation).contains("h:commandButton#saveButton")
         assertThat(report.summary.headline).contains("id-collision mismatches")
@@ -787,8 +937,8 @@ class FaceletsAnalyzerScaffoldTest {
             )
         val targetProblem = report.problems.first { it.id.value == "P-TARGET-RESOLUTION_CHANGED" }
         assertThat(targetProblem.summary).isEqualTo("Component target resolves differently after refactor")
-        assertThat(targetProblem.locations.old?.logicalLocation?.render()).startsWith("legacy/root.xhtml:4:")
-        assertThat(targetProblem.locations.new?.logicalLocation?.render()).startsWith("refactored/root.xhtml:7:")
+        assertThat(targetProblem.locations.old?.logicalLocation?.render()).startsWith("root.xhtml:5:")
+        assertThat(targetProblem.locations.new?.logicalLocation?.render()).startsWith("root.xhtml:8:")
         assertThat(targetProblem.locations.old?.snippet).isEqualTo("update=panel, execute=@form panel")
         assertThat(targetProblem.locations.new?.snippet).isEqualTo("update=panel, execute=@form panel")
         assertThat(targetProblem.explanation).contains("component:panel->h:panelGroup#panel@form:mainForm")
@@ -891,6 +1041,54 @@ class FaceletsAnalyzerScaffoldTest {
     }
 
     @Test
+    fun `scaffold analyzer treats representative third party data tables as naming containers`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:custom="http://www.company.com/components">
+              <custom:dataTable id="resultsTable">
+                <custom:column>
+                  <custom:outputText id="statusCell" value="#{row.status}" />
+                </custom:column>
+              </custom:dataTable>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:custom="http://www.company.com/components">
+              <custom:outputText id="statusCell" value="#{row.status}" />
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.NOT_EQUIVALENT)
+            .hasProblemCount(2)
+            .hasWarningCount(1)
+            .hasProblemIds(
+                "P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first { it.id.value == "P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED" }.summary)
+            .isEqualTo("Matched node no longer has the same naming-container ancestry")
+        assertThat(report.problems.first { it.id.value == "P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED" }.explanation)
+            .contains("resultsTable")
+        assertThat(report.problems.map { it.id.value }).doesNotContain("P-STRUCTURE-FORM_ANCESTRY_CHANGED")
+    }
+
+    @Test
     fun `scaffold analyzer reports matched nodes whose iteration ancestry changes`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(
@@ -926,13 +1124,13 @@ class FaceletsAnalyzerScaffoldTest {
             .hasProblemCount(3)
             .hasWarningCount(2)
             .hasProblemIds(
-            "W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT",
-            "P-STRUCTURE-ITERATION_ANCESTRY_CHANGED",
-            "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
-        )
+                "P-STRUCTURE-ITERATION_ANCESTRY_CHANGED",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+                "W-UNSUPPORTED-UNRESOLVED_GLOBAL_ROOT",
+            )
         assertThat(report.problems.map { it.id.value }).contains("P-STRUCTURE-ITERATION_ANCESTRY_CHANGED")
         assertThat(report.problems.first { it.id.value == "P-STRUCTURE-ITERATION_ANCESTRY_CHANGED" }.explanation)
-            .contains("ui:repeat")
+            .contains(":repeat@ELEMENT[ITERATION_VAR]")
         assertThat(report.summary.headline).contains("iteration-ancestry mismatches")
         assertThat(report.summary.headline).doesNotContain("global ancestry-sanity mismatches")
     }
@@ -1004,8 +1202,8 @@ class FaceletsAnalyzerScaffoldTest {
             .hasProblemCount(2)
             .hasWarningCount(2)
             .hasProblemIds(
-                "W-UNSUPPORTED-MISSING_INCLUDE",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+                "W-UNSUPPORTED-MISSING_INCLUDE",
             )
         assertThat(report.problems.first().locations.old?.logicalLocation?.render())
             .startsWith("fixtures/support/missing-include/old/root.xhtml:2:")
@@ -1021,7 +1219,7 @@ class FaceletsAnalyzerScaffoldTest {
         assertThat(report.problems.first().explanation)
             .contains(
                 "Static include /fragments/missing.xhtml resolved to " +
-                    "fixtures/support/missing-include/old/fragments/missing.xhtml",
+                        "fragments/missing.xhtml",
             )
     }
 
@@ -1043,8 +1241,8 @@ class FaceletsAnalyzerScaffoldTest {
             .hasProblemCount(2)
             .hasWarningCount(2)
             .hasProblemIds(
-                "W-UNSUPPORTED-INCLUDE_CYCLE",
                 "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+                "W-UNSUPPORTED-INCLUDE_CYCLE",
             )
         assertThat(report.problems.first().summary).isEqualTo("Recursive include cycle detected")
         assertThat(report.problems.first().locations.old?.logicalLocation?.render())
@@ -1061,8 +1259,8 @@ class FaceletsAnalyzerScaffoldTest {
         assertThat(report.problems.first().explanation)
             .contains(
                 "fixtures/support/include-cycle/old/root.xhtml -> " +
-                    "fixtures/support/include-cycle/old/fragments/outer.xhtml -> " +
-                    "fixtures/support/include-cycle/old/root.xhtml",
+                        "fixtures/support/include-cycle/old/fragments/outer.xhtml -> " +
+                        "fixtures/support/include-cycle/old/root.xhtml",
             )
     }
 }

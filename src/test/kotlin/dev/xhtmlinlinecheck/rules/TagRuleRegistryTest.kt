@@ -29,6 +29,32 @@ class TagRuleRegistryTest {
     }
 
     @Test
+    fun `legacy facelets namespace keeps the same include and wrapper semantics`() {
+        val includeRule = registry.resolve(
+            LogicalName(
+                localName = "include",
+                namespaceUri = LEGACY_FACELETS_NAMESPACE,
+                prefix = "ui"
+            )
+        )
+        val compositionRule = registry.resolve(
+            LogicalName(
+                localName = "composition",
+                namespaceUri = LEGACY_FACELETS_NAMESPACE,
+                prefix = "ui"
+            )
+        )
+
+        assertThat(includeRule.syntaxRole).isEqualTo(SyntaxRole.INCLUDE)
+        assertThat(includeRule.isTransparentStructureWrapper).isTrue()
+        assertThat(includeRule.elAttributeNames).containsExactly("src")
+        assertThat(compositionRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(compositionRule.isTransparentStructureWrapper).isTrue()
+        assertThat(compositionRule.elAttributeNames).isEmpty()
+        assertThat(compositionRule.targetAttributeNames).isEmpty()
+    }
+
+    @Test
     fun `ui repeat rule exposes binding and EL semantics`() {
         val repeatRule = registry.ruleFor(LogicalName(localName = "repeat", namespaceUri = FACELETS_NAMESPACE))
 
@@ -48,7 +74,13 @@ class TagRuleRegistryTest {
             ),
         )
         assertThat(resolvedRepeatRule.elAttributeNames).containsExactly("value", "offset", "size", "step", "rendered")
-        assertThat(resolvedRepeatRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
+        assertThat(resolvedRepeatRule.targetAttributeNames).containsExactly(
+            "for",
+            "update",
+            "render",
+            "process",
+            "execute"
+        )
     }
 
     @Test
@@ -117,32 +149,32 @@ class TagRuleRegistryTest {
                 exactRules =
                     mapOf(
                         "panel" to
-                            StaticTagRule(
-                                bindingRules =
-                                    listOf(
-                                        BindingCreationRule(
-                                            kind = BindingKind.C_SET,
-                                            nameAttribute = "exactVar",
+                                StaticTagRule(
+                                    bindingRules =
+                                        listOf(
+                                            BindingCreationRule(
+                                                kind = BindingKind.C_SET,
+                                                nameAttribute = "exactVar",
+                                            ),
                                         ),
-                                    ),
-                                elAttributeNames = linkedSetOf("exactOnly", "shared"),
-                                targetAttributeNames = linkedSetOf("exactTarget", "sharedTarget"),
-                            ),
+                                    elAttributeNames = linkedSetOf("exactOnly", "shared"),
+                                    targetAttributeNames = linkedSetOf("exactTarget", "sharedTarget"),
+                                ),
                     ),
                 namespaceDefaults =
                     mapOf(
                         "urn:test" to
-                            StaticTagRule(
-                                bindingRules =
-                                    listOf(
-                                        BindingCreationRule(
-                                            kind = BindingKind.ITERATION_VAR,
-                                            nameAttribute = "namespaceVar",
+                                StaticTagRule(
+                                    bindingRules =
+                                        listOf(
+                                            BindingCreationRule(
+                                                kind = BindingKind.ITERATION_VAR,
+                                                nameAttribute = "namespaceVar",
+                                            ),
                                         ),
-                                    ),
-                                elAttributeNames = linkedSetOf("namespaceOnly", "shared"),
-                                targetAttributeNames = linkedSetOf("namespaceTarget", "sharedTarget"),
-                            ),
+                                    elAttributeNames = linkedSetOf("namespaceOnly", "shared"),
+                                    targetAttributeNames = linkedSetOf("namespaceTarget", "sharedTarget"),
+                                ),
                     ),
                 fallbackRule =
                     StaticTagRule(
@@ -158,8 +190,10 @@ class TagRuleRegistryTest {
                     ),
             )
 
-        val firstLookup = customRegistry.resolve(LogicalName(localName = "panel", namespaceUri = "urn:test", prefix = "a"))
-        val secondLookup = customRegistry.resolve(LogicalName(localName = "panel", namespaceUri = "urn:test", prefix = "b"))
+        val firstLookup =
+            customRegistry.resolve(LogicalName(localName = "panel", namespaceUri = "urn:test", prefix = "a"))
+        val secondLookup =
+            customRegistry.resolve(LogicalName(localName = "panel", namespaceUri = "urn:test", prefix = "b"))
 
         assertThat(firstLookup).isEqualTo(secondLookup)
         assertThat(firstLookup.bindingRules).containsExactly(
@@ -197,7 +231,13 @@ class TagRuleRegistryTest {
         assertThat(prefixedFormRule.isNamingContainer).isTrue()
         assertThat(prefixedFormRule.isTransparentStructureWrapper).isFalse()
         assertThat(prefixedFormRule.elAttributeNames).containsExactly("rendered")
-        assertThat(prefixedFormRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
+        assertThat(prefixedFormRule.targetAttributeNames).containsExactly(
+            "for",
+            "update",
+            "render",
+            "process",
+            "execute"
+        )
     }
 
     @Test
@@ -222,7 +262,8 @@ class TagRuleRegistryTest {
 
     @Test
     fun `same local name in another namespace does not inherit facelets include semantics`() {
-        val faceletsInclude = registry.resolve(LogicalName(localName = "include", namespaceUri = FACELETS_NAMESPACE, prefix = "ui"))
+        val faceletsInclude =
+            registry.resolve(LogicalName(localName = "include", namespaceUri = FACELETS_NAMESPACE, prefix = "ui"))
         val genericInclude = registry.resolve(LogicalName(localName = "include", namespaceUri = null))
 
         assertThat(faceletsInclude.syntaxRole).isEqualTo(SyntaxRole.INCLUDE)
@@ -261,18 +302,110 @@ class TagRuleRegistryTest {
 
     @Test
     fun `transparent facelets wrappers stay explicit instead of inheriting generic component attributes`() {
-        val compositionRule = registry.resolve(LogicalName(localName = "composition", namespaceUri = FACELETS_NAMESPACE))
+        val compositionRule =
+            registry.resolve(LogicalName(localName = "composition", namespaceUri = FACELETS_NAMESPACE))
+        val decorateRule = registry.resolve(LogicalName(localName = "decorate", namespaceUri = FACELETS_NAMESPACE))
+        val defineRule = registry.resolve(LogicalName(localName = "define", namespaceUri = FACELETS_NAMESPACE))
         val fragmentRule = registry.resolve(LogicalName(localName = "fragment", namespaceUri = FACELETS_NAMESPACE))
+        val insertRule = registry.resolve(LogicalName(localName = "insert", namespaceUri = FACELETS_NAMESPACE))
+        val componentRule = registry.resolve(LogicalName(localName = "component", namespaceUri = FACELETS_NAMESPACE))
 
         assertThat(compositionRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
         assertThat(compositionRule.isTransparentStructureWrapper).isTrue()
         assertThat(compositionRule.isForm).isFalse()
         assertThat(compositionRule.elAttributeNames).isEmpty()
         assertThat(compositionRule.targetAttributeNames).isEmpty()
+        assertThat(decorateRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(decorateRule.isTransparentStructureWrapper).isTrue()
+        assertThat(decorateRule.elAttributeNames).isEmpty()
+        assertThat(decorateRule.targetAttributeNames).isEmpty()
+        assertThat(defineRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(defineRule.isTransparentStructureWrapper).isTrue()
+        assertThat(defineRule.elAttributeNames).isEmpty()
+        assertThat(defineRule.targetAttributeNames).isEmpty()
         assertThat(fragmentRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
         assertThat(fragmentRule.isTransparentStructureWrapper).isTrue()
         assertThat(fragmentRule.elAttributeNames).isEmpty()
         assertThat(fragmentRule.targetAttributeNames).isEmpty()
+        assertThat(insertRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(insertRule.isTransparentStructureWrapper).isTrue()
+        assertThat(insertRule.elAttributeNames).isEmpty()
+        assertThat(insertRule.targetAttributeNames).isEmpty()
+        assertThat(componentRule.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(componentRule.isTransparentStructureWrapper).isTrue()
+        assertThat(componentRule.elAttributeNames).isEmpty()
+        assertThat(componentRule.targetAttributeNames).isEmpty()
+    }
+
+    @Test
+    fun `representative third party tags from the dummy sample have explicit wrapper and naming container coverage`() {
+        val defaultsRule = registry.resolve(
+            LogicalName(
+                localName = "defaults",
+                namespaceUri = COMPANY_COMPONENT_NAMESPACE,
+                prefix = "custom"
+            )
+        )
+        val injectAttributesRule =
+            registry.resolve(
+                LogicalName(
+                    localName = "injectAttributes",
+                    namespaceUri = COMPANY_COMPONENT_NAMESPACE,
+                    prefix = "custom"
+                )
+            )
+        val withRule = registry.resolve(
+            LogicalName(
+                localName = "with",
+                namespaceUri = COMPANY_COMPONENT_NAMESPACE,
+                prefix = "custom"
+            )
+        )
+        val dataTableRule = registry.resolve(
+            LogicalName(
+                localName = "dataTable",
+                namespaceUri = COMPANY_COMPONENT_NAMESPACE,
+                prefix = "custom"
+            )
+        )
+        val modalPanelRule = registry.resolve(
+            LogicalName(
+                localName = "modalPanel",
+                namespaceUri = COMPANY_COMPONENT_NAMESPACE,
+                prefix = "custom"
+            )
+        )
+        val facetRule =
+            registry.resolve(LogicalName(localName = "facet", namespaceUri = JSF_CORE_NAMESPACE, prefix = "f"))
+        val metadataRule =
+            registry.resolve(LogicalName(localName = "metadata", namespaceUri = JSF_CORE_NAMESPACE, prefix = "f"))
+
+        assertThat(defaultsRule.isTransparentStructureWrapper).isTrue()
+        assertThat(defaultsRule.elAttributeNames).containsExactly("rendered")
+        assertThat(defaultsRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
+        assertThat(injectAttributesRule.isTransparentStructureWrapper).isTrue()
+        assertThat(injectAttributesRule.elAttributeNames).containsExactly("rendered")
+        assertThat(injectAttributesRule.targetAttributeNames).containsExactly(
+            "for",
+            "update",
+            "render",
+            "process",
+            "execute"
+        )
+        assertThat(withRule.isTransparentStructureWrapper).isTrue()
+        assertThat(withRule.elAttributeNames).containsExactly("rendered")
+        assertThat(withRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
+        assertThat(dataTableRule.isTransparentStructureWrapper).isFalse()
+        assertThat(dataTableRule.isNamingContainer).isTrue()
+        assertThat(dataTableRule.elAttributeNames).containsExactly("rendered")
+        assertThat(dataTableRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
+        assertThat(modalPanelRule.isNamingContainer).isTrue()
+        assertThat(facetRule.isTransparentStructureWrapper).isTrue()
+        assertThat(facetRule.elAttributeNames).isEmpty()
+        assertThat(facetRule.targetAttributeNames).isEmpty()
+        assertThat(metadataRule.isTransparentStructureWrapper).isTrue()
+        assertThat(metadataRule.elAttributeNames).isEmpty()
+        assertThat(metadataRule.targetAttributeNames).isEmpty()
     }
 
     @Test

@@ -202,7 +202,7 @@ private fun ScopeStackModel.iterationAncestorFor(
     val descendantScope = scopes.getValue(snapshot.descendantScopeId)
     val iterationBindings =
         descendantScope.bindingIds
-            .map { bindingId -> this.bindings.first { it.id == bindingId } }
+            .map(this::bindingById)
             .filter { it.kind == BindingKind.ITERATION_VAR || it.kind == BindingKind.VAR_STATUS }
     if (iterationBindings.isEmpty()) {
         return null
@@ -227,7 +227,7 @@ private fun SemanticNode.asAncestor(): SemanticNodeAncestor =
         nodeName = nodeName,
         logicalName = logicalName,
         syntaxRole = syntaxRole,
-        explicitId = explicitIdAttribute?.rawValue,
+        explicitId = explicitIdAttribute?.takeIf { it.isStaticLiteral }?.rawValue,
         location = location,
         provenance = provenance,
     )

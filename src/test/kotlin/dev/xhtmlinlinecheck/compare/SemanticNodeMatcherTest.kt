@@ -66,8 +66,8 @@ class SemanticNodeMatcherTest {
         assertThat(result.matches)
             .extracting("reason", "oldNodeId.value", "newNodeId.value")
             .containsExactly(
-                org.assertj.core.groups.Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/0/0/0/0", "node:/0"),
-                org.assertj.core.groups.Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/0/0/0/0/0", "node:/0/0"),
+                org.assertj.core.groups.Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/0/0/0", "node:/0"),
+                org.assertj.core.groups.Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/0/0/0/0", "node:/0/0"),
             )
         assertThat(result.unmatchedOldNodeIds).isEmpty()
         assertThat(result.unmatchedNewNodeIds).isEmpty()
@@ -110,8 +110,69 @@ class SemanticNodeMatcherTest {
         assertThat(result.matches)
             .extracting("reason", "oldNodeId.value", "newNodeId.value")
             .containsExactly(
-                org.assertj.core.groups.Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, "node:/0/0", "node:/0"),
-                org.assertj.core.groups.Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, "node:/0/0/0", "node:/0/0"),
+                org.assertj.core.groups.Tuple.tuple(
+                    SemanticNodeMatchReason.STRUCTURAL_SIGNATURE,
+                    "node:/0/0",
+                    "node:/0"
+                ),
+                org.assertj.core.groups.Tuple.tuple(
+                    SemanticNodeMatchReason.STRUCTURAL_SIGNATURE,
+                    "node:/0/0/0",
+                    "node:/0/0"
+                ),
+            )
+        assertThat(result.unmatchedOldNodeIds).isEmpty()
+        assertThat(result.unmatchedNewNodeIds).isEmpty()
+    }
+
+    @Test
+    fun `representative third party wrapper tags do not create unmatched node noise when flattening removes them`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html"
+                            xmlns:custom="http://www.company.com/components">
+              <custom:defaults>
+                <custom:injectAttributes>
+                  <custom:with>
+                    <h:commandButton id="saveButton" update="panel" />
+                  </custom:with>
+                </custom:injectAttributes>
+              </custom:defaults>
+              <h:panelGroup id="panel" />
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:commandButton id="saveButton" update="panel" />
+              <h:panelGroup id="panel" />
+            </ui:composition>
+            """,
+        )
+
+        val semanticModels = semanticModelsFor(oldRoot, newRoot, tempDir)
+        assertThat(
+            semanticModels.oldRoot.semanticNodes
+                .filter { it.nodeName in setOf("custom:defaults", "custom:injectAttributes", "custom:with") }
+                .map { it.isTransparentStructureWrapper },
+        ).containsOnly(true)
+
+        val result = SemanticNodeMatcher.matchStructuralCandidates(
+            oldNodes = semanticModels.oldRoot.semanticNodes,
+            newNodes = semanticModels.newRoot.semanticNodes,
+        )
+
+        assertThat(result.matches)
+            .extracting("reason", "oldNodeId.value", "newNodeId.value")
+            .containsExactlyInAnyOrder(
+                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/0/0/0/0", "node:/0"),
+                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/1", "node:/1"),
             )
         assertThat(result.unmatchedOldNodeIds).isEmpty()
         assertThat(result.unmatchedNewNodeIds).isEmpty()
@@ -314,11 +375,11 @@ class SemanticNodeMatcherTest {
             .extracting("reason", "oldNodeId.value", "newNodeId.value")
             .containsExactlyInAnyOrder(
                 Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/0", "node:/1"),
-                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/0/0", "node:/1/0"),
-                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, "node:/0/1", "node:/1/1"),
+                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, "node:/0/0", "node:/1/0"),
+                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_TARGET_RELATIONSHIP, "node:/0/1", "node:/1/1"),
                 Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/1", "node:/0"),
-                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_ID, "node:/1/0", "node:/0/0"),
-                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, "node:/1/1", "node:/0/1"),
+                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, "node:/1/0", "node:/0/0"),
+                Tuple.tuple(SemanticNodeMatchReason.EXPLICIT_TARGET_RELATIONSHIP, "node:/1/1", "node:/0/1"),
             )
         assertThat(result.unmatchedOldNodeIds).isEmpty()
         assertThat(result.unmatchedNewNodeIds).isEmpty()
@@ -360,9 +421,11 @@ class SemanticNodeMatcherTest {
         val oldLabels = semanticModels.oldRoot.semanticNodes.filter { it.nodeName == "h:outputLabel" }
         val newLabels = semanticModels.newRoot.semanticNodes.filter { it.nodeName == "h:outputLabel" }
         val oldLeftLabel = oldLabels.single { it.componentTargetAttributes.single().attribute.rawValue == "leftInput" }
-        val oldRightLabel = oldLabels.single { it.componentTargetAttributes.single().attribute.rawValue == "rightInput" }
+        val oldRightLabel =
+            oldLabels.single { it.componentTargetAttributes.single().attribute.rawValue == "rightInput" }
         val newLeftLabel = newLabels.single { it.componentTargetAttributes.single().attribute.rawValue == "leftInput" }
-        val newRightLabel = newLabels.single { it.componentTargetAttributes.single().attribute.rawValue == "rightInput" }
+        val newRightLabel =
+            newLabels.single { it.componentTargetAttributes.single().attribute.rawValue == "rightInput" }
 
         val result = SemanticNodeMatcher.matchStructuralCandidates(
             oldNodes = semanticModels.oldRoot.semanticNodes,
@@ -578,10 +641,26 @@ class SemanticNodeMatcherTest {
         assertThat(result.matches)
             .extracting("reason", "oldNodeId.value", "newNodeId.value")
             .containsExactlyInAnyOrder(
-                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, oldLeftPanel.nodeId.value, newLeftPanel.nodeId.value),
-                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, oldRightPanel.nodeId.value, newRightPanel.nodeId.value),
-                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, oldLeftOutput.nodeId.value, newLeftOutput.nodeId.value),
-                Tuple.tuple(SemanticNodeMatchReason.STRUCTURAL_SIGNATURE, oldRightOutput.nodeId.value, newRightOutput.nodeId.value),
+                Tuple.tuple(
+                    SemanticNodeMatchReason.STRUCTURAL_SIGNATURE,
+                    oldLeftPanel.nodeId.value,
+                    newLeftPanel.nodeId.value
+                ),
+                Tuple.tuple(
+                    SemanticNodeMatchReason.STRUCTURAL_SIGNATURE,
+                    oldRightPanel.nodeId.value,
+                    newRightPanel.nodeId.value
+                ),
+                Tuple.tuple(
+                    SemanticNodeMatchReason.STRUCTURAL_SIGNATURE,
+                    oldLeftOutput.nodeId.value,
+                    newLeftOutput.nodeId.value
+                ),
+                Tuple.tuple(
+                    SemanticNodeMatchReason.STRUCTURAL_SIGNATURE,
+                    oldRightOutput.nodeId.value,
+                    newRightOutput.nodeId.value
+                ),
             )
         assertThat(result.unmatchedOldNodeIds).isEmpty()
         assertThat(result.unmatchedNewNodeIds).isEmpty()
