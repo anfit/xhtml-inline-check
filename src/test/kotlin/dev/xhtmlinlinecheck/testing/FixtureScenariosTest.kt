@@ -35,8 +35,8 @@ class FixtureScenariosTest {
         assertThat(expectation.result).isEqualTo("INCONCLUSIVE")
         assertThat(expectation.problemIds).isEmpty()
         assertThat(expectation.warningIds).containsExactly(
-            "W-UNSUPPORTED-DYNAMIC_INCLUDE",
             "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            "W-UNSUPPORTED-DYNAMIC_INCLUDE",
         )
     }
 
@@ -47,14 +47,20 @@ class FixtureScenariosTest {
         val includeInlineScenario = FixtureScenarios.scenario("equivalent/safe-include-inline")
         val lostParamScenario = FixtureScenarios.scenario("not-equivalent/lost-ui-param")
         val changedForScenario = FixtureScenarios.scenario("not-equivalent/changed-for-target")
+        val namingContainerScenario = FixtureScenarios.scenario("not-equivalent/naming-container-ancestry-drift")
+        val dynamicIncludeScenario = FixtureScenarios.scenario("inconclusive/dynamic-include")
 
         assertThat(FixtureExpectations.read(equivalentScenario).result).isEqualTo("EQUIVALENT")
         assertThat(FixtureExpectations.read(includeInlineScenario).result).isEqualTo("EQUIVALENT")
         assertThat(FixtureExpectations.read(lostParamScenario).problemIds)
             .containsExactly("P-SCOPE-BINDING_MISMATCH")
+        assertThat(FixtureExpectations.read(namingContainerScenario).problemIds)
+            .containsExactly("P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED")
         assertThat(FixtureExpectations.read(changedForScenario).problemIds)
             .containsExactly("P-TARGET-RESOLUTION_CHANGED")
         assertThat(FixtureExpectations.read(mismatchScenario).problemIds)
             .containsExactly("P-TARGET-RESOLUTION_CHANGED")
+        assertThat(FixtureExpectations.read(dynamicIncludeScenario).warningIds)
+            .containsExactly("W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD", "W-UNSUPPORTED-DYNAMIC_INCLUDE")
     }
 }

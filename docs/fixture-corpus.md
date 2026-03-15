@@ -96,8 +96,8 @@ The implementation can evolve the exact schema later, but the fixture contract s
 
 Current repository status:
 
-- the first-pass canonical corpus now covers safe include inlining, safe alpha-renaming, lost `ui:param`, variable capture, form ancestry drift, changed `for` target resolution, changed AJAX target resolution, and inconclusive unsupported cases under `fixtures/`
-- a dedicated naming-container-only canonical fixture is still deferred because the current built-in rule set models naming containers only through `h:form`, so the most direct refactors collapse into the already-covered form-ancestry diagnostic path
+- the first-pass canonical corpus now covers safe include inlining, safe alpha-renaming, lost `ui:param`, variable capture, form ancestry drift, naming-container ancestry drift, changed `for` target resolution, changed AJAX target resolution, and inconclusive unsupported cases under `fixtures/`
+- the dedicated naming-container ancestry fixture uses `h:dataTable` as a non-form built-in naming container so the corpus can prove `P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED` independently of `h:form` drift
 
 ## Realistic Sample Baseline
 

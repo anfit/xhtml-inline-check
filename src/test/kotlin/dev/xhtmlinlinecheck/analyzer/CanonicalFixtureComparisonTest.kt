@@ -47,8 +47,10 @@ class CanonicalFixtureComparisonTest {
                 "not-equivalent/lost-ui-param",
                 "not-equivalent/variable-capture-regression",
                 "not-equivalent/form-ancestry-drift",
+                "not-equivalent/naming-container-ancestry-drift",
                 "not-equivalent/changed-for-target",
                 "not-equivalent/changed-ajax-target",
+                "inconclusive/dynamic-include",
                 "inconclusive/inconclusive-but-not-proven-wrong",
             )
     }

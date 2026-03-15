@@ -1,0 +1,6 @@
+{
+  "result": "NOT_EQUIVALENT",
+  "problemIds": ["P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED"],
+  "warningIds": ["W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD"],
+  "notes": "The matched component leaves a non-form naming container, so client-id and target scoping ancestry changes even though form ancestry does not."
+}

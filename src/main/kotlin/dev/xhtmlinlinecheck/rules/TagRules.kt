@@ -169,6 +169,10 @@ object BuiltInTagRuleRegistry : TagRuleRegistry by StaticTagRuleRegistry(
                     isForm = true,
                     isNamingContainer = true,
                 ),
+            TagSelector(JSF_HTML_NAMESPACE, "dataTable") to
+                StaticTagRule(
+                    isNamingContainer = true,
+                ),
         ),
     namespaceDefaults =
         mapOf(

@@ -1,4 +1,3 @@
-Ensure the canonical fixture corpus includes at minimum safe include inlining, safe iterator alpha-renaming, variable capture, lost `ui:param`, moved components outside `h:form`, changed naming-container ancestry, changed `for` target resolution, changed AJAX target resolution, and dynamic include paths.
 Implement reporter behavior together, including concise equivalent text output, detailed mismatch text output, visible inconclusive text output, deterministic problem ordering, stable JSON output, and shared summary/statistics rendering.
 Add golden tests for both text and JSON reporters once ordering, ids, provenance, and statistics are stable so human-facing and machine-facing output contracts stop drifting accidentally.
 Implement CLI/reporting controls together, including `--max-problems`, `--fail-on-warning`, and `--explain <problem-id>`, on top of deterministic ordering and finalized problem ids.

@@ -91,6 +91,7 @@ class TagRuleRegistryTest {
     @Test
     fun `namespace defaults merge with exact tag rules deterministically`() {
         val formRule = registry.ruleFor(LogicalName(localName = "form", namespaceUri = JSF_HTML_NAMESPACE))
+        val dataTableRule = registry.ruleFor(LogicalName(localName = "dataTable", namespaceUri = JSF_HTML_NAMESPACE))
 
         assertThat(formRule).isNotNull()
         assertThat(formRule!!.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
@@ -99,6 +100,14 @@ class TagRuleRegistryTest {
         assertThat(formRule.bindingRules).isEmpty()
         assertThat(formRule.elAttributeNames).containsExactly("rendered")
         assertThat(formRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
+
+        assertThat(dataTableRule).isNotNull()
+        assertThat(dataTableRule!!.syntaxRole).isEqualTo(SyntaxRole.ELEMENT)
+        assertThat(dataTableRule.isForm).isFalse()
+        assertThat(dataTableRule.isNamingContainer).isTrue()
+        assertThat(dataTableRule.bindingRules).isEmpty()
+        assertThat(dataTableRule.elAttributeNames).containsExactly("rendered")
+        assertThat(dataTableRule.targetAttributeNames).containsExactly("for", "update", "render", "process", "execute")
     }
 
     @Test

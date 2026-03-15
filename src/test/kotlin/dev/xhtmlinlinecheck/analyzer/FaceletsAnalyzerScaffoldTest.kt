@@ -844,6 +844,53 @@ class FaceletsAnalyzerScaffoldTest {
     }
 
     @Test
+    fun `scaffold analyzer reports matched nodes whose naming container ancestry changes without a form move`() {
+        val tree = TemporaryProjectTree(tempDir)
+        val oldRoot = tree.write(
+            "legacy/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:dataTable id="resultsTable">
+                <h:column>
+                  <h:panelGroup id="statusPanel" />
+                </h:column>
+              </h:dataTable>
+            </ui:composition>
+            """,
+        )
+        val newRoot = tree.write(
+            "refactored/root.xhtml",
+            """
+            <ui:composition xmlns:ui="http://xmlns.jcp.org/jsf/facelets"
+                            xmlns:h="http://xmlns.jcp.org/jsf/html">
+              <h:panelGroup id="statusPanel" />
+            </ui:composition>
+            """,
+        )
+
+        val report = FaceletsAnalyzer.scaffold().analyze(
+            AnalysisRequest(
+                oldRoot = oldRoot,
+                newRoot = newRoot,
+            ),
+        )
+
+        assertThatReport(report)
+            .hasResult(AnalysisResult.NOT_EQUIVALENT)
+            .hasProblemCount(2)
+            .hasWarningCount(1)
+            .hasProblemIds(
+                "P-STRUCTURE-NAMING_CONTAINER_ANCESTRY_CHANGED",
+                "W-UNSUPPORTED-ANALYZER_PIPELINE_SCAFFOLD",
+            )
+        assertThat(report.problems.first().summary).isEqualTo("Matched node no longer has the same naming-container ancestry")
+        assertThat(report.problems.first().explanation).contains("resultsTable")
+        assertThat(report.problems.map { it.id.value }).doesNotContain("P-STRUCTURE-FORM_ANCESTRY_CHANGED")
+        assertThat(report.summary.headline).contains("naming-container mismatches")
+    }
+
+    @Test
     fun `scaffold analyzer reports matched nodes whose iteration ancestry changes`() {
         val tree = TemporaryProjectTree(tempDir)
         val oldRoot = tree.write(

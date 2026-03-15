@@ -11,6 +11,7 @@ Current first-pass canonical fixtures:
 - `fixtures/not-equivalent/lost-ui-param/`
 - `fixtures/not-equivalent/variable-capture-regression/`
 - `fixtures/not-equivalent/form-ancestry-drift/`
+- `fixtures/not-equivalent/naming-container-ancestry-drift/`
 - `fixtures/not-equivalent/changed-for-target/`
 - `fixtures/not-equivalent/changed-ajax-target/`
 - `fixtures/inconclusive/dynamic-include/`
