@@ -68,7 +68,9 @@ facelets-verify legacy/order.xhtml refactored/order.xhtml --base-old legacy --ba
 - [Architecture Overview](docs/architecture.md)
 - [MVP EL Grammar Subset](docs/el-grammar-subset.md)
 - [Fixture Corpus Plan](docs/fixture-corpus.md)
+- [Release Readiness](docs/release-readiness.md)
 - [Contributing Guide](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
 
 ## Expected Repository Shape
 
@@ -111,6 +113,8 @@ For the release-readiness deterministic-output gate that reruns the real CLI ent
 - on Windows PowerShell, run `scripts/verify-deterministic-output.ps1`
 
 On Windows, the PowerShell helper pins `GRADLE_USER_HOME`, `TEMP`, and `TMP` inside the repository before invoking Gradle. That avoids failures caused by inaccessible profile or temp directories in restricted environments while still using the installed Gradle executable. The first run still needs network access or a pre-populated Gradle cache so the Kotlin plugin and dependencies can be resolved.
+
+Release packaging and the MVP release checklist are documented in [docs/release-readiness.md](docs/release-readiness.md). The repository-level changelog template lives in [CHANGELOG.md](CHANGELOG.md).
 
 ## Near-Term Roadmap
 

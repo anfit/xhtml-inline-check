@@ -1,1 +1,0 @@
-Finish release readiness together by adding packaging instructions, an initial changelog or release-notes template, and the first MVP release checklist tied to fixtures, integration tests, deterministic output, and packaging.
