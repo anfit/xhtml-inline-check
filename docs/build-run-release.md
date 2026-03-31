@@ -25,6 +25,12 @@ Build the plain jar:
 gradle jar
 ```
 
+Build the executable uber jar (bundles runtime dependencies and runs `dev.xhtmlinlinecheck.cli.MainKt` automatically):
+
+```text
+gradle fatJar
+```
+
 Build the installable CLI distribution:
 
 ```text
@@ -34,6 +40,7 @@ gradle installDist
 Expected output:
 
 - plain jar: `build/libs/`
+- executable uber jar: `build/libs/*-all.jar`
 - installed distribution: `build/facelets-verify/`
 - launcher scripts: `build/facelets-verify/bin/`
 - runtime libraries: `build/facelets-verify/lib/`

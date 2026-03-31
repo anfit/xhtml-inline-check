@@ -93,6 +93,7 @@ The Gradle application setup is configured around the `facelets-verify` entrypoi
 
 - compile and test with `gradle test`
 - run the CLI with `gradle runFaceletsVerify --args="legacy.xhtml refactored.xhtml"`
+- build the executable jar (bundled runtime + `MainKt` entrypoint) with `gradle fatJar`
 - assemble the runnable distribution in `build/facelets-verify/` with `gradle installDist`
 - assemble distribution archives with `gradle distZip distTar`
 

@@ -2,6 +2,7 @@ import org.gradle.api.plugins.ApplicationPlugin
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.Sync
+import org.gradle.jvm.tasks.Jar
 
 plugins {
     kotlin("jvm") version "2.1.10"
@@ -52,6 +53,23 @@ tasks.jar {
     manifest {
         attributes["Main-Class"] = faceletsVerifyMainClass
     }
+}
+
+tasks.register<Jar>("fatJar") {
+    group = "build"
+    description = "Builds an executable jar that bundles runtime dependencies."
+    archiveClassifier = "all"
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes["Main-Class"] = faceletsVerifyMainClass
+    }
+    from(sourceSets.named("main").get().output)
+    dependsOn(configurations.runtimeClasspath)
+    from({
+        configurations.runtimeClasspath.get().map { dependency ->
+            if (dependency.isDirectory) dependency else zipTree(dependency)
+        }
+    })
 }
 
 tasks.named<Sync>("installDist") {
