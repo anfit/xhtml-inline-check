@@ -31,6 +31,12 @@ Build the executable uber jar (bundles runtime dependencies and runs `dev.xhtmli
 gradle fatJar
 ```
 
+Or use the repository helper script:
+
+```text
+./build.sh
+```
+
 Build the installable CLI distribution:
 
 ```text
@@ -57,6 +63,14 @@ Expected output:
 - `build/distributions/facelets-verify-<version>.tar`
 
 ## Run
+
+### Run Through Local Jar Wrapper
+
+Use the checked-in wrapper to run the newest `build/libs/*-all.jar` locally. If the jar is missing, the wrapper runs `./build.sh` first.
+
+```text
+./run.sh old/root.xhtml new/root.xhtml --base-old old --base-new new
+```
 
 ### Run Through Gradle
 
