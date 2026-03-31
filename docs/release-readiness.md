@@ -42,7 +42,13 @@ Build the plain jar if needed for inspection or alternate JVM launch flows:
 gradle jar
 ```
 
-The jar manifest points at `dev.xhtmlinlinecheck.cli.MainKt`, but the packaged distribution under `build/facelets-verify/` is the primary release artifact because it includes the runtime classpath and the stable `facelets-verify` launcher name.
+Build the executable uber jar when a single-file CLI artifact is required:
+
+```text
+gradle fatJar
+```
+
+The executable uber jar is emitted as `build/libs/*-all.jar` and runs `dev.xhtmlinlinecheck.cli.MainKt` directly. The packaged distribution under `build/facelets-verify/` remains the primary release artifact because it also includes the stable `facelets-verify` launcher name.
 
 ## Recommended Verification Order
 

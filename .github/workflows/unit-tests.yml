@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   test:
-    name: Gradle Test
+    name: Gradle Test + Executable Jar
     runs-on: ubuntu-latest
 
     steps:
@@ -27,3 +27,12 @@ jobs:
 
       - name: Run unit tests
         run: gradle --no-daemon test
+
+      - name: Build executable jar
+        run: gradle --no-daemon fatJar
+
+      - name: Upload executable jar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: facelets-verify-jar
+          path: build/libs/*-all.jar
